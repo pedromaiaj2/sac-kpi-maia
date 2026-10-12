@@ -3,7 +3,6 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import { memoizeWithTtl } from "./memoCache";
-import { classificarFabricanteGrupo, type FabricanteGrupo } from "./fabricas";
 
 // Cache de 5 min pras consultas pesadas desta tela -- pedido do Victor
 // 17/09/2026: "a mudança entre as páginas seja mais rápida" (kpis -> clientes
@@ -539,28 +538,6 @@ export async function getCustoUnitarioPorCodigo(codes: string[]): Promise<Map<st
     }
   } catch (err) {
     console.error("getCustoUnitarioPorCodigo:", (err as Error).message);
-  }
-  return resultado;
-}
-
-// Classificação "nossa fábrica x outros fornecedores" por código Protheus
-// (totvs_stock.manufacturer) -- pedido do Victor 13/10/2026, mesmo espírito
-// de getCustoUnitarioPorCodigo acima (foto do catálogo ATUAL, sem período).
-// Ver classificarFabricanteGrupo (fabricas.ts) pro critério de
-// classificação e o porquê de não reusar EXTERNAL_FABRICAS aqui.
-export async function getFabricanteGrupoPorCodigo(codes: string[]): Promise<Map<string, FabricanteGrupo>> {
-  const resultado = new Map<string, FabricanteGrupo>();
-  if (codes.length === 0) return resultado;
-
-  try {
-    const admin = getSupabaseAdmin();
-    const { data, error } = await admin.from("totvs_stock").select("product_code, manufacturer").in("product_code", codes);
-    if (error) throw new Error(error.message);
-    for (const row of data ?? []) {
-      resultado.set(row.product_code, classificarFabricanteGrupo(row.manufacturer));
-    }
-  } catch (err) {
-    console.error("getFabricanteGrupoPorCodigo:", (err as Error).message);
   }
   return resultado;
 }

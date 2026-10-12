@@ -13,12 +13,10 @@ import {
   getCustoMedioPorCategoria,
   getEarliestSyncedOrderDate,
   getVendasCountPorLoja,
-  getFabricanteGrupoPorCodigo,
 } from "./vendasProduto";
 import { listStores, type RequestType, type RequestStatus, type ReportRowItem } from "./serviceRequests";
 import { listPartOrders } from "./partOrders";
 import { CONFERENTE_CODIGO_NOME } from "./conferentes";
-import type { FabricanteGrupo } from "./fabricas";
 
 // "KPIs da Assistência" (página própria, /kpis-assistencia) -- pedido do
 // Victor 27/08/2026: "preciso que você pegue todas as informações de
@@ -255,6 +253,20 @@ function aggregate(
 // percentual atual fica acima.
 export const ASSISTENCIA_TAXA_META_IDEAL_PCT = 3.0;
 
+// Ranking "Conferente que mais errou" por PERCENTUAL (erros ÷ notas
+// conferidas no período, ver getConferenteNotasTotais acima), não mais por
+// volume cru de erro -- pedido do Victor 13/10/2026: "faça um ranking
+// também para os erros dos conferentes, levando em conta o percentual de
+// erros/notas". totalNotas/errorPct ficam null quando não dá pra
+// identificar o código TOTVS desse conferente (texto livre sem nome de
+// verdade, ex. "Conferente da loja 205") -- ranking cai pro fim da lista
+// nesse caso (não dá pra comparar sem denominador), mas continua
+// aparecendo com o número de erros cru.
+export type ConferenteErroStat = Count & {
+  totalNotas: number | null;
+  errorPct: number | null;
+};
+
 // Uma peça em atraso, pro drill-down do ranking "Peças atrasadas por
 // fornecedor" (ver byFornecedorPecasAtrasadas abaixo).
 export type PecaAtrasadaItem = {
@@ -319,17 +331,16 @@ export type AssistenciaKpiData = {
   prejuizoCobertura: Coverage;
   byProductGroup: Count[];
   // Produtos com mais chamados por defeito de fabricação especificamente
-  // (causa_raiz = 'defeito_fabricacao'), como TAXA (chamados ÷ vendas) e já
-  // classificado por fabricanteGrupo -- ver ProductDefectRateStat acima.
-  // Substituiu o ranking antigo (volume cru, sem cruzar com venda) em
-  // 13/10/2026.
+  // (causa_raiz = 'defeito_fabricacao'), como ranking por TAXA (chamados ÷
+  // vendas) -- ver ProductDefectRateStat acima. Já vem cortado/ordenado
+  // (top PRODUCT_RANKING_LIMIT, maior % primeiro).
   byProductDefeitoFabricacaoTaxa: ProductDefectRateStat[];
   byAgent: Count[];
   byRota: Count[];
   byStore: Count[];
   byType: Count[];
   byCausaRaiz: Count[];
-  byConferente: Count[];
+  byConferente: ConferenteErroStat[];
   byMotoristaErro: Count[];
   // Peças de pedido de fornecedor (part_orders) em atraso (>30 dias
   // aguardando_resposta/aguardando_peca, ver ATRASO_ELIGIBLE_STATUSES em
@@ -448,24 +459,23 @@ export type ProductBreakageStat = Count & {
   prejuizoEstimado: number;
 };
 
-// "Produtos com mais defeito de fabricação", mas como TAXA (chamados ÷
-// vendas do mesmo produto no período, igual ProductBreakageStat acima) em
-// vez de volume cru -- pedido do Victor 13/10/2026: "comparar o número de
-// defeitos dos produtos da nossa fábrica e dos produtos de outros
-// fornecedores, baseado no número de venda de cada produto". Só os itens
-// com causa_raiz='defeito_fabricacao' entram aqui (ProductBreakageStat
-// cruza TODO causa_raiz, não serve pra essa comparação específica) --
-// versão enxuta, sem os campos de custo/prejuízo (não é o que foi pedido
-// aqui, e evita duplicar o 2º passe caro de resolverCustoUnitarioItem só
-// pra isso). fabricanteGrupo vem de getFabricanteGrupoPorCodigo
-// (vendasProduto.ts/fabricas.ts) -- "indefinido" quando o Protheus não tem
-// o fabricante classificado pra esse código (ver classificarFabricanteGrupo).
+// "Produtos com mais defeito de fabricação", como TAXA (chamados ÷ vendas
+// do mesmo produto no período, igual ProductBreakageStat acima) em vez de
+// volume cru -- pedido do Victor 13/10/2026, refeito no mesmo dia ("não
+// gostei, volta ao que era antes e só coloque num formato de ranking,
+// levando em consideração o numero de vendas por produto"): ranking
+// simples por percentual de assistência/venda, 1º/2º/3º -- sem o filtro
+// nossa fábrica x fornecedores da 1ª tentativa (ver histórico do commit,
+// removido por pedido explícito). Só os itens com causa_raiz=
+// 'defeito_fabricacao' entram aqui (ProductBreakageStat cruza TODO
+// causa_raiz, não serve pra essa métrica específica) -- versão enxuta, sem
+// os campos de custo/prejuízo (não é o que foi pedido aqui, e evita
+// duplicar o 2º passe caro de resolverCustoUnitarioItem só pra isso).
 export type ProductDefectRateStat = Count & {
   partCode: string;
   itensQuantidade: number;
   vendaQtd: number;
   taxaQuebraPct: number | null;
-  fabricanteGrupo: FabricanteGrupo;
 };
 
 // Custo logístico REAL diluído -- pedido do Victor 21/09/2026: "descobrimos
@@ -775,18 +785,24 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     "conferente",
     produtosPorChamado
   );
-  // Acrescenta "de quantas notas" no label de quem a gente consegue
-  // identificar pelo código do TOTVS (ver getConferenteNotasTotais acima)
-  // -- quem não bate com nenhum código (ex.: "CONFERENTE DA LOJA 205",
-  // texto livre sem nome de verdade) continua só com o número de erros,
-  // igual sempre.
+  // Ranking por PERCENTUAL (erro ÷ notas conferidas), não mais volume cru
+  // -- ver ConferenteErroStat acima. Quem não bate com nenhum código do
+  // TOTVS (ex.: "CONFERENTE DA LOJA 205", texto livre sem nome de
+  // verdade) fica sem errorPct (null) e cai pro fim da lista -- não dá
+  // pra comparar percentual sem saber de quantas notas.
   const conferenteNotasTotais = await getConferenteNotasTotais(fromIso, toIso);
-  const byConferente = byConferenteRaw.map((item) => {
-    const total = conferenteNotasTotais.get(item.label.toUpperCase());
-    if (!total) return item;
-    const pct = (item.count / total) * 100;
-    return { ...item, label: `${item.label} (${item.count} de ${total} notas · ${pct.toFixed(pct < 1 ? 2 : 1)}%)` };
-  });
+  const byConferente: ConferenteErroStat[] = byConferenteRaw
+    .map((item) => {
+      const totalNotas = conferenteNotasTotais.get(item.label.toUpperCase()) ?? null;
+      const errorPct = totalNotas ? (item.count / totalNotas) * 100 : null;
+      return { ...item, totalNotas, errorPct };
+    })
+    .sort((a, b) => {
+      if (a.errorPct != null && b.errorPct != null) return b.errorPct - a.errorPct;
+      if (a.errorPct != null) return -1;
+      if (b.errorPct != null) return 1;
+      return b.count - a.count;
+    });
   // Ressalva importante: `driver_name` também é sobrescrito toda vez que
   // a rota/data do chamado é reagendada (setSchedule, actions.ts) -- pra
   // um chamado criado com causa_raiz='erro_motorista' e depois
@@ -856,9 +872,9 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   // mais erros de fabricação nos kpis da assistencia?" -- virou TAXA
   // (chamados ÷ vendas) em 13/10/2026, ver ProductDefectRateStat acima.
   // Rastreado por CÓDIGO (não baseLabel direto) igual breakagePorCodigo
-  // logo abaixo -- precisa do código pra cruzar com vendaQtdPorCodigo/
-  // fabricanteGrupoPorCodigo; reagrupado por modelo (baseProductLabel)
-  // depois do loop, mesmo padrão de breakagePorGrupo.
+  // logo abaixo -- precisa do código pra cruzar com vendaQtdPorCodigo;
+  // reagrupado por modelo (baseProductLabel) depois do loop, mesmo padrão
+  // de breakagePorGrupo.
   const codigoDefeitoPorChamado = new Set<string>();
   const chamadosPorCodigoDefeito = new Map<string, Set<string>>();
   const defeitoPorCodigo = new Map<string, { label: string; itensQuantidade: number }>();
@@ -1025,16 +1041,8 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   // conferiu noutros gráficos, fora do escopo desse cruzamento).
   const chamadosFromIso = `${vendaRange.from}T00:00:00.000Z`;
   const chamadosToIso = `${vendaRange.to}T23:59:59.999Z`;
-  const [
-    vendaQtdPorCodigo,
-    custoPorCodigo,
-    custoPorDescricaoPai,
-    custoMedioPorCategoria,
-    vendasPorLoja,
-    chamadosTodosTiposRows,
-    allStores,
-    fabricanteGrupoPorCodigo,
-  ] = await Promise.all([
+  const [vendaQtdPorCodigo, custoPorCodigo, custoPorDescricaoPai, custoMedioPorCategoria, vendasPorLoja, chamadosTodosTiposRows, allStores] =
+    await Promise.all([
       getVendaQuantidadePorCodigoNoPeriodo(codigosReais, vendaRange),
       getCustoUnitarioPorCodigo(codigosReais),
       // Custo do produto PAI (Envio de peça sem custo exato da peça, ver
@@ -1077,11 +1085,6 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
       // nome. `listStores()` (serviceRequests.ts) já é cacheada 60s e cobre
       // TODAS as lojas, com ou sem chamado.
       listStores(),
-      // Nossa fábrica x outros fornecedores (ver ProductDefectRateStat
-      // acima) -- foto do catálogo ATUAL (sem período, mesmo espírito de
-      // getCustoUnitarioPorCodigo), busca os mesmos codigosReais já
-      // levantados pra Taxa de Quebra, sem round-trip extra.
-      getFabricanteGrupoPorCodigo(codigosReais),
     ]);
   const storeNameById = new Map(allStores.map((s) => [s.id, s.name]));
   // Produto(s) desses chamados -- pedido do Victor 14/09/2026: "coloque o
@@ -1247,17 +1250,14 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
 
   // Mesmo agrupamento por modelo acima, só que pra "Produtos com mais
   // defeito de fabricação" por TAXA (defeitoPorCodigo, só causa_raiz =
-  // 'defeito_fabricacao') -- pedido do Victor 13/10/2026. fabricanteGrupo
-  // do grupo = do primeiro código do grupo com classificação conhecida
-  // (interna/externa); na prática todo código de um mesmo modelo
-  // compartilha fabricante, então isso quase nunca precisa desempatar.
+  // 'defeito_fabricacao') -- pedido do Victor 13/10/2026, ranking simples
+  // por percentual, sem quebra por fabricante (removida no mesmo dia).
   type DefeitoGrupo = {
     label: string;
     itensQuantidade: number;
     vendaQtd: number;
     chamadoIds: Set<string>;
     tickets: ReportRowItem[];
-    fabricanteGrupo: FabricanteGrupo;
   };
   const defeitoPorGrupo = new Map<string, DefeitoGrupo>();
   for (const [codigo, entry] of defeitoPorCodigo.entries()) {
@@ -1269,23 +1269,13 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
       vendaQtd: 0,
       chamadoIds: new Set<string>(),
       tickets: [],
-      fabricanteGrupo: "indefinido" as FabricanteGrupo,
     };
     grupo.itensQuantidade += entry.itensQuantidade;
     grupo.vendaQtd += isNaoIdentificado ? 0 : (vendaQtdPorCodigo.get(codigo) ?? 0);
     for (const requestId of chamadosPorCodigoDefeito.get(codigo) ?? []) grupo.chamadoIds.add(requestId);
     grupo.tickets.push(...(ticketsByTag[`produto_defeito_taxa:${codigo}`] ?? []));
-    if (!isNaoIdentificado && grupo.fabricanteGrupo === "indefinido") {
-      const codigoFabricanteGrupo = fabricanteGrupoPorCodigo.get(codigo);
-      if (codigoFabricanteGrupo && codigoFabricanteGrupo !== "indefinido") grupo.fabricanteGrupo = codigoFabricanteGrupo;
-    }
     defeitoPorGrupo.set(grupoKey, grupo);
   }
-  // Sem corte de PRODUCT_RANKING_LIMIT aqui (diferente de byProductBreakage
-  // abaixo) -- o filtro "Nossa fábrica"/"Outros fornecedores" é aplicado no
-  // CLIENTE (ver ProductDefectRateRanking.tsx), que corta o top 20 DEPOIS
-  // de filtrar por grupo; cortar aqui faria um grupo pequeno sumir do
-  // dropdown só por ter perdido o corte geral.
   const byProductDefeitoFabricacaoTaxa: ProductDefectRateStat[] = [...defeitoPorGrupo.entries()]
     .map(([grupoKey, grupo]) => {
       const isNaoIdentificado = grupoKey === CODIGO_NAO_IDENTIFICADO;
@@ -1301,7 +1291,6 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
         itensQuantidade: grupo.itensQuantidade,
         vendaQtd: grupo.vendaQtd,
         taxaQuebraPct,
-        fabricanteGrupo: isNaoIdentificado ? ("indefinido" as FabricanteGrupo) : grupo.fabricanteGrupo,
       };
     })
     .sort((a, b) => {
@@ -1311,7 +1300,8 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
       if (a.taxaQuebraPct != null) return -1;
       if (b.taxaQuebraPct != null) return 1;
       return b.count - a.count;
-    });
+    })
+    .slice(0, PRODUCT_RANKING_LIMIT);
 
   const byProductBreakageAll: ProductBreakageStat[] = [...breakagePorGrupo.entries()].map(([grupoKey, grupo]) => {
     const isNaoIdentificado = grupoKey === CODIGO_NAO_IDENTIFICADO;
