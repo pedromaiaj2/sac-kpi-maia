@@ -236,7 +236,12 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
       ) : null}
 
       <section className="grid md:grid-cols-2 gap-4">
-        <BarRanking title="Conferente que mais errou" data={data.byConferente} onSelect={openDrilldown} showCount />
+        <div className="flex flex-col gap-2">
+          <BarRanking title="Conferente que mais errou" data={data.byConferente} onSelect={openDrilldown} showCount />
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Quando dá pra identificar o código do conferente no TOTVS, o nome do ranking já mostra &quot;erros de quantas notas&quot; e a taxa de erro. Passe o mouse na barra pra ver o detalhe completo.
+          </p>
+        </div>
         <div className="flex flex-col gap-2">
           <BarRanking title="Motorista que mais errou" data={data.byMotoristaErro} onSelect={openDrilldown} showCount />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>

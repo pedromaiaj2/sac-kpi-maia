@@ -16,6 +16,7 @@ import {
 } from "./vendasProduto";
 import { listStores, type RequestType, type RequestStatus, type ReportRowItem } from "./serviceRequests";
 import { listPartOrders } from "./partOrders";
+import { CONFERENTE_CODIGO_NOME } from "./conferentes";
 
 // "KPIs da Assistência" (página própria, /kpis-assistencia) -- pedido do
 // Victor 27/08/2026: "preciso que você pegue todas as informações de
@@ -167,6 +168,60 @@ const CONFERENTE_ALIASES: Record<string, string> = {
 function canonicalConferenteKey(raw: string): string {
   const upper = raw.trim().toUpperCase();
   return CONFERENTE_ALIASES[upper] ?? upper;
+}
+
+type CargaConferenteRow = { conferente_codigo: string | null; nota_fiscal: string | null; serie: string | null };
+
+// Total de notas conferidas por pessoa no período (denominador pro
+// ranking "Conferente que mais errou") -- pedido do Victor 12/10/2026,
+// repassando a pergunta de um conferente: "5 erros de quantas notas
+// emitidas em meu nome?" -- restaurado 13/10/2026 depois de um revert
+// mais amplo ("volta tudo a como era antes"), a pedido explícito: "so
+// volte com o numero de notas dos conferentes". O ranking de erros só
+// tem o numerador (texto livre digitado quando dá problema, ver
+// canonicalConferenteKey acima); o total de notas vem de
+// totvs_delivery_cargas.conferente_codigo (sincronizado do TOTVS, fonte
+// AC4), resolvido pra nome via CONFERENTE_CODIGO_NOME (conferentes.ts,
+// mesma fonte usada no dropdown "Conferente" dos formulários de erro) e
+// agrupado pela MESMA chave canônica usada no ranking de erro, senão
+// "Samuel" (erro) e "SAMUEL" (TOTVS) virariam barras diferentes. Conta
+// notas DISTINTAS (nota_fiscal+serie), não linhas -- uma carga tem 1
+// linha por pedido, mas pode repetir a mesma nota em tentativas
+// diferentes. Usa dt_previsao como proxy do período selecionado (não tem
+// outra data melhor nessa tabela) -- pode destoar um pouco de quando o
+// ERRO foi registrado (chamado criado depois da entrega), mas é a
+// aproximação mais razoável sem mudar schema.
+async function getConferenteNotasTotais(fromIso: string | null, toIso: string): Promise<Map<string, number>> {
+  const admin = getSupabaseAdmin();
+  const toDate = toIso.slice(0, 10);
+  const fromDate = fromIso ? fromIso.slice(0, 10) : null;
+
+  const rows = await fetchAllPagesParallel<CargaConferenteRow>(
+    (from, to) => {
+      let query = admin
+        .from("totvs_delivery_cargas")
+        .select("conferente_codigo, nota_fiscal, serie", { count: "exact" })
+        .not("conferente_codigo", "is", null)
+        .lte("dt_previsao", toDate);
+      if (fromDate) query = query.gte("dt_previsao", fromDate);
+      return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<CargaConferenteRow>>;
+    },
+    { pageSize: PAGE_SIZE }
+  );
+
+  const notasPorConferente = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const nome = r.conferente_codigo ? CONFERENTE_CODIGO_NOME[r.conferente_codigo] : null;
+    if (!nome) continue;
+    const key = canonicalConferenteKey(nome);
+    const notaKey = `${r.nota_fiscal ?? ""}|${r.serie ?? ""}`;
+    if (!notasPorConferente.has(key)) notasPorConferente.set(key, new Set());
+    notasPorConferente.get(key)!.add(notaKey);
+  }
+
+  const totals = new Map<string, number>();
+  for (const [key, notas] of notasPorConferente) totals.set(key, notas.size);
+  return totals;
 }
 
 // Mesmo espírito do `aggregate()` de getRequestsReport (serviceRequests.ts)
@@ -692,7 +747,7 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   const byAgent = aggregate(rows, atendenteName, (k) => k, ticketsByTag, "atendente", produtosPorChamado);
   // Ver titleCase acima -- agrupa por nome em caixa alta (mesma pessoa,
   // caixa diferente, conta junto), exibe sempre em Title Case.
-  const byConferente = aggregate(
+  const byConferenteRaw = aggregate(
     rows.filter((r) => (r.causa_raiz === "erro_conferencia" || r.causa_raiz === "sujeira_conferencia") && r.causa_conferente),
     (r) => canonicalConferenteKey(r.causa_conferente!),
     titleCase,
@@ -700,6 +755,18 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     "conferente",
     produtosPorChamado
   );
+  // Acrescenta "de quantas notas" no label de quem a gente consegue
+  // identificar pelo código do TOTVS (ver getConferenteNotasTotais acima)
+  // -- quem não bate com nenhum código (ex.: "CONFERENTE DA LOJA 205",
+  // texto livre sem nome de verdade) continua só com o número de erros,
+  // igual sempre.
+  const conferenteNotasTotais = await getConferenteNotasTotais(fromIso, toIso);
+  const byConferente = byConferenteRaw.map((item) => {
+    const total = conferenteNotasTotais.get(item.label.toUpperCase());
+    if (!total) return item;
+    const pct = (item.count / total) * 100;
+    return { ...item, label: `${item.label} (${item.count} de ${total} notas · ${pct.toFixed(pct < 1 ? 2 : 1)}%)` };
+  });
   // Ressalva importante: `driver_name` também é sobrescrito toda vez que
   // a rota/data do chamado é reagendada (setSchedule, actions.ts) -- pra
   // um chamado criado com causa_raiz='erro_motorista' e depois
