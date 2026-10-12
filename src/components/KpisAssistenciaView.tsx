@@ -8,6 +8,7 @@ import { MetricCard } from "./MetricCard";
 import { KpiCardShell, StatusPill } from "./KpiCardShell";
 import { BarRanking } from "./BarRanking";
 import { ProductBreakageRanking } from "./assistencia/ProductBreakageRanking";
+import { ProductDefectRateRanking } from "./assistencia/ProductDefectRateRanking";
 import { VendaVsAssistenciaTable } from "./assistencia/VendaVsAssistenciaTable";
 import { PrejuizoDetalheModal } from "./assistencia/PrejuizoDetalheModal";
 import { DiagnosticoEstrategicoModal } from "./assistencia/DiagnosticoEstrategicoModal";
@@ -230,9 +231,11 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           "consegue colocar o ranking de produtos com mais erros de
           fabricação nos kpis da assistencia?". Fica perto de "Quem errou"
           por ser outro recorte da mesma causa raiz, não perto do ranking
-          geral de produto. */}
-      {data.byProductDefeitoFabricacao.length > 0 ? (
-        <BarRanking title="Produtos com mais defeito de fabricação" data={data.byProductDefeitoFabricacao} onSelect={openDrilldown} showPercent />
+          geral de produto. Virou Taxa de Quebra (não volume cru) com
+          filtro Nossa fábrica x Outros fornecedores em 13/10/2026, ver
+          ProductDefectRateRanking.tsx. */}
+      {data.byProductDefeitoFabricacaoTaxa.length > 0 ? (
+        <ProductDefectRateRanking data={data.byProductDefeitoFabricacaoTaxa} onSelect={openDrilldown} />
       ) : null}
 
       <section className="grid md:grid-cols-2 gap-4">
