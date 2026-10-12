@@ -16,6 +16,7 @@ import {
 } from "./vendasProduto";
 import { listStores, type RequestType, type RequestStatus, type ReportRowItem } from "./serviceRequests";
 import { listPartOrders } from "./partOrders";
+import { CONFERENTE_CODIGO_NOME } from "./conferentes";
 
 // "KPIs da Assistência" (página própria, /kpis-assistencia) -- pedido do
 // Victor 27/08/2026: "preciso que você pegue todas as informações de
@@ -168,39 +169,6 @@ function canonicalConferenteKey(raw: string): string {
   const upper = raw.trim().toUpperCase();
   return CONFERENTE_ALIASES[upper] ?? upper;
 }
-
-// Código do conferente no Protheus (tabela AC4, mesmo código que
-// totvs_delivery_cargas.conferente_codigo recebe do sync -- ver
-// 0072_carga_conferente_e_problemas.sql) -> nome. Curado manualmente a
-// partir da tela de consulta do Protheus (print do Victor, 12/10/2026) --
-// não tem endpoint que devolva esse cadastro, só o browse dentro do
-// sistema. "4" e "5" são dois ROBERTOS diferentes (ambíguo na origem,
-// sem jeito de distinguir só pelo nome) -- não apareceram em
-// totvs_delivery_cargas.conferente_codigo na checagem de 12/10/2026,
-// então não afetam o cruzamento hoje, mas um `código->nome` 1:1 não dá
-// conta se um dos dois passar a aparecer.
-const CONFERENTE_CODIGO_NOME: Record<string, string> = {
-  "1": "ERYCK",
-  "2": "LUAN",
-  "3": "FLAVIO",
-  "4": "ROBERTO",
-  "5": "ROBERTO",
-  "6": "FILIPE",
-  "7": "SAMUEL",
-  "8": "EVERTON",
-  "9": "FABRICIO",
-  A: "PEDRO MAIA",
-  B: "CARLOS GABRIEL",
-  C: "WILLIAM GABRIEL",
-  D: "DIEGO",
-  E: "GABRIEL",
-  F: "SERGIO",
-  G: "COLETA LOJA",
-  H: "JEFFERSON",
-  I: "PEDRO LUCAS",
-  J: "KELVIN",
-  K: "VINICIUS JP",
-};
 
 type CargaConferenteRow = { conferente_codigo: string | null; nota_fiscal: string | null; serie: string | null };
 

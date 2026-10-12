@@ -24,6 +24,7 @@ import { ADDRESS_NUMBER_REQUIRED_TYPES, SHIFTS, type Store } from "@/lib/service
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
+import { ConferenteField } from "./ConferenteField";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -918,15 +919,7 @@ export function SacCreateRequestForm({
                 ))}
               </datalist>
             </Field>
-            <Field label="Conferente *">
-              <input
-                name="causa_conferente"
-                required
-                placeholder="Nome de quem conferiu a carga"
-                className="rounded border px-3 py-2"
-                style={inputStyle}
-              />
-            </Field>
+            <ConferenteField inputStyle={inputStyle} />
           </div>
         ) : null}
 

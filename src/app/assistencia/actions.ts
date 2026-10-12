@@ -33,6 +33,7 @@ import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { checkIpRateLimit, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isRota, getRotaDriverAssignments, getAvailableRotasForDate, ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
+import { CONFERENTE_OUTRO_VALUE } from "@/lib/conferentes";
 import { sanitizeOrFilterValue } from "@/lib/searchFilter";
 import { findTotvsClientByCode, findTotvsClientByCpf, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
 import { searchPartOrdersForLink, type PartOrderLinkMatch } from "@/lib/partOrders";
@@ -69,6 +70,16 @@ const SHIFTS = ["manha", "tarde", "dia"] as const;
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
   return str.length > 0 ? str : null;
+}
+
+// causa_conferente agora vem de um <select> com os conferentes conhecidos
+// do CD (ver ConferenteField.tsx/conferentes.ts) + "Outro" com texto livre
+// (causa_conferente_other) -- mesmo padrão de supplier/supplier_other em
+// pecas-actions.ts. Resolve pro valor final que de fato grava no banco.
+function resolveCausaConferente(formData: FormData): string {
+  const choice = String(formData.get("causa_conferente") ?? "").trim();
+  if (choice !== CONFERENTE_OUTRO_VALUE) return choice;
+  return String(formData.get("causa_conferente_other") ?? "").trim();
 }
 
 // Número é obrigatório nos tipos com visita/entrega física (ver
@@ -2157,7 +2168,7 @@ export async function updateRequestDetails(
   let driverNameForError: string | undefined;
   if (causaRaiz === "erro_conferencia" || causaRaiz === "sujeira_conferencia") {
     causaCarga = String(formData.get("causa_carga") ?? "").trim();
-    causaConferente = String(formData.get("causa_conferente") ?? "").trim();
+    causaConferente = resolveCausaConferente(formData);
     if (!causaCarga) return { error: "Informe a carga (precisa registrar qual foi)." };
     if (!causaConferente) return { error: "Informe o conferente (precisa registrar quem conferiu)." };
   }
@@ -2334,7 +2345,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     }
     if (causaRaiz === "erro_conferencia" || causaRaiz === "sujeira_conferencia") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
-      causaConferente = String(formData.get("causa_conferente") ?? "").trim();
+      causaConferente = resolveCausaConferente(formData);
       if (!causaCarga) return { error: "Informe a carga (precisa registrar qual foi)." };
       if (!causaConferente) return { error: "Informe o conferente (precisa registrar quem conferiu)." };
     }
@@ -2777,7 +2788,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     }
     if (causaRaiz === "erro_conferencia" || causaRaiz === "sujeira_conferencia") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
-      causaConferente = String(formData.get("causa_conferente") ?? "").trim();
+      causaConferente = resolveCausaConferente(formData);
       if (!causaCarga) return { error: "Informe a carga (precisa registrar qual foi)." };
       if (!causaConferente) return { error: "Informe o conferente (precisa registrar quem conferiu)." };
     }

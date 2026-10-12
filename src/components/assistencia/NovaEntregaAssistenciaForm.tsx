@@ -19,6 +19,7 @@ import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
 import { useFormPrefill } from "./useFormPrefill";
+import { ConferenteField } from "./ConferenteField";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -761,9 +762,7 @@ export function NovaEntregaAssistenciaForm({
                 ))}
               </datalist>
             </Field>
-            <Field label="Conferente *">
-              <input name="causa_conferente" required placeholder="Nome de quem conferiu a carga" className="rounded border px-3 py-2" style={inputStyle} />
-            </Field>
+            <ConferenteField inputStyle={inputStyle} />
           </div>
         ) : null}
 

@@ -11,6 +11,7 @@ import {
   PICKUP_DESTINATION_OPTIONS,
   PICKUP_DESTINATION_LABELS,
 } from "@/lib/assistenciaLabels";
+import { ConferenteField } from "./ConferenteField";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -266,16 +267,7 @@ export function EditRequestForm({
               ))}
             </datalist>
           </Field>
-          <Field label="Conferente *">
-            <input
-              name="causa_conferente"
-              required
-              defaultValue={request.causaConferente ?? ""}
-              placeholder="Nome de quem conferiu a carga"
-              className="rounded border px-3 py-2"
-              style={inputStyle}
-            />
-          </Field>
+          <ConferenteField defaultValue={request.causaConferente} inputStyle={inputStyle} />
         </div>
       ) : null}
 
