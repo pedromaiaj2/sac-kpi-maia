@@ -168,6 +168,89 @@ function canonicalConferenteKey(raw: string): string {
   return CONFERENTE_ALIASES[upper] ?? upper;
 }
 
+// Código do conferente no Protheus (tabela AC4, mesmo código que
+// totvs_delivery_cargas.conferente_codigo recebe do sync -- ver
+// 0072_carga_conferente_e_problemas.sql) -> nome. Curado manualmente a
+// partir da tela de consulta do Protheus (print do Victor, 12/10/2026) --
+// não tem endpoint que devolva esse cadastro, só o browse dentro do
+// sistema. "4" e "5" são dois ROBERTOS diferentes (ambíguo na origem,
+// sem jeito de distinguir só pelo nome) -- não apareceram em
+// totvs_delivery_cargas.conferente_codigo na checagem de 12/10/2026,
+// então não afetam o cruzamento hoje, mas um `código->nome` 1:1 não dá
+// conta se um dos dois passar a aparecer.
+const CONFERENTE_CODIGO_NOME: Record<string, string> = {
+  "1": "ERYCK",
+  "2": "LUAN",
+  "3": "FLAVIO",
+  "4": "ROBERTO",
+  "5": "ROBERTO",
+  "6": "FILIPE",
+  "7": "SAMUEL",
+  "8": "EVERTON",
+  "9": "FABRICIO",
+  A: "PEDRO MAIA",
+  B: "CARLOS GABRIEL",
+  C: "WILLIAM GABRIEL",
+  D: "DIEGO",
+  E: "GABRIEL",
+  F: "SERGIO",
+  G: "COLETA LOJA",
+  H: "JEFFERSON",
+  I: "PEDRO LUCAS",
+  J: "KELVIN",
+  K: "VINICIUS JP",
+};
+
+type CargaConferenteRow = { conferente_codigo: string | null; nota_fiscal: string | null; serie: string | null };
+
+// Total de notas conferidas por pessoa no período (denominador pro
+// ranking "Conferente que mais errou") -- pedido do Victor 12/10/2026,
+// repassando a pergunta de um conferente: "5 erros de quantas notas
+// emitidas em meu nome?". O ranking de erros só tem o numerador (texto
+// livre digitado quando dá problema, ver canonicalConferenteKey acima);
+// o total de notas vem de totvs_delivery_cargas.conferente_codigo
+// (sincronizado do TOTVS, fonte AC4), resolvido pra nome via
+// CONFERENTE_CODIGO_NOME e agrupado pela MESMA chave canônica usada no
+// ranking de erro, senão "Samuel" (erro) e "SAMUEL" (TOTVS) virariam
+// barras diferentes. Conta notas DISTINTAS (nota_fiscal+serie), não
+// linhas -- uma carga tem 1 linha por pedido, mas pode repetir a mesma
+// nota em tentativas diferentes. Usa dt_previsao como proxy do período
+// selecionado (não tem outra data melhor nessa tabela) -- pode destoar
+// um pouco de quando o ERRO foi registrado (chamado criado depois da
+// entrega), mas é a aproximação mais razoável sem mudar schema.
+async function getConferenteNotasTotais(fromIso: string | null, toIso: string): Promise<Map<string, number>> {
+  const admin = getSupabaseAdmin();
+  const toDate = toIso.slice(0, 10);
+  const fromDate = fromIso ? fromIso.slice(0, 10) : null;
+
+  const rows = await fetchAllPagesParallel<CargaConferenteRow>(
+    (from, to) => {
+      let query = admin
+        .from("totvs_delivery_cargas")
+        .select("conferente_codigo, nota_fiscal, serie", { count: "exact" })
+        .not("conferente_codigo", "is", null)
+        .lte("dt_previsao", toDate);
+      if (fromDate) query = query.gte("dt_previsao", fromDate);
+      return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<CargaConferenteRow>>;
+    },
+    { pageSize: PAGE_SIZE }
+  );
+
+  const notasPorConferente = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const nome = r.conferente_codigo ? CONFERENTE_CODIGO_NOME[r.conferente_codigo] : null;
+    if (!nome) continue;
+    const key = canonicalConferenteKey(nome);
+    const notaKey = `${r.nota_fiscal ?? ""}|${r.serie ?? ""}`;
+    if (!notasPorConferente.has(key)) notasPorConferente.set(key, new Set());
+    notasPorConferente.get(key)!.add(notaKey);
+  }
+
+  const totals = new Map<string, number>();
+  for (const [key, notas] of notasPorConferente) totals.set(key, notas.size);
+  return totals;
+}
+
 // Mesmo espírito do `aggregate()` de getRequestsReport (serviceRequests.ts)
 // -- agrupa por chave, guarda os chamados de cada grupo pro drill-down
 // (aqui num Record só, `ticketsByTag`, compartilhado entre todos os
@@ -667,7 +750,7 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   const byAgent = aggregate(rows, atendenteName, (k) => k, ticketsByTag, "atendente", produtosPorChamado);
   // Ver titleCase acima -- agrupa por nome em caixa alta (mesma pessoa,
   // caixa diferente, conta junto), exibe sempre em Title Case.
-  const byConferente = aggregate(
+  const byConferenteRaw = aggregate(
     rows.filter((r) => (r.causa_raiz === "erro_conferencia" || r.causa_raiz === "sujeira_conferencia") && r.causa_conferente),
     (r) => canonicalConferenteKey(r.causa_conferente!),
     titleCase,
@@ -675,6 +758,18 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     "conferente",
     produtosPorChamado
   );
+  // Acrescenta "de quantas notas" no label de quem a gente consegue
+  // identificar pelo código do TOTVS (ver getConferenteNotasTotais acima)
+  // -- quem não bate com nenhum código (ex.: "CONFERENTE DA LOJA 205",
+  // texto livre sem nome de verdade) continua só com o número de erros,
+  // igual sempre.
+  const conferenteNotasTotais = await getConferenteNotasTotais(fromIso, toIso);
+  const byConferente = byConferenteRaw.map((item) => {
+    const total = conferenteNotasTotais.get(item.label.toUpperCase());
+    if (!total) return item;
+    const pct = (item.count / total) * 100;
+    return { ...item, label: `${item.label} (${item.count} de ${total} notas · ${pct.toFixed(pct < 1 ? 2 : 1)}%)` };
+  });
   // Ressalva importante: `driver_name` também é sobrescrito toda vez que
   // a rota/data do chamado é reagendada (setSchedule, actions.ts) -- pra
   // um chamado criado com causa_raiz='erro_motorista' e depois
