@@ -2,19 +2,12 @@
 
 import { useState } from "react";
 import type { Count } from "@/lib/kpi";
-import {
-  ASSISTENCIA_TAXA_META_IDEAL_PCT,
-  type AssistenciaKpiData,
-  type PecaAtrasadaItem,
-  type ProductDefectRateStat,
-  type ConferenteErroStat,
-} from "@/lib/kpiAssistencia";
+import { ASSISTENCIA_TAXA_META_IDEAL_PCT, type AssistenciaKpiData, type PecaAtrasadaItem } from "@/lib/kpiAssistencia";
 import type { ReportRowItem } from "@/lib/serviceRequests";
 import { MetricCard } from "./MetricCard";
 import { KpiCardShell, StatusPill } from "./KpiCardShell";
 import { BarRanking } from "./BarRanking";
 import { ProductBreakageRanking } from "./assistencia/ProductBreakageRanking";
-import { PercentualRankingList, type PercentualRankingRow } from "./assistencia/PercentualRankingList";
 import { VendaVsAssistenciaTable } from "./assistencia/VendaVsAssistenciaTable";
 import { PrejuizoDetalheModal } from "./assistencia/PrejuizoDetalheModal";
 import { DiagnosticoEstrategicoModal } from "./assistencia/DiagnosticoEstrategicoModal";
@@ -25,38 +18,6 @@ import { PecasAtrasadasModal } from "./assistencia/PecasAtrasadasModal";
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function formatPct(pct: number): string {
-  return `${pct.toFixed(pct < 1 ? 2 : 1)}%`;
-}
-
-// ProductDefectRateStat (kpiAssistencia.ts) -> linha do ranking genérico
-// (PercentualRankingList.tsx) -- "9999" é CODIGO_NAO_IDENTIFICADO lá
-// (mesmo valor cru usado em ProductBreakageRanking.tsx).
-function produtoDefeitoToRankingRow(item: ProductDefectRateStat): PercentualRankingRow {
-  const isNaoIdentificado = item.partCode === "9999";
-  return {
-    ...item,
-    pct: item.taxaQuebraPct,
-    pctLabel: item.taxaQuebraPct != null ? formatPct(item.taxaQuebraPct) : "N/A",
-    detail: isNaoIdentificado
-      ? `${item.count} chamado${item.count === 1 ? "" : "s"} (sem código Protheus pra cruzar com venda)`
-      : `${item.count} chamado${item.count === 1 ? "" : "s"} de ${item.vendaQtd} vendido${item.vendaQtd === 1 ? "" : "s"} no período`,
-  };
-}
-
-// ConferenteErroStat (kpiAssistencia.ts) -> linha do ranking genérico.
-function conferenteToRankingRow(item: ConferenteErroStat): PercentualRankingRow {
-  return {
-    ...item,
-    pct: item.errorPct,
-    pctLabel: item.errorPct != null ? formatPct(item.errorPct) : "N/A",
-    detail:
-      item.totalNotas != null
-        ? `${item.count} erro${item.count === 1 ? "" : "s"} de ${item.totalNotas} nota${item.totalNotas === 1 ? "" : "s"} conferida${item.totalNotas === 1 ? "" : "s"}`
-        : `${item.count} erro${item.count === 1 ? "" : "s"} (conferente sem código TOTVS identificado)`,
-  };
 }
 
 // Conteúdo da página /kpis-assistencia -- extraído de dentro de
@@ -269,28 +230,13 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           "consegue colocar o ranking de produtos com mais erros de
           fabricação nos kpis da assistencia?". Fica perto de "Quem errou"
           por ser outro recorte da mesma causa raiz, não perto do ranking
-          geral de produto. Virou ranking por percentual (defeito ÷ venda)
-          em 13/10/2026 -- 1ª tentativa foi um gráfico de barra com filtro
-          Nossa fábrica x Outros fornecedores, revertida no mesmo dia a
-          pedido do Victor ("não gostei"). */}
-      {data.byProductDefeitoFabricacaoTaxa.length > 0 ? (
-        <PercentualRankingList
-          title="Produtos com mais defeito de fabricação"
-          subtitle="Chamados de defeito de fabricação ÷ vendas do mesmo produto no período. Clique num produto pra ver os chamados."
-          items={data.byProductDefeitoFabricacaoTaxa.map(produtoDefeitoToRankingRow)}
-          onSelect={openDrilldown}
-        />
+          geral de produto. */}
+      {data.byProductDefeitoFabricacao.length > 0 ? (
+        <BarRanking title="Produtos com mais defeito de fabricação" data={data.byProductDefeitoFabricacao} onSelect={openDrilldown} showPercent />
       ) : null}
 
       <section className="grid md:grid-cols-2 gap-4">
-        <div className="flex flex-col gap-2">
-          <PercentualRankingList
-            title="Conferente que mais errou"
-            subtitle="Erros de conferência ÷ notas conferidas no período (quando dá pra identificar o código do conferente no TOTVS). Clique num nome pra ver os chamados."
-            items={data.byConferente.map(conferenteToRankingRow)}
-            onSelect={openDrilldown}
-          />
-        </div>
+        <BarRanking title="Conferente que mais errou" data={data.byConferente} onSelect={openDrilldown} showCount />
         <div className="flex flex-col gap-2">
           <BarRanking title="Motorista que mais errou" data={data.byMotoristaErro} onSelect={openDrilldown} showCount />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
