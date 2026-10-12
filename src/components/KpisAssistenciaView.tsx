@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Count } from "@/lib/kpi";
-import { ASSISTENCIA_TAXA_META_IDEAL_PCT, type AssistenciaKpiData } from "@/lib/kpiAssistencia";
+import { ASSISTENCIA_TAXA_META_IDEAL_PCT, type AssistenciaKpiData, type PecaAtrasadaItem } from "@/lib/kpiAssistencia";
 import type { ReportRowItem } from "@/lib/serviceRequests";
 import { MetricCard } from "./MetricCard";
 import { KpiCardShell, StatusPill } from "./KpiCardShell";
@@ -14,6 +14,7 @@ import { DiagnosticoEstrategicoModal } from "./assistencia/DiagnosticoEstrategic
 import { VolumeChart } from "./VolumeChart";
 import { CausaRaizDonutChart } from "./CausaRaizDonutChart";
 import { AssistenciaTicketsModal } from "./AssistenciaTicketsModal";
+import { PecasAtrasadasModal } from "./assistencia/PecasAtrasadasModal";
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -38,6 +39,10 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
   // padrão booleano de showPrejuizoDetalhe acima -- conteúdo 100% estático, não depende de
   // qual card/linha foi clicada.
   const [showDiagnosticoEstrategico, setShowDiagnosticoEstrategico] = useState(false);
+  // Drill-down do ranking "Peças atrasadas por fornecedor" -- formato de
+  // dado diferente (PecaAtrasadaItem, não ReportRowItem), não dá pra
+  // reaproveitar ticketsModal/openDrilldown acima.
+  const [pecasModal, setPecasModal] = useState<{ fornecedor: string; items: PecaAtrasadaItem[] } | null>(null);
 
   function openDrilldown(item: Count) {
     const tag = item.tag ?? item.label;
@@ -46,6 +51,11 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
       totalCount: item.count,
       tickets: data.ticketsByTag[tag] ?? [],
     });
+  }
+
+  function openPecasDrilldown(item: Count) {
+    const fornecedor = item.tag ?? item.label;
+    setPecasModal({ fornecedor, items: data.pecasAtrasadasPorFornecedor[fornecedor] ?? [] });
   }
 
   const causaRaizDonutData = data.byCausaRaiz.map((c) => ({
@@ -240,6 +250,15 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
         </div>
       </section>
 
+      {data.byFornecedorPecasAtrasadas.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <BarRanking title="Peças atrasadas por fornecedor" data={data.byFornecedorPecasAtrasadas} onSelect={openPecasDrilldown} showCount />
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Pedidos de peça há mais de 30 dias aguardando resposta/chegada do fornecedor (situação atual, não muda com o período selecionado acima). Clique numa barra pra ver quais peças e há quanto tempo.
+          </p>
+        </div>
+      ) : null}
+
       {ticketsModal ? (
         <AssistenciaTicketsModal
           title={ticketsModal.title}
@@ -262,6 +281,10 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
       ) : null}
 
       {showDiagnosticoEstrategico ? <DiagnosticoEstrategicoModal onClose={() => setShowDiagnosticoEstrategico(false)} /> : null}
+
+      {pecasModal ? (
+        <PecasAtrasadasModal fornecedor={pecasModal.fornecedor} items={pecasModal.items} onClose={() => setPecasModal(null)} />
+      ) : null}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
   getVendasCountPorLoja,
 } from "./vendasProduto";
 import { listStores, type RequestType, type RequestStatus, type ReportRowItem } from "./serviceRequests";
+import { listPartOrders } from "./partOrders";
 
 // "KPIs da Assistência" (página própria, /kpis-assistencia) -- pedido do
 // Victor 27/08/2026: "preciso que você pegue todas as informações de
@@ -284,6 +285,20 @@ function aggregate(
 // percentual atual fica acima.
 export const ASSISTENCIA_TAXA_META_IDEAL_PCT = 3.0;
 
+// Uma peça em atraso, pro drill-down do ranking "Peças atrasadas por
+// fornecedor" (ver byFornecedorPecasAtrasadas abaixo).
+export type PecaAtrasadaItem = {
+  id: string;
+  ticketNumber: number;
+  externalReference: string | null;
+  partName: string;
+  product: string | null;
+  partCode: string | null;
+  clientName: string | null;
+  diasEsperando: number;
+  createdAt: string;
+};
+
 export type AssistenciaKpiData = {
   totalChamados: number;
   // Vendas (TOTVS) no mesmo período selecionado -- pedido do Victor
@@ -344,6 +359,16 @@ export type AssistenciaKpiData = {
   byCausaRaiz: Count[];
   byConferente: Count[];
   byMotoristaErro: Count[];
+  // Peças de pedido de fornecedor (part_orders) em atraso (>30 dias
+  // aguardando_resposta/aguardando_peca, ver ATRASO_ELIGIBLE_STATUSES em
+  // partOrders.ts, mesmo filtro "atrasado" já usado na tela /assistencia/pecas),
+  // agrupadas por fornecedor -- pedido do Victor 12/10/2026: "peças
+  // atrasadas divididas por fornecedor... quando clicar no fornecedor
+  // aparecem quais peças e há quanto tempo estamos esperando". Estado
+  // ATUAL (não respeita o filtro de período do resto da tela) -- atraso é
+  // uma condição de agora, não "quantos atrasaram no mês passado".
+  byFornecedorPecasAtrasadas: Count[];
+  pecasAtrasadasPorFornecedor: Record<string, PecaAtrasadaItem[]>;
   // "Vendas x Assistência Técnica" por loja -- pedido do Victor 14/09/2026:
   // "quero ver o percentual de quantidade de vendas (entregas) x
   // quantidade de assistencia tecnica". Cruza DUAS fontes independentes
@@ -785,6 +810,35 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     "motorista",
     produtosPorChamado
   );
+
+  // Peças atrasadas por fornecedor -- pedido do Victor 12/10/2026. Reusa
+  // o filtro "atrasado" de partOrders.ts (>30 dias ainda
+  // aguardando_resposta/aguardando_peca, mesmo critério já usado na tela
+  // /assistencia/pecas) em vez de inventar um limiar novo aqui.
+  const pecasAtrasadas = await listPartOrders({ atraso: "atrasado" });
+  const pecasAtrasadasPorFornecedor: Record<string, PecaAtrasadaItem[]> = {};
+  const fornecedorCounts = new Map<string, number>();
+  for (const p of pecasAtrasadas) {
+    const fornecedor = p.supplier?.trim() || "Fornecedor não informado";
+    fornecedorCounts.set(fornecedor, (fornecedorCounts.get(fornecedor) ?? 0) + 1);
+    (pecasAtrasadasPorFornecedor[fornecedor] ??= []).push({
+      id: p.id,
+      ticketNumber: p.ticketNumber,
+      externalReference: p.externalReference,
+      partName: p.partName,
+      product: p.product,
+      partCode: p.partCode,
+      clientName: p.clientName,
+      diasEsperando: Math.floor((Date.now() - new Date(p.createdAt).getTime()) / (24 * 60 * 60 * 1000)),
+      createdAt: p.createdAt,
+    });
+  }
+  for (const items of Object.values(pecasAtrasadasPorFornecedor)) {
+    items.sort((a, b) => b.diasEsperando - a.diasEsperando);
+  }
+  const byFornecedorPecasAtrasadas: Count[] = [...fornecedorCounts.entries()]
+    .map(([label, count]) => ({ label, count, tag: label }))
+    .sort((a, b) => b.count - a.count);
 
   // Produto (e grupo de produto) -- de service_request_items, dedupe por
   // (request_id, product) antes de contar: "em quantos chamados esse
@@ -1306,6 +1360,8 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     byCausaRaiz,
     byConferente,
     byMotoristaErro,
+    byFornecedorPecasAtrasadas,
+    pecasAtrasadasPorFornecedor,
     byStoreVendaVsAssistencia,
     ticketsByTag,
   };
