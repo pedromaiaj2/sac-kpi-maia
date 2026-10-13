@@ -222,8 +222,25 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   const porDia = kpis ? volumesPorDia(kpis) : [];
   const grade = kpis ? gradeVeiculos(kpis) : [];
 
+  // Média por dia de operação (dias com carga no período) -- pedido do
+  // Victor 13/10/2026: o 1º card de KPIs mostra entregas e produtos por dia.
+  const porDiaDe = (n: number, dias: number) => (dias > 0 ? n / dias : null);
+  const entregasDia = resumo ? porDiaDe(resumo.entregasRealizadas, resumo.dias) : null;
+  const entregasDiaAnterior = resumoAnterior ? porDiaDe(resumoAnterior.entregasRealizadas, resumoAnterior.dias) : null;
+  const decimal = (n: number | null) => (n === null ? "—" : n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+
   const tickerItems: TickerItem[] = resumo
     ? [
+        {
+          key: "media-dia",
+          hint: "Média por dia de operação (dias com carga no período): entregas (completas ou parciais) ÷ dias e produtos (unidades) nas cargas ÷ dias. A variação é das entregas por dia.",
+          label: "Média por dia",
+          destaque: true,
+          valor: `${decimal(entregasDia)} entregas`,
+          complemento: `${decimal(resumo ? porDiaDe(resumo.volumes.total, resumo.dias) : null)} produtos`,
+          variacao: variar(entregasDia, entregasDiaAnterior),
+          formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
+        },
         {
           key: "volta",
           hint: "De cada 100 visitas, quantas voltaram com problema: (insucessos + entregas parciais) ÷ visitas. Visita = cada vez que um pedido saiu numa carga e voltou com resultado. Mede o retrabalho, não a culpa do motorista. Verde até 5%, amarelo até 10%, vermelho acima.",
@@ -348,6 +365,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             assistencias={kpis.assistencias}
             ocorrencias={kpis.ocorrencias}
             insucessos={kpis.insucessos}
+            produtosPorte={kpis.produtosPorte}
+            regrasPorte={kpis.regrasPorte}
           />
         </>
       )}

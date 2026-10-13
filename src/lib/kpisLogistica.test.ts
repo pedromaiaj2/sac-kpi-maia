@@ -56,6 +56,8 @@ const base: KpisEntregas = {
   assistenciasPeriodo: { total: 6, vinculadas: 4 },
   ocorrencias: {},
   insucessos: [],
+  produtosPorte: [],
+  regrasPorte: [],
 };
 
 describe("resumirLogistica", () => {

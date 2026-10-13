@@ -110,6 +110,21 @@ export type KpisEntregas = {
   // pedido que voltou sem entregar no período (abre ao clicar no motivo) -- 0164.
   ocorrencias: Record<string, { descricao: string | null; categoria: string | null }>;
   insucessos: InsucessoDetalhe[];
+  // Produtos das cargas do período por classe de porte e as regras de
+  // classificação por descrição -- abre ao clicar em P/M/G (0165).
+  produtosPorte: ProdutoPorte[];
+  regrasPorte: { padrao: string; porte: "P" | "M" | "G" }[];
+};
+
+// porte "N" = sem classe (nenhuma regra bateu). origem: "regra" (padrão
+// na descrição), "nenhuma", ou a origem do cadastro manual em produto_porte.
+export type ProdutoPorte = {
+  porte: "P" | "M" | "G" | "N";
+  produto: string;
+  descricao: string | null;
+  unidades: number;
+  cargas: number;
+  origem: string | null;
 };
 
 export type InsucessoDetalhe = {
