@@ -2,9 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { ArrowUp, ArrowDown, ArrowUpDown, X } from "lucide-react";
-import { StatusPill } from "@/components/KpiCardShell";
 import { ThHint } from "./ThHint";
-import { pct, VISITAS_MINIMAS, toneIndiceVolta } from "@/lib/logisticaFormat";
+import { pct, VISITAS_MINIMAS, toneIndiceVolta, TONE_COLOR } from "@/lib/logisticaFormat";
 import type { MotoristaEntregas } from "@/lib/kpisLogistica";
 
 // Versão "order book" da tabela de Índice de Volta -- pedido do Victor
@@ -36,7 +35,7 @@ const COLUNAS: { key: SortKey; label: string; hint: string }[] = [
     label: "Entregas",
     hint: "Visitas com o produto entregue, completa ou parcial. Passe o mouse no número pra ver quantas foram de Strada e de caminhão.",
   },
-  { key: "produtosPorCarga", label: "Produtos/carga", hint: "Média de produtos (unidades) por carga do motorista no período." },
+  { key: "produtosPorCarga", label: "Prod./carga", hint: "Média de produtos (unidades) por carga do motorista no período." },
   {
     key: "insucessos",
     label: "Insucessos",
@@ -85,18 +84,48 @@ function valorOrdenavel(m: MotoristaEntregas, key: SortKey, produtos: Record<str
   }
 }
 
-const th = "px-1.5 py-1.5 font-semibold whitespace-nowrap";
-const thStyle = { color: "var(--text-secondary)" };
+// Cabeçalho fixo (sticky) -- pedido do Victor 13/10/2026: continua visível
+// ao rolar a tabela. O fundo precisa estar no próprio <th>.
+const th = "sticky top-0 z-10 px-1.5 py-2 font-semibold whitespace-nowrap";
+const thStyle = { color: "var(--text-secondary)", background: "var(--surface-2)" };
+
+const ROTULO_TOM: Record<"good" | "warning" | "critical" | "neutral", string> = {
+  good: "dentro da meta (até 5%)",
+  warning: "atenção (5% a 10%)",
+  critical: "crítico (acima de 10%)",
+  neutral: "sem visitas",
+};
+
+// Badge do semáforo da volta: fundo na cor do status, texto sempre neutro,
+// bolinha na cor cheia (padrão de badges do painel).
+function VoltaBadge({ valor }: { valor: number | null }) {
+  const tom = toneIndiceVolta(valor);
+  const cor = TONE_COLOR[tom];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-semibold tabular-nums rounded-full px-2.5 py-1"
+      style={{
+        background: tom === "neutral" ? "var(--surface-2)" : `color-mix(in srgb, ${cor} 22%, var(--surface-1))`,
+        color: "var(--text-primary)",
+      }}
+      title={ROTULO_TOM[tom]}
+    >
+      {tom !== "neutral" && <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: cor }} />}
+      {pct(valor)}
+    </span>
+  );
+}
 
 export function VinculoTag({ vinculo, transportadora }: { vinculo: string | null; transportadora?: string | null }) {
   if (!vinculo) return <span style={{ color: "var(--text-muted)" }}>—</span>;
   const cor = vinculo === "Próprio" ? "var(--brand-green)" : "var(--series-5)";
   return (
     <span
-      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-      style={{ color: cor, background: `color-mix(in srgb, ${cor} 14%, var(--surface-1))` }}
+      className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+      style={{ color: "var(--text-primary)", background: "var(--surface-2)" }}
       title={transportadora ?? undefined}
     >
+      <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: cor }} />
       {vinculo}
     </span>
   );
@@ -155,10 +184,10 @@ export function TabelaMotoristasOrdenavel({
           </button>
         </div>
       ) : null}
-      <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+      <div className="rounded-lg border overflow-auto max-h-[70vh]" style={{ borderColor: "var(--border)" }}>
         <table className="w-full text-xs border-collapse">
           <thead>
-            <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+            <tr>
               <th className={`${th} text-left`} style={thStyle}>
                 <button type="button" onClick={() => toggleSort("nome")} className="inline-flex items-center gap-1">
                   Motorista
@@ -190,26 +219,25 @@ export function TabelaMotoristasOrdenavel({
               const poucas = m.visitas < VISITAS_MINIMAS;
               return (
                 <tr key={m.codigo} className="border-b" style={{ borderColor: "var(--border)", opacity: poucas ? 0.55 : 1 }}>
-                  <td className="px-2 py-1.5 min-w-[150px]">
+                  <td className="px-1.5 py-1.5 min-w-[150px]" title={poucas ? `Menos de ${VISITAS_MINIMAS} visitas no período: índice instável` : undefined}>
                     <span className="block font-semibold" style={{ color: "var(--text-primary)" }}>
                       {m.nome ?? "Sem nome"}
                     </span>
                     <span className="flex items-center gap-1.5 mt-0.5 tabular-nums" style={{ color: "var(--text-muted)" }}>
                       <VinculoTag vinculo={m.vinculo} transportadora={m.transportadora} />
                       {m.codigo}
-                      {poucas ? " · poucas visitas" : ""}
                     </span>
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.cargas}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.visitas}</td>
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">{m.cargas}</td>
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">{m.visitas}</td>
                   <td
                     className="px-2 py-1.5 text-right tabular-nums font-semibold"
                     title={`Strada ${m.entregasPorVeiculo.Carro} · caminhão ${m.entregasPorVeiculo["Caminhão"]}`}
                   >
                     {m.entregasRealizadas}
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">
-                    {m.cargas > 0 ? ((produtos[m.codigo] ?? 0) / m.cargas).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
+                    {m.cargas > 0 ? ((produtos[m.codigo] ?? 0) / m.cargas).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"}
                   </td>
                   <td
                     className="px-2 py-1.5 text-right tabular-nums font-semibold"
@@ -222,14 +250,14 @@ export function TabelaMotoristasOrdenavel({
                       </span>
                     )}
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.parciais}</td>
-                  <td className="px-2 py-1.5 text-right">
-                    <StatusPill label={pct(m.indiceVolta)} tone={toneIndiceVolta(m.indiceVolta)} />
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">{m.parciais}</td>
+                  <td className="px-1.5 py-1.5 text-right">
+                    <VoltaBadge valor={m.indiceVolta} />
                   </td>
-                  <td className="px-2 py-1.5 text-right">
-                    <StatusPill label={pct(m.indiceVoltaLogistica)} tone={toneIndiceVolta(m.indiceVoltaLogistica)} />
+                  <td className="px-1.5 py-1.5 text-right">
+                    <VoltaBadge valor={m.indiceVoltaLogistica} />
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
                     {m.assistencias.total > 0 ? (
                       <button
                         type="button"

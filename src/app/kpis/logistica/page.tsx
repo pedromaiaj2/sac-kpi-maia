@@ -1,11 +1,10 @@
-import Link from "next/link";
-import { RefreshCw } from "lucide-react";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { AppHeader } from "@/components/AppHeader";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 import { ThHint } from "@/components/logistica/ThHint";
 import { LogisticaTerminal } from "@/components/logistica/LogisticaTerminal";
 import { IndiceTicker, type TickerItem } from "@/components/logistica/IndiceTicker";
+import { FiltrosLogistica } from "@/components/logistica/FiltrosLogistica";
 import { parsePeriodoKpis, TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
 import {
   getKpisEntregas,
@@ -64,27 +63,13 @@ function resolverPeriodo(params: Params) {
   return { preset: preset.key, de, ate, tipo, veiculo, vinculo };
 }
 
-function href(base: Record<string, string | undefined>) {
-  const q = new URLSearchParams(Object.entries(base).filter((e): e is [string, string] => !!e[1]));
-  const s = q.toString();
-  return s ? `/kpis/logistica?${s}` : "/kpis/logistica";
-}
-
-function pillStyle(active: boolean) {
-  return {
-    color: active ? "var(--surface-1)" : "var(--text-secondary)",
-    background: active ? "var(--brand-green)" : "transparent",
-    border: `1px solid ${active ? "var(--brand-green)" : "var(--border)"}`,
-  };
-}
-
-// Título com ícone "i" (ThHint) quando tem hint -- pedido do Victor
-// 09/10/2026, 2ª rodada de refino: "remova todo texto cinza explicativo
-// renderizado direto na tela". Mesmo padrão de Secao em LogisticaTerminal.tsx.
+// Card de seção: borda verde 2px (padrão do painel) + sombra leve e mais
+// respiro (pedido do Victor 13/10/2026). Título com ícone "i" (ThHint) em
+// vez de texto explicativo solto. Mesmo padrão de Secao em LogisticaTerminal.tsx.
 function Bloco({ titulo, hint, children }: { titulo: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl p-3 flex flex-col gap-2" style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
-      <h2 className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
+    <section className="rounded-xl p-4 sm:p-5 flex flex-col gap-3 shadow-sm" style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
+      <h2 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
         {hint ? <ThHint hint={hint}>{titulo}</ThHint> : titulo}
       </h2>
       {children}
@@ -108,7 +93,7 @@ function Celula({ c, total, destaque }: { c: CelulaVeiculo; total: number; desta
         {num(c.entregas)}
         {total > 0 && (
           <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--text-muted)" }}>
-            {pct(c.entregas / total, 0)}
+            {pct(c.entregas / total)}
           </span>
         )}
       </span>
@@ -205,7 +190,6 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   await requireDashboardAuth();
   const params = await searchParams;
   const sel = resolverPeriodo(params);
-  const filtros = { tipo: sel.tipo, veiculo: sel.veiculo, vinculo: sel.vinculo };
   const vinculo = sel.vinculo ?? null;
   const parsed = parsePeriodoKpis(
     new URLSearchParams({
@@ -215,7 +199,6 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
       ...(sel.veiculo ? { tipoVeiculo: sel.veiculo } : {}),
     }),
   );
-  const base = sel.preset === "custom" ? { de: sel.de, ate: sel.ate } : { periodo: sel.preset };
 
   // Tela só de entregas (RPC kpis_entregas, migração 0162) -- pedido do
   // Victor 13/10/2026: Índice de Volta só com a entrega; as assistências
@@ -309,89 +292,29 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     : [];
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-10 flex flex-col gap-6">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-12 flex flex-col gap-7">
       <AppHeader />
       <KpisSectionTabs active="logistica" />
 
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
-            Logística
-          </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Cargas despachadas pelo CD, entregas por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que
-            aconteceu na entrega). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a
-            previsão definida pelo CD (ZAG_DTPREV). A conta de treinamento (000058) fica fora.
-          </p>
-        </div>
-        {/* Página é force-dynamic (sem cache) -- esse horário é o do
-            render de verdade, não um placeholder. "Atualizar" é só
-            recarregar a mesma URL (mesmo filtro/período já aplicado),
-            pedido do Victor pra deixar explícito que os dados são ao
-            vivo em telas de TV/reunião. */}
-        <Link
-          href={href({ ...base, ...filtros })}
-          className="flex items-center gap-1.5 text-xs shrink-0 rounded-full px-3 py-1.5"
-          style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
-        >
-          <RefreshCw aria-hidden size={13} />
-          Atualizado às{" "}
-          {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }).format(new Date())}
-        </Link>
-      </div>
+      <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+        <ThHint hint="Cargas despachadas pelo CD, entregas por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que aconteceu na entrega). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). A conta de treinamento (000058) fica fora.">
+          Logística
+        </ThHint>
+      </h1>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {PRESETS.map((p) => (
-            <Link key={p.key} href={href({ periodo: p.key, ...filtros })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.preset === p.key)}>
-              {p.label}
-            </Link>
-          ))}
-          <form method="get" className="flex items-center gap-1.5 text-sm" style={{ color: "var(--text-secondary)" }}>
-            <input
-              type="date"
-              name="de"
-              defaultValue={sel.preset === "custom" ? sel.de : undefined}
-              className="rounded px-2 py-1 text-xs"
-              style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
-            />
-            <span>até</span>
-            <input
-              type="date"
-              name="ate"
-              defaultValue={sel.preset === "custom" ? sel.ate : undefined}
-              className="rounded px-2 py-1 text-xs"
-              style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
-            />
-            {sel.tipo && <input type="hidden" name="tipo" value={sel.tipo} />}
-            {sel.veiculo && <input type="hidden" name="veiculo" value={sel.veiculo} />}
-            {sel.vinculo && <input type="hidden" name="vinculo" value={sel.vinculo} />}
-            <button type="submit" className="text-xs px-2 py-1 rounded" style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-              Aplicar
-            </button>
-          </form>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-          <span>Tipo:</span>
-          {[undefined, ...TIPOS_CARGA.filter((t) => t !== "Retirada")].map((t) => (
-            <Link key={t ?? "todos"} href={href({ ...base, ...filtros, tipo: t })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.tipo === t)}>
-              {t ?? "Todos"}
-            </Link>
-          ))}
-          <span className="ml-3">Veículo:</span>
-          {[undefined, ...TIPOS_VEICULO].map((v) => (
-            <Link key={v ?? "todos"} href={href({ ...base, ...filtros, veiculo: v })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.veiculo === v)}>
-              {v === "Carro" ? "Carro (Strada)" : (v ?? "Todos")}
-            </Link>
-          ))}
-          <span className="ml-3">Motoristas:</span>
-          {[undefined, ...VINCULOS].map((v) => (
-            <Link key={v ?? "todos"} href={href({ ...base, ...filtros, vinculo: v })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.vinculo === v)}>
-              {v ? ROTULO_VINCULO[v] : "Todos"}
-            </Link>
-          ))}
-        </div>
-      </div>
+      <FiltrosLogistica
+        preset={sel.preset}
+        de={sel.de}
+        ate={sel.ate}
+        tipo={sel.tipo}
+        veiculo={sel.veiculo}
+        vinculo={sel.vinculo}
+        presets={PRESETS.map((p) => ({ valor: p.key, rotulo: p.label }))}
+        tipos={TIPOS_CARGA.filter((t) => t !== "Retirada").map((t) => ({ valor: t, rotulo: t }))}
+        veiculos={TIPOS_VEICULO.map((v) => ({ valor: v, rotulo: v === "Carro" ? "Carro (Strada)" : v }))}
+        vinculos={VINCULOS.map((v) => ({ valor: v, rotulo: ROTULO_VINCULO[v] }))}
+        atualizadoEm={new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }).format(new Date())}
+      />
 
       {!parsed.ok || !kpis || !resumo ? (
         <p className="text-sm rounded-lg px-4 py-3" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>

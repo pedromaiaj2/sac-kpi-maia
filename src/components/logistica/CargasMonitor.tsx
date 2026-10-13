@@ -71,9 +71,10 @@ export function CargasMonitor({
             </span>
             <span className="flex flex-col items-end gap-0.5 shrink-0">
               <span
-                className="text-[10px] font-semibold px-1.5 rounded-full"
-                style={{ color: status.color, background: `color-mix(in srgb, ${status.color} 14%, var(--surface-1))` }}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 rounded-full"
+                style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${status.color} 22%, var(--surface-1))` }}
               >
+                <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: status.color }} />
                 {status.label}
               </span>
               <span className="tabular-nums" style={{ color: "var(--text-muted)" }}>

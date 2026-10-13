@@ -17,10 +17,10 @@ import type { AssistenciaEntrega, CargaEntregas, MotoristaEntregas, CausasVolta,
 // explicação -- nunca mais um parágrafo de texto solto ocupando espaço
 // vertical. O texto completo continua acessível (tooltip nativo), só não
 // fica mais sempre visível.
-function Secao({ titulo, hint, children }: { titulo: string; hint?: string; children: React.ReactNode }) {
+function Secao({ titulo, hint, className = "", children }: { titulo: string; hint?: string; className?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl p-2.5 flex flex-col gap-2 min-w-0" style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
-      <h2 className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
+    <section className={`rounded-xl p-4 sm:p-5 flex flex-col gap-3 min-w-0 shadow-sm ${className}`} style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
+      <h2 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
         {hint ? <ThHint hint={hint}>{titulo}</ThHint> : titulo}
       </h2>
       {children}
@@ -73,31 +73,38 @@ export function LogisticaTerminal({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
+    <div className="flex flex-col gap-7">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         <Secao
           titulo="Monitor de Cargas"
           hint="Cargas do período, da mais recente. Alerta = tem pedido não entregue ou cancelado; Concluída = tudo entregue; Em rota = ainda sem resultado de todos. Clique numa carga pra filtrar a tabela de motoristas pelo motorista dela; clique de novo pra limpar."
         >
           <CargasMonitor cargas={cargas} selecionada={selecionado?.codigo ?? null} onSelect={handleSelect} />
         </Secao>
-        <Secao titulo="Produtos por porte (P/M/G)" hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande.">
+        <Secao
+          titulo="Produtos por porte (P/M/G)"
+          hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande. Passe o mouse numa barra pra ver os números do dia."
+          className="lg:col-span-2"
+        >
           <VolumePorteChart data={porDia} />
         </Secao>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         <Secao
           titulo="Causas da Volta"
           hint="Tudo o que entra no Índice de Volta, por tipo: insucessos (pela categoria do motivo) e entregas parciais. A soma das barras é o total de voltas do período."
         >
           <CausasVoltaChart causas={causasVolta} />
         </Secao>
+        <Secao
+          titulo="Motivos dos insucessos"
+          hint="Cada pedido que voltou sem entregar, pelo código de ocorrência lançado no Protheus. Nas barras: vermelho = logística (conta na Volta Logística); azul = L06, pedido não carregado (falha do CD); o resto é do cliente ou outros. Troque para Rosca pra ver a fatia de cada motivo."
+          className="lg:col-span-2"
+        >
+          <MotivosInsucesso motivos={motivos} />
+        </Secao>
       </div>
-
-      <Secao
-        titulo="Motivos dos insucessos"
-        hint="Cada pedido que voltou sem entregar, pelo código de ocorrência lançado no Protheus. Vermelho = logística (conta na Volta Logística); L06 = pedido não carregado (falha do CD); o resto é do cliente ou outros."
-      >
-        <MotivosInsucesso motivos={motivos} />
-      </Secao>
 
       <Secao
         titulo="Índice de Volta por motorista"

@@ -106,9 +106,10 @@ export function AssistenciasMotorista({
                     </td>
                     <td className="px-2 py-1.5 whitespace-nowrap" title={at.hint}>
                       <span
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                        style={{ color: at.cor, background: `color-mix(in srgb, ${at.cor} 14%, var(--surface-1))` }}
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${at.cor} 22%, var(--surface-1))` }}
                       >
+                        <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: at.cor }} />
                         {at.label}
                       </span>
                     </td>
