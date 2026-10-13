@@ -314,7 +314,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
       <KpisSectionTabs active="logistica" />
 
       <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
-        <ThHint hint="Cargas despachadas pelo CD, entregas por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que aconteceu na entrega). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). A conta de treinamento (000058) fica fora.">
+        <ThHint hint="Cargas despachadas pelo CD, entregas por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que aconteceu na entrega). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). O código 000058 (LOJAS MAIA TREINAMENTO) é o motorista em treinamento e entra nos números como qualquer outro.">
           Logística
         </ThHint>
       </h1>
