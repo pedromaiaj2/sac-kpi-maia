@@ -62,7 +62,12 @@ export type KpisLogistica = {
 // Formato da RPC kpis_entregas (migração 0162), lida só pela tela
 // /kpis/logistica: as mesmas cargas e visitas, sem nada da assistência
 // técnica (pedido do Victor 13/10/2026: "quero só entregas").
-export type CargaEntregas = CargaKpi & { vinculo: string | null; transportadora: string | null };
+export type CargaEntregas = CargaKpi & {
+  vinculo: string | null;
+  transportadora: string | null;
+  // não entregues da carga por código de ocorrência ("—" = sem código) -- 0164
+  insucessosPorMotivo: Record<string, number>;
+};
 
 export type MotoristaEntregas = {
   codigo: string;
@@ -101,6 +106,23 @@ export type KpisEntregas = {
   // ao clicar no número do motorista) e quantos chamados o período teve.
   assistencias: AssistenciaEntrega[];
   assistenciasPeriodo: { total: number; vinculadas: number };
+  // Descrição/categoria de cada código de ocorrência do Protheus e cada
+  // pedido que voltou sem entregar no período (abre ao clicar no motivo) -- 0164.
+  ocorrencias: Record<string, { descricao: string | null; categoria: string | null }>;
+  insucessos: InsucessoDetalhe[];
+};
+
+export type InsucessoDetalhe = {
+  dia: string;
+  carga: string;
+  motoristaCodigo: string;
+  codigo: string | null;
+  notaFiscal: string | null;
+  tentativa: number | null;
+  pedido: string | null;
+  cliente: string | null;
+  cpf: string | null;
+  produtos: string | null;
 };
 
 // atribuicao: "carga" (carga informada no chamado), "produto" (entrega ao

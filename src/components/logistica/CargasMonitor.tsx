@@ -13,8 +13,29 @@ import type { CargaEntregas } from "@/lib/kpisLogistica";
 // naoEntregues/canceladas), mesmo dado que a tabela "Ver as N cargas"
 // (expandível, abaixo) já mostrava cru -- só resumido em uma palavra +
 // cor pra escaneamento rápido.
-function statusCarga(c: CargaEntregas): { label: string; color: string } {
-  if (c.canceladas > 0 || c.naoEntregues > 0) return { label: "Alerta", color: "var(--status-critical)" };
+// Pedido do Victor 13/10/2026: o "Alerta" passa a dizer o motivo e a cor
+// segue o responsável -- vermelho só quando voltou por falha de logística
+// (L01 rota estourada, L02 veículo quebrado...; L06 é do CD e não conta),
+// amarelo quando voltou por cliente, CD ou outro motivo, ou teve cancelamento.
+type Ocorrencias = Record<string, { descricao: string | null; categoria: string | null }>;
+
+function motivosTexto(c: CargaEntregas, ocorrencias: Ocorrencias): string {
+  const partes = Object.entries(c.insucessosPorMotivo)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cod, n]) => `${n} × ${cod === "—" ? "sem motivo informado" : `${cod} ${ocorrencias[cod]?.descricao ?? ""}`.trim()}`);
+  const linhas = [];
+  if (c.naoEntregues > 0) linhas.push(`${c.naoEntregues} não entregue${c.naoEntregues === 1 ? "" : "s"}: ${partes.join(", ")}`);
+  if (c.canceladas > 0) linhas.push(`${c.canceladas} cancelado${c.canceladas === 1 ? "" : "s"}`);
+  return linhas.join(" · ");
+}
+
+function statusCarga(c: CargaEntregas, ocorrencias: Ocorrencias): { label: string; color: string; detalhe?: string } {
+  if (c.canceladas > 0 || c.naoEntregues > 0) {
+    const logistica = Object.keys(c.insucessosPorMotivo).some((cod) => cod.startsWith("L") && cod !== "L06");
+    return logistica
+      ? { label: "Falha logística", color: "var(--status-critical)", detalhe: motivosTexto(c, ocorrencias) }
+      : { label: "Voltou", color: "var(--status-warning)", detalhe: motivosTexto(c, ocorrencias) };
+  }
   if (c.pedidos > 0 && c.entregues === c.pedidos) return { label: "Concluída", color: "var(--status-good)" };
   return { label: "Em rota", color: "var(--series-5)" };
 }
@@ -29,10 +50,12 @@ function dataBr(dia: string) {
 
 export function CargasMonitor({
   cargas,
+  ocorrencias,
   selecionada,
   onSelect,
 }: {
   cargas: CargaEntregas[];
+  ocorrencias: Ocorrencias;
   selecionada: string | null;
   onSelect: (carga: CargaEntregas) => void;
 }) {
@@ -46,7 +69,7 @@ export function CargasMonitor({
   return (
     <div className="flex flex-col divide-y max-h-[420px] overflow-y-auto rounded-lg border" style={{ borderColor: "var(--border)" }}>
       {cargas.map((c) => {
-        const status = statusCarga(c);
+        const status = statusCarga(c, ocorrencias);
         const unidades = c.volumes.P + c.volumes.M + c.volumes.G + c.volumes.naoClassificado;
         const ativa = selecionada === c.motorista?.codigo;
         return (
@@ -56,7 +79,7 @@ export function CargasMonitor({
             onClick={() => onSelect(c)}
             className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs w-full"
             style={{ background: ativa ? "var(--surface-2)" : "transparent", borderColor: "var(--border)" }}
-            title={`${dataBr(c.dia)} · ${c.tipo ?? "Tipo não informado"} · ${c.tipoVeiculo}${c.veiculo ? ` (${c.veiculo})` : ""}${c.vinculo ? ` · ${c.vinculo}` : ""}${c.transportadora ? ` (${c.transportadora})` : ""}`}
+            title={`${dataBr(c.dia)} · ${c.tipo ?? "Tipo não informado"} · ${c.tipoVeiculo}${c.veiculo ? ` (${c.veiculo})` : ""}${c.vinculo ? ` · ${c.vinculo}` : ""}${c.transportadora ? ` (${c.transportadora})` : ""}${status.detalhe ? `\n${status.detalhe}` : ""}`}
           >
             <span className="flex flex-col min-w-0">
               <span className="font-semibold tabular-nums truncate" style={{ color: "var(--text-primary)" }}>
@@ -78,6 +101,7 @@ export function CargasMonitor({
                 {status.label}
               </span>
               <span className="tabular-nums" style={{ color: "var(--text-muted)" }}>
+                {c.naoEntregues > 0 ? `${c.naoEntregues} volt${c.naoEntregues === 1 ? "ou" : "aram"} · ` : ""}
                 {fmt(unidades)} un.
               </span>
             </span>
