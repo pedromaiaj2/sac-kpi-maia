@@ -58,6 +58,12 @@ const base: KpisEntregas = {
   insucessos: [],
   produtosPorte: [],
   regrasPorte: [],
+  veiculosPorDia: [
+    { dia: "2026-10-01", vinculo: "Próprio", tipoVeiculo: "Caminhão", veiculos: 2 },
+    { dia: "2026-10-01", vinculo: "Próprio", tipoVeiculo: "Carro", veiculos: 1 },
+    { dia: "2026-10-02", vinculo: "Próprio", tipoVeiculo: "Caminhão", veiculos: 1 },
+    { dia: "2026-10-02", vinculo: "Terceirizado", tipoVeiculo: "Caminhão", veiculos: 1 },
+  ],
 };
 
 describe("resumirLogistica", () => {
@@ -68,6 +74,9 @@ describe("resumirLogistica", () => {
     expect(r.indiceVolta).toBeCloseTo(12 / 100);
     expect(r.indiceVoltaLogistica).toBeCloseTo(1 / 100);
     expect(r).toMatchObject({ entregasRealizadas: 80, entregasCarro: 5, entregasCaminhao: 75 });
+    // 2 dias com carga: (2 + 1 + 1) caminhões e 1 Strada
+    expect(r.caminhoesDia).toBeCloseTo(4 / 2);
+    expect(r.stradasDia).toBeCloseTo(1 / 2);
     // Soma das causas bate com o numerador de indiceVolta (12/100 acima).
     expect(r.causasVolta).toEqual({
       insucessoCliente: 7,
@@ -88,8 +97,8 @@ describe("resumirLogistica", () => {
 describe("volumesPorDia", () => {
   it("agrupa as cargas por dia, em ordem crescente", () => {
     expect(volumesPorDia(base)).toEqual([
-      { dia: "2026-10-01", cargas: 2, P: 2, M: 3, G: 2, naoClassificado: 1 },
-      { dia: "2026-10-02", cargas: 1, P: 1, M: 0, G: 3, naoClassificado: 0 },
+      { dia: "2026-10-01", cargas: 2, caminhoes: 2, stradas: 1, P: 2, M: 3, G: 2, naoClassificado: 1 },
+      { dia: "2026-10-02", cargas: 1, caminhoes: 2, stradas: 0, P: 1, M: 0, G: 3, naoClassificado: 0 },
     ]);
   });
 });
@@ -136,19 +145,23 @@ describe("gradeVeiculos", () => {
     expect(g.map((l) => l.vinculo)).toEqual(["Próprio", "Terceirizado", "Total"]);
     expect(g[0]).toEqual({
       vinculo: "Próprio",
-      Carro: { cargas: 1, pedidos: 2, entregas: 5, produtos: 4 },
-      "Caminhão": { cargas: 2, pedidos: 4, entregas: 60, produtos: 8 },
-      total: { cargas: 3, pedidos: 6, entregas: 65, produtos: 12 },
+      Carro: { cargas: 1, pedidos: 2, entregas: 5, produtos: 4, veiculos: 1 },
+      "Caminhão": { cargas: 2, pedidos: 4, entregas: 60, produtos: 8, veiculos: 3 },
+      total: { cargas: 3, pedidos: 6, entregas: 65, produtos: 12, veiculos: 4 },
     });
     expect(g[2].Carro.entregas).toBe(5);
     expect(g[2]["Caminhão"].entregas).toBe(75);
-    expect(g[2].total).toEqual({ cargas: 3, pedidos: 6, entregas: 80, produtos: 12 });
+    expect(g[2].total).toEqual({ cargas: 3, pedidos: 6, entregas: 80, produtos: 12, veiculos: 5 });
   });
 
   it("vínculos sem nada no período aparecem zerados; Sem vínculo só se existir", () => {
-    const g = gradeVeiculos({ ...base, entregasPorVeiculo: [{ vinculo: "Sem vínculo", tipoVeiculo: "Caminhão", cargas: 1, pedidos: 3, entregas: 0 }] });
+    const g = gradeVeiculos({
+      ...base,
+      entregasPorVeiculo: [{ vinculo: "Sem vínculo", tipoVeiculo: "Caminhão", cargas: 1, pedidos: 3, entregas: 0 }],
+      veiculosPorDia: [],
+    });
     expect(g.map((l) => l.vinculo)).toEqual(["Próprio", "Terceirizado", "Sem vínculo", "Total"]);
-    expect(g[1].total).toEqual({ cargas: 0, pedidos: 0, entregas: 0, produtos: 0 });
+    expect(g[1].total).toEqual({ cargas: 0, pedidos: 0, entregas: 0, produtos: 0, veiculos: 0 });
   });
 });
 

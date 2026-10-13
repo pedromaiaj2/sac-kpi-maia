@@ -114,6 +114,9 @@ export type KpisEntregas = {
   // classificação por descrição -- abre ao clicar em P/M/G (0165).
   produtosPorte: ProdutoPorte[];
   regrasPorte: { padrao: string; porte: "P" | "M" | "G" }[];
+  // Veículos na rua por dia (0167): placas distintas; carga sem placa usa a
+  // placa do motorista no dia ou conta pelo motorista. Estimativa.
+  veiculosPorDia: { dia: string; vinculo: string; tipoVeiculo: string; veiculos: number }[];
 };
 
 // porte "N" = sem classe (nenhuma regra bateu). origem: "regra" (padrão
@@ -218,6 +221,9 @@ export type ResumoLogistica = {
   entregasRealizadas: number;
   entregasCarro: number;
   entregasCaminhao: number;
+  // médias por dia de operação (dias com carga)
+  caminhoesDia: number | null;
+  stradasDia: number | null;
 };
 
 export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
@@ -258,9 +264,12 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
     causasVolta.insucessoOutros += m.insucessos.outros;
     causasVolta.parciais += m.parciais;
   }
+  const dias = k.cargasPorDia.length;
+  const somaVeiculos = (tipo: string) =>
+    k.veiculosPorDia.filter((v) => (tipo === "Carro" ? v.tipoVeiculo === "Carro" : v.tipoVeiculo !== "Carro")).reduce((s, v) => s + v.veiculos, 0);
   return {
     cargas: k.cargas.length,
-    dias: k.cargasPorDia.length,
+    dias,
     pedidos: k.cargas.reduce((s, c) => s + c.pedidos, 0),
     volumes: { ...volumes, total: volumes.P + volumes.M + volumes.G + volumes.naoClassificado },
     visitas,
@@ -272,15 +281,17 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
     entregasRealizadas,
     entregasCarro,
     entregasCaminhao,
+    caminhoesDia: dias > 0 ? somaVeiculos("Caminhão") / dias : null,
+    stradasDia: dias > 0 ? somaVeiculos("Carro") / dias : null,
   };
 }
 
-export type VolumeDia = { dia: string; cargas: number } & VolumesPorte;
+export type VolumeDia = { dia: string; cargas: number; caminhoes: number; stradas: number } & VolumesPorte;
 
 export function volumesPorDia(k: KpisEntregas): VolumeDia[] {
   const porDia = new Map<string, VolumeDia>();
   for (const c of k.cargas) {
-    const d = porDia.get(c.dia) ?? { dia: c.dia, cargas: 0, P: 0, M: 0, G: 0, naoClassificado: 0 };
+    const d = porDia.get(c.dia) ?? { dia: c.dia, cargas: 0, caminhoes: 0, stradas: 0, P: 0, M: 0, G: 0, naoClassificado: 0 };
     d.cargas += 1;
     d.P += c.volumes.P;
     d.M += c.volumes.M;
@@ -288,11 +299,18 @@ export function volumesPorDia(k: KpisEntregas): VolumeDia[] {
     d.naoClassificado += c.volumes.naoClassificado;
     porDia.set(c.dia, d);
   }
+  for (const v of k.veiculosPorDia) {
+    const d = porDia.get(v.dia);
+    if (!d) continue;
+    if (v.tipoVeiculo === "Carro") d.stradas += v.veiculos;
+    else d.caminhoes += v.veiculos;
+  }
   return [...porDia.values()].sort((a, b) => a.dia.localeCompare(b.dia));
 }
 
-// produtos = unidades nas cargas (soma das quantidades dos itens).
-export type CelulaVeiculo = { cargas: number; pedidos: number; entregas: number; produtos: number };
+// produtos = unidades nas cargas (soma das quantidades dos itens);
+// veiculos = soma, dia a dia, dos veículos na rua (÷ dias = média por dia).
+export type CelulaVeiculo = { cargas: number; pedidos: number; entregas: number; produtos: number; veiculos: number };
 export type LinhaVeiculo = { vinculo: string; Carro: CelulaVeiculo; "Caminhão": CelulaVeiculo; total: CelulaVeiculo };
 
 // Grade vínculo (linhas) x veículo (colunas) a partir de entregasPorVeiculo,
@@ -300,12 +318,13 @@ export type LinhaVeiculo = { vinculo: string; Carro: CelulaVeiculo; "Caminhão":
 // (carga sem motorista) só aparece se tiver algo. Os produtos vêm das
 // cargas da lista (mesma base das cargas da grade).
 export function gradeVeiculos(k: KpisEntregas): LinhaVeiculo[] {
-  const vazia = (): CelulaVeiculo => ({ cargas: 0, pedidos: 0, entregas: 0, produtos: 0 });
+  const vazia = (): CelulaVeiculo => ({ cargas: 0, pedidos: 0, entregas: 0, produtos: 0, veiculos: 0 });
   const somar = (a: CelulaVeiculo, b: Partial<CelulaVeiculo>) => {
     a.cargas += b.cargas ?? 0;
     a.pedidos += b.pedidos ?? 0;
     a.entregas += b.entregas ?? 0;
     a.produtos += b.produtos ?? 0;
+    a.veiculos += b.veiculos ?? 0;
   };
   const linhas = new Map<string, LinhaVeiculo>();
   for (const v of VINCULOS) linhas.set(v, { vinculo: v, Carro: vazia(), "Caminhão": vazia(), total: vazia() });
@@ -322,6 +341,13 @@ export function gradeVeiculos(k: KpisEntregas): LinhaVeiculo[] {
     const coluna = c.tipoVeiculo === "Carro" ? "Carro" : "Caminhão";
     const produtos = { produtos: unidades(c.volumes) };
     for (const alvo of [linha[coluna], linha.total, total[coluna], total.total]) somar(alvo, produtos);
+  }
+  for (const v of k.veiculosPorDia) {
+    const linha = linhas.get(v.vinculo);
+    if (!linha) continue;
+    const coluna = v.tipoVeiculo === "Carro" ? "Carro" : "Caminhão";
+    const veiculos = { veiculos: v.veiculos };
+    for (const alvo of [linha[coluna], linha.total, total[coluna], total.total]) somar(alvo, veiculos);
   }
   return [...linhas.values(), total];
 }
