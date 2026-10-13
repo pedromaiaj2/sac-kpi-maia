@@ -61,8 +61,8 @@ export function VolumePorteChart({ data }: { data: VolumeDia[] }) {
           Nenhuma carga despachada no período.
         </p>
       ) : (
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 4 }} barCategoryGap="20%">
+        <ResponsiveContainer width="100%" height={360}>
+          <BarChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 4 }} barCategoryGap="30%">
             <CartesianGrid vertical={false} stroke="var(--gridline)" />
             <XAxis dataKey="dia" tickFormatter={formatDia} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
             <YAxis allowDecimals={false} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} width={44} />
