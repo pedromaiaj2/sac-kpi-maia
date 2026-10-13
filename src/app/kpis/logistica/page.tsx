@@ -249,10 +249,10 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     ? [
         {
           key: "media-dia",
-          hint: "Média por dia de operação (dias com carga no período): entregas (completas ou parciais), produtos (unidades) nas cargas e veículos na rua. Veículo = placa distinta nas cargas do dia; carga sem placa lançada usa a placa do motorista no dia ou conta pelo motorista (estimativa). A variação é das entregas por dia.",
+          hint: "Média por dia de operação (dias com carga no período; domingo sem carga não conta). Notas = pedidos que saíram nas cargas (o volume despachado pelo CD; nota que volta e sai de novo conta de novo). Entregas = pedidos que chegaram ao cliente (completas ou parciais), pelo dia da entrega. A diferença entre as duas é o que voltou sem entregar. Também: produtos (unidades) nas cargas e veículos na rua. Veículo = placa distinta nas cargas do dia; carga sem placa lançada usa a placa do motorista no dia ou conta pelo motorista (estimativa). A variação é das entregas por dia.",
           label: "Média por dia",
           destaque: true,
-          valor: `${decimal(entregasDia)} entregas`,
+          valor: `${decimal(resumo ? porDiaDe(resumo.pedidos, resumo.dias) : null)} notas · ${decimal(entregasDia)} entregas`,
           complemento: `${decimal(resumo ? porDiaDe(resumo.volumes.total, resumo.dias) : null)} produtos · ${decimal(resumo?.caminhoesDia ?? null)} caminhões · ${decimal(resumo?.stradasDia ?? null)} Stradas`,
           variacao: variar(entregasDia, entregasDiaAnterior),
           formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
