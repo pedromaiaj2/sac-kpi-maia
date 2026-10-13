@@ -34,6 +34,7 @@ function TooltipVolume({ active, payload }: { active?: boolean; payload?: Readon
       </p>
       <p className="mb-1 tabular-nums" style={{ color: "var(--text-secondary)" }}>
         Na rua: {d.caminhoes} caminh{d.caminhoes === 1 ? "ão" : "ões"} · {d.stradas} Strada{d.stradas === 1 ? "" : "s"}
+        {d.naoIdentificados > 0 ? ` · ${d.naoIdentificados} sem placa` : ""}
       </p>
       {[...SERIES].reverse().map((s) => (
         <p key={s.key} className="flex items-center gap-2 tabular-nums">

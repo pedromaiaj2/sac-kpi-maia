@@ -232,7 +232,7 @@ export function TabelaMotoristasOrdenavel({
                   <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">{m.visitas}</td>
                   <td
                     className="px-2 py-1.5 text-right tabular-nums font-semibold"
-                    title={`Strada ${m.entregasPorVeiculo.Carro} · caminhão ${m.entregasPorVeiculo["Caminhão"]}`}
+                    title={`Strada ${m.entregasPorVeiculo.Carro} · caminhão ${m.entregasPorVeiculo["Caminhão"]} · sem placa ${m.entregasPorVeiculo["Não identificado"] ?? 0}`}
                   >
                     {m.entregasRealizadas}
                   </td>

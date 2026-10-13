@@ -78,7 +78,7 @@ export type MotoristaEntregas = {
   visitas: number;
   entregues: number;
   entregasRealizadas: number;
-  entregasPorVeiculo: { Carro: number; "Caminhão": number };
+  entregasPorVeiculo: { Carro: number; "Caminhão": number; "Não identificado": number };
   insucessos: { total: number; cliente: number; logistica: number; cd: number; outros: number };
   parciais: number;
   // Chamados de assistência ligados a entregas dele (migração 0163) -- à
@@ -221,10 +221,20 @@ export type ResumoLogistica = {
   entregasRealizadas: number;
   entregasCarro: number;
   entregasCaminhao: number;
+  entregasNaoIdentificado: number;
   // médias por dia de operação (dias com carga)
   caminhoesDia: number | null;
   stradasDia: number | null;
+  naoIdentificadosDia: number | null;
 };
+
+// Coluna da grade/contagem de cada tipo de veículo. Caminhão só o que é
+// caminhão de fato; carga própria sem placa fica em "Não identificado" (0169).
+export type ColunaVeiculo = "Carro" | "Caminhão" | "Não identificado";
+export function colunaVeiculo(tipoVeiculo: string | null | undefined): ColunaVeiculo {
+  if (tipoVeiculo === "Carro" || tipoVeiculo === "Caminhão") return tipoVeiculo;
+  return "Não identificado";
+}
 
 export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
   const volumes = { P: 0, M: 0, G: 0, naoClassificado: 0 };
@@ -242,6 +252,7 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
   let entregasRealizadas = 0;
   let entregasCarro = 0;
   let entregasCaminhao = 0;
+  let entregasNaoIdentificado = 0;
   const causasVolta: CausasVolta = {
     insucessoCliente: 0,
     insucessoLogistica: 0,
@@ -253,6 +264,7 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
     entregasRealizadas += m.entregasRealizadas;
     entregasCarro += m.entregasPorVeiculo.Carro;
     entregasCaminhao += m.entregasPorVeiculo["Caminhão"];
+    entregasNaoIdentificado += m.entregasPorVeiculo["Não identificado"] ?? 0;
     visitas += m.visitas;
     entregues += m.entregues;
     voltas += m.insucessos.total + m.parciais;
@@ -265,8 +277,7 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
     causasVolta.parciais += m.parciais;
   }
   const dias = k.cargasPorDia.length;
-  const somaVeiculos = (tipo: string) =>
-    k.veiculosPorDia.filter((v) => (tipo === "Carro" ? v.tipoVeiculo === "Carro" : v.tipoVeiculo !== "Carro")).reduce((s, v) => s + v.veiculos, 0);
+  const somaVeiculos = (tipo: string) => k.veiculosPorDia.filter((v) => colunaVeiculo(v.tipoVeiculo) === tipo).reduce((s, v) => s + v.veiculos, 0);
   return {
     cargas: k.cargas.length,
     dias,
@@ -281,17 +292,19 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
     entregasRealizadas,
     entregasCarro,
     entregasCaminhao,
+    entregasNaoIdentificado,
     caminhoesDia: dias > 0 ? somaVeiculos("Caminhão") / dias : null,
     stradasDia: dias > 0 ? somaVeiculos("Carro") / dias : null,
+    naoIdentificadosDia: dias > 0 ? somaVeiculos("Não identificado") / dias : null,
   };
 }
 
-export type VolumeDia = { dia: string; cargas: number; caminhoes: number; stradas: number } & VolumesPorte;
+export type VolumeDia = { dia: string; cargas: number; caminhoes: number; stradas: number; naoIdentificados: number } & VolumesPorte;
 
 export function volumesPorDia(k: KpisEntregas): VolumeDia[] {
   const porDia = new Map<string, VolumeDia>();
   for (const c of k.cargas) {
-    const d = porDia.get(c.dia) ?? { dia: c.dia, cargas: 0, caminhoes: 0, stradas: 0, P: 0, M: 0, G: 0, naoClassificado: 0 };
+    const d = porDia.get(c.dia) ?? { dia: c.dia, cargas: 0, caminhoes: 0, stradas: 0, naoIdentificados: 0, P: 0, M: 0, G: 0, naoClassificado: 0 };
     d.cargas += 1;
     d.P += c.volumes.P;
     d.M += c.volumes.M;
@@ -302,8 +315,10 @@ export function volumesPorDia(k: KpisEntregas): VolumeDia[] {
   for (const v of k.veiculosPorDia) {
     const d = porDia.get(v.dia);
     if (!d) continue;
-    if (v.tipoVeiculo === "Carro") d.stradas += v.veiculos;
-    else d.caminhoes += v.veiculos;
+    const coluna = colunaVeiculo(v.tipoVeiculo);
+    if (coluna === "Carro") d.stradas += v.veiculos;
+    else if (coluna === "Caminhão") d.caminhoes += v.veiculos;
+    else d.naoIdentificados += v.veiculos;
   }
   return [...porDia.values()].sort((a, b) => a.dia.localeCompare(b.dia));
 }
@@ -311,7 +326,7 @@ export function volumesPorDia(k: KpisEntregas): VolumeDia[] {
 // produtos = unidades nas cargas (soma das quantidades dos itens);
 // veiculos = soma, dia a dia, dos veículos na rua (÷ dias = média por dia).
 export type CelulaVeiculo = { cargas: number; pedidos: number; entregas: number; produtos: number; veiculos: number };
-export type LinhaVeiculo = { vinculo: string; Carro: CelulaVeiculo; "Caminhão": CelulaVeiculo; total: CelulaVeiculo };
+export type LinhaVeiculo = { vinculo: string; total: CelulaVeiculo } & Record<ColunaVeiculo, CelulaVeiculo>;
 
 // Grade vínculo (linhas) x veículo (colunas) a partir de entregasPorVeiculo,
 // com a linha "Total" no fim. Vínculos na ordem de VINCULOS; "Sem vínculo"
@@ -326,26 +341,27 @@ export function gradeVeiculos(k: KpisEntregas): LinhaVeiculo[] {
     a.produtos += b.produtos ?? 0;
     a.veiculos += b.veiculos ?? 0;
   };
+  const nova = (vinculo: string): LinhaVeiculo => ({ vinculo, Carro: vazia(), "Caminhão": vazia(), "Não identificado": vazia(), total: vazia() });
   const linhas = new Map<string, LinhaVeiculo>();
-  for (const v of VINCULOS) linhas.set(v, { vinculo: v, Carro: vazia(), "Caminhão": vazia(), total: vazia() });
-  const total: LinhaVeiculo = { vinculo: "Total", Carro: vazia(), "Caminhão": vazia(), total: vazia() };
+  for (const v of VINCULOS) linhas.set(v, nova(v));
+  const total = nova("Total");
   for (const e of k.entregasPorVeiculo) {
-    const linha = linhas.get(e.vinculo) ?? { vinculo: e.vinculo, Carro: vazia(), "Caminhão": vazia(), total: vazia() };
+    const linha = linhas.get(e.vinculo) ?? nova(e.vinculo);
     linhas.set(e.vinculo, linha);
-    const coluna = e.tipoVeiculo === "Carro" ? "Carro" : "Caminhão";
+    const coluna = colunaVeiculo(e.tipoVeiculo);
     for (const alvo of [linha[coluna], linha.total, total[coluna], total.total]) somar(alvo, e);
   }
   for (const c of k.cargas) {
     const linha = linhas.get(c.vinculo ?? "Sem vínculo");
     if (!linha) continue;
-    const coluna = c.tipoVeiculo === "Carro" ? "Carro" : "Caminhão";
+    const coluna = colunaVeiculo(c.tipoVeiculo);
     const produtos = { produtos: unidades(c.volumes) };
     for (const alvo of [linha[coluna], linha.total, total[coluna], total.total]) somar(alvo, produtos);
   }
   for (const v of k.veiculosPorDia) {
     const linha = linhas.get(v.vinculo);
     if (!linha) continue;
-    const coluna = v.tipoVeiculo === "Carro" ? "Carro" : "Caminhão";
+    const coluna = colunaVeiculo(v.tipoVeiculo);
     const veiculos = { veiculos: v.veiculos };
     for (const alvo of [linha[coluna], linha.total, total[coluna], total.total]) somar(alvo, veiculos);
   }

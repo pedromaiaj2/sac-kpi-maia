@@ -24,7 +24,7 @@ function motorista(visitas: number, entregues: number, extra: Partial<MotoristaE
   return {
     codigo: "1", nome: "X", vinculo: "Próprio", transportadora: "TRANSP. LOJAS MAIA",
     cargas: 1, visitas, entregues, entregasRealizadas: entregues,
-    entregasPorVeiculo: { Carro: 0, "Caminhão": entregues },
+    entregasPorVeiculo: { Carro: 0, "Caminhão": entregues, "Não identificado": 0 },
     insucessos: { total: 0, cliente: 0, logistica: 0, cd: 0, outros: 0 },
     parciais: 0,
     assistencias: { total: 0, porCarga: 0, porProduto: 0, porCliente: 0 },
@@ -42,13 +42,14 @@ const base: KpisEntregas = {
       insucessos: { total: 10, cliente: 7, logistica: 1, cd: 2, outros: 0 },
       parciais: 2,
       assistencias: { total: 4, porCarga: 1, porProduto: 2, porCliente: 1 },
-      entregasPorVeiculo: { Carro: 0, "Caminhão": 60 },
+      entregasPorVeiculo: { Carro: 0, "Caminhão": 55, "Não identificado": 5 },
     }),
-    motorista(20, 20, { vinculo: "Terceirizado", entregasPorVeiculo: { Carro: 5, "Caminhão": 15 } }),
+    motorista(20, 20, { vinculo: "Terceirizado", entregasPorVeiculo: { Carro: 5, "Caminhão": 15, "Não identificado": 0 } }),
   ],
   entregasPorVeiculo: [
     { vinculo: "Próprio", tipoVeiculo: "Caminhão", cargas: 2, pedidos: 4, entregas: 60 },
     { vinculo: "Próprio", tipoVeiculo: "Carro", cargas: 1, pedidos: 2, entregas: 5 },
+    { vinculo: "Próprio", tipoVeiculo: "Não identificado", cargas: 0, pedidos: 0, entregas: 0 },
     { vinculo: "Terceirizado", tipoVeiculo: "Caminhão", cargas: 0, pedidos: 0, entregas: 15 },
   ],
   motivosInsucesso: [{ codigo: "C01", descricao: "Cliente Ausente", categoria: "Cliente", total: 7 }],
@@ -63,6 +64,7 @@ const base: KpisEntregas = {
     { dia: "2026-10-01", vinculo: "Próprio", tipoVeiculo: "Carro", veiculos: 1 },
     { dia: "2026-10-02", vinculo: "Próprio", tipoVeiculo: "Caminhão", veiculos: 1 },
     { dia: "2026-10-02", vinculo: "Terceirizado", tipoVeiculo: "Caminhão", veiculos: 1 },
+    { dia: "2026-10-02", vinculo: "Próprio", tipoVeiculo: "Não identificado", veiculos: 1 },
   ],
 };
 
@@ -73,10 +75,11 @@ describe("resumirLogistica", () => {
     expect(r.volumes).toEqual({ P: 3, M: 3, G: 5, naoClassificado: 1, total: 12 });
     expect(r.indiceVolta).toBeCloseTo(12 / 100);
     expect(r.indiceVoltaLogistica).toBeCloseTo(1 / 100);
-    expect(r).toMatchObject({ entregasRealizadas: 80, entregasCarro: 5, entregasCaminhao: 75 });
+    expect(r).toMatchObject({ entregasRealizadas: 80, entregasCarro: 5, entregasCaminhao: 70, entregasNaoIdentificado: 5 });
     // 2 dias com carga: (2 + 1 + 1) caminhões e 1 Strada
     expect(r.caminhoesDia).toBeCloseTo(4 / 2);
     expect(r.stradasDia).toBeCloseTo(1 / 2);
+    expect(r.naoIdentificadosDia).toBeCloseTo(1 / 2);
     // Soma das causas bate com o numerador de indiceVolta (12/100 acima).
     expect(r.causasVolta).toEqual({
       insucessoCliente: 7,
@@ -97,8 +100,8 @@ describe("resumirLogistica", () => {
 describe("volumesPorDia", () => {
   it("agrupa as cargas por dia, em ordem crescente", () => {
     expect(volumesPorDia(base)).toEqual([
-      { dia: "2026-10-01", cargas: 2, caminhoes: 2, stradas: 1, P: 2, M: 3, G: 2, naoClassificado: 1 },
-      { dia: "2026-10-02", cargas: 1, caminhoes: 2, stradas: 0, P: 1, M: 0, G: 3, naoClassificado: 0 },
+      { dia: "2026-10-01", cargas: 2, caminhoes: 2, stradas: 1, naoIdentificados: 0, P: 2, M: 3, G: 2, naoClassificado: 1 },
+      { dia: "2026-10-02", cargas: 1, caminhoes: 2, stradas: 0, naoIdentificados: 1, P: 1, M: 0, G: 3, naoClassificado: 0 },
     ]);
   });
 });
@@ -147,11 +150,13 @@ describe("gradeVeiculos", () => {
       vinculo: "Próprio",
       Carro: { cargas: 1, pedidos: 2, entregas: 5, produtos: 4, veiculos: 1 },
       "Caminhão": { cargas: 2, pedidos: 4, entregas: 60, produtos: 8, veiculos: 3 },
-      total: { cargas: 3, pedidos: 6, entregas: 65, produtos: 12, veiculos: 4 },
+      "Não identificado": { cargas: 0, pedidos: 0, entregas: 0, produtos: 0, veiculos: 1 },
+      total: { cargas: 3, pedidos: 6, entregas: 65, produtos: 12, veiculos: 5 },
     });
     expect(g[2].Carro.entregas).toBe(5);
     expect(g[2]["Caminhão"].entregas).toBe(75);
-    expect(g[2].total).toEqual({ cargas: 3, pedidos: 6, entregas: 80, produtos: 12, veiculos: 5 });
+    expect(g[2].total).toEqual({ cargas: 3, pedidos: 6, entregas: 80, produtos: 12, veiculos: 6 });
+    expect(g[0]["Não identificado"].veiculos).toBe(1);
   });
 
   it("vínculos sem nada no período aparecem zerados; Sem vínculo só se existir", () => {
