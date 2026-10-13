@@ -17,6 +17,7 @@ import type {
   InsucessoDetalhe,
   KpisEntregas,
   MotivoInsucesso,
+  ProdutoPorte,
   VolumeDia,
 } from "@/lib/kpisLogistica";
 
@@ -61,6 +62,8 @@ export function LogisticaTerminal({
   assistencias,
   ocorrencias,
   insucessos,
+  produtosPorte,
+  regrasPorte,
 }: {
   cargas: CargaEntregas[];
   motoristas: MotoristaEntregas[];
@@ -74,6 +77,8 @@ export function LogisticaTerminal({
   assistencias: AssistenciaEntrega[];
   ocorrencias: KpisEntregas["ocorrencias"];
   insucessos: InsucessoDetalhe[];
+  produtosPorte: ProdutoPorte[];
+  regrasPorte: KpisEntregas["regrasPorte"];
 }) {
   const nomes = Object.fromEntries(motoristas.map((m) => [m.codigo, m.nome ?? m.codigo]));
   const [assistAberto, setAssistAberto] = useState<MotoristaEntregas | null>(null);
@@ -97,10 +102,10 @@ export function LogisticaTerminal({
         </Secao>
         <Secao
           titulo="Produtos por porte (P/M/G)"
-          hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande. Passe o mouse numa barra pra ver os números do dia."
+          hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande. Passe o mouse numa barra pra ver os números do dia. Clique numa classe da legenda pra ver quais produtos são dela e as regras que a definem."
           className="lg:col-span-2"
         >
-          <VolumePorteChart data={porDia} />
+          <VolumePorteChart data={porDia} produtos={produtosPorte} regras={regrasPorte} />
         </Secao>
       </div>
 

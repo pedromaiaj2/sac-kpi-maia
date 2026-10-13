@@ -1,13 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { VolumeDia } from "@/lib/kpisLogistica";
+import { ProdutosPorte } from "./ProdutosPorte";
+import type { KpisEntregas, ProdutoPorte, VolumeDia } from "@/lib/kpisLogistica";
 
 const SERIES = [
-  { key: "P", label: "P (pequeno)", color: "var(--porte-p)" },
-  { key: "M", label: "M (médio)", color: "var(--porte-m)" },
-  { key: "G", label: "G (grande)", color: "var(--porte-g)" },
-  { key: "naoClassificado", label: "Sem classe", color: "var(--axis)" },
+  { key: "P", porte: "P", label: "P (pequeno)", color: "var(--porte-p)" },
+  { key: "M", porte: "M", label: "M (médio)", color: "var(--porte-m)" },
+  { key: "G", porte: "G", label: "G (grande)", color: "var(--porte-g)" },
+  { key: "naoClassificado", porte: "N", label: "Sem classe", color: "var(--axis)" },
 ] as const;
 
 function formatDia(dia: unknown) {
@@ -45,17 +47,39 @@ function TooltipVolume({ active, payload }: { active?: boolean; payload?: Readon
   );
 }
 
-export function VolumePorteChart({ data }: { data: VolumeDia[] }) {
+// Legenda clicável (pedido do Victor 13/10/2026): cada classe abre a lista
+// dos produtos dela nas cargas do período (ProdutosPorte).
+export function VolumePorteChart({
+  data,
+  produtos,
+  regras,
+}: {
+  data: VolumeDia[];
+  produtos: ProdutoPorte[];
+  regras: KpisEntregas["regrasPorte"];
+}) {
+  const [aberto, setAberto] = useState<ProdutoPorte["porte"] | null>(null);
   return (
     <div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-xs" style={{ color: "var(--text-secondary)" }}>
+      <div className="flex flex-wrap gap-2 mb-3 text-xs">
         {SERIES.map((s) => (
-          <span key={s.key} className="flex items-center gap-1.5">
+          <button
+            key={s.key}
+            type="button"
+            onClick={() => setAberto(s.porte)}
+            className="flex items-center gap-1.5 rounded-full px-2.5 py-1 hover:bg-[var(--surface-2)]"
+            style={{ border: "1px solid var(--border)", color: "var(--text-primary)" }}
+            title={`Ver os produtos ${s.label}`}
+          >
             <span className="inline-block w-3 h-3 rounded-sm" style={{ background: s.color }} />
             {s.label}
-          </span>
+            <span style={{ color: "var(--text-muted)" }}>· {produtos.filter((p) => p.porte === s.porte).length} produtos</span>
+          </button>
         ))}
       </div>
+      {aberto && (
+        <ProdutosPorte porte={aberto} produtos={produtos.filter((p) => p.porte === aberto)} regras={regras} onFechar={() => setAberto(null)} />
+      )}
       {data.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Nenhuma carga despachada no período.
