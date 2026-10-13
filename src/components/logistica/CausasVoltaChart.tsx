@@ -5,7 +5,7 @@ import type { CausasVolta } from "@/lib/kpisLogistica";
 
 // Detalhamento das causas do Índice de Volta -- pedido do Victor
 // 09/10/2026 ("detalhamento das causas da volta" na tela de KPIs de
-// logística). A soma das 6 barras é exatamente o numerador de
+// logística). A soma das 5 barras é exatamente o numerador de
 // resumo.indiceVolta (ver resumirLogistica, kpisLogistica.ts) -- nenhum
 // número novo, só a mesma conta já feita por motorista, agregada e
 // exposta aqui.
@@ -16,7 +16,7 @@ import type { CausasVolta } from "@/lib/kpisLogistica";
 // nossa/controlável dessa lista. Insucesso de CD fica de fora dessa conta
 // de propósito (ver nota "Volta Logística" na tela -- "exceto L06"), então
 // não leva a cor crítica também, mesmo sendo "nosso". O resto (cliente, CD,
-// outros, parciais, devoluções ≈) são causas externas ou
+// outros, parciais) são causas externas ou
 // mistas -- tons neutros da paleta categórica, mesmo critério de
 // CausaRaizDonutChart.tsx (causa externa/decisão do cliente = tom neutro,
 // só erro interno controlável vira vermelho).
@@ -38,12 +38,6 @@ const CAUSAS: { key: keyof CausasVolta; label: string; color: string; hint: stri
     label: "Insucesso — CD",
     color: "var(--series-5)",
     hint: "Falha do CD antes de sair pra entrega (L06, pedido não carregado etc.) -- fica fora de Volta Logística de propósito.",
-  },
-  {
-    key: "devolucoes",
-    label: "Devolução ≈",
-    color: "var(--series-8)",
-    hint: "Produto devolvido depois da entrega -- estimado por CPF (ver aviso da tela).",
   },
   { key: "parciais", label: "Entrega parcial", color: "var(--series-3)", hint: "Visita que entregou só parte do pedido." },
   {

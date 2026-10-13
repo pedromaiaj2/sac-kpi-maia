@@ -76,8 +76,10 @@ export type MotoristaEntregas = {
   entregasPorVeiculo: { Carro: number; "Caminhão": number };
   insucessos: { total: number; cliente: number; logistica: number; cd: number; outros: number };
   parciais: number;
-  devolucoes: number;
-  // (insucessos + parciais + devoluções) ÷ visitas
+  // Chamados de assistência ligados a entregas dele (migração 0163) -- à
+  // parte, não entram no Índice de Volta.
+  assistencias: { total: number; porCarga: number; porProduto: number; porCliente: number };
+  // (insucessos + parciais) ÷ visitas
   indiceVolta: number | null;
   // insucessos de logística (exceto L06) ÷ visitas
   indiceVoltaLogistica: number | null;
@@ -95,6 +97,28 @@ export type KpisEntregas = {
   // Insucessos do período pelo código de ocorrência do Protheus (C01
   // cliente ausente, L01 rota estourada...), do mais comum ao menos.
   motivosInsucesso: MotivoInsucesso[];
+  // Chamados de assistência do período ligados a uma entrega (lista que abre
+  // ao clicar no número do motorista) e quantos chamados o período teve.
+  assistencias: AssistenciaEntrega[];
+  assistenciasPeriodo: { total: number; vinculadas: number };
+};
+
+// atribuicao: "carga" (carga informada no chamado), "produto" (entrega ao
+// mesmo cliente com o produto do chamado) ou "cliente" (só pelo cliente,
+// a entrega mais recente -- provável).
+export type AssistenciaEntrega = {
+  id: string;
+  origem: "chamado" | "pedido_peca";
+  ticket: string | null;
+  tipo: string;
+  frente: string;
+  dia: string;
+  produto: string | null;
+  causaRaiz: string | null;
+  motoristaCodigo: string;
+  carga: string;
+  diaEntrega: string | null;
+  atribuicao: "carga" | "produto" | "cliente";
 };
 
 export type MotivoInsucesso = { codigo: string | null; descricao: string; categoria: string | null; total: number };
@@ -132,7 +156,7 @@ export async function getKpisLogistica({ de, ate, tipo, tipoVeiculo }: PeriodoKp
 // Quebra das causas que compõem o Índice de Volta (soma = numerador de
 // indiceVolta) -- pedido do Victor 09/10/2026: "detalhamento das causas da
 // volta" na tela. Cada chave já existia espalhada por motorista
-// (MotoristaEntregas.insucessos/.parciais/.devolucoes); aqui é
+// (MotoristaEntregas.insucessos/.parciais); aqui é
 // só a soma agregada do período inteiro, pra alimentar o gráfico de
 // distribuição sem recalcular nada.
 export type CausasVolta = {
@@ -141,7 +165,6 @@ export type CausasVolta = {
   insucessoCd: number;
   insucessoOutros: number;
   parciais: number;
-  devolucoes: number;
 };
 
 export type ResumoLogistica = {
@@ -182,7 +205,6 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
     insucessoCd: 0,
     insucessoOutros: 0,
     parciais: 0,
-    devolucoes: 0,
   };
   for (const m of k.motoristas) {
     entregasRealizadas += m.entregasRealizadas;
@@ -190,7 +212,7 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
     entregasCaminhao += m.entregasPorVeiculo["Caminhão"];
     visitas += m.visitas;
     entregues += m.entregues;
-    voltas += m.insucessos.total + m.parciais + m.devolucoes;
+    voltas += m.insucessos.total + m.parciais;
     voltasLogistica += m.insucessos.logistica;
     insucessosCd += m.insucessos.cd;
     causasVolta.insucessoCliente += m.insucessos.cliente;
@@ -198,7 +220,6 @@ export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
     causasVolta.insucessoCd += m.insucessos.cd;
     causasVolta.insucessoOutros += m.insucessos.outros;
     causasVolta.parciais += m.parciais;
-    causasVolta.devolucoes += m.devolucoes;
   }
   return {
     cargas: k.cargas.length,

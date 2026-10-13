@@ -14,24 +14,17 @@ import type { MotoristaEntregas } from "@/lib/kpisLogistica";
 // idêntico ao TabelaMotoristas anterior, só virou clicável.
 type SortKey =
   | "nome"
-  | "vinculo"
   | "cargas"
   | "visitas"
   | "entregas"
   | "produtosPorCarga"
   | "insucessos"
   | "parciais"
-  | "devolucoes"
+  | "assistencias"
   | "indiceVolta"
   | "indiceVoltaLogistica";
 
-const COLUNAS: { key: SortKey; label: string; hint: string; alinhar?: "left" }[] = [
-  {
-    key: "vinculo",
-    label: "Vínculo",
-    hint: "Próprio ou terceirizado pela maioria das cargas do motorista. Nos totais, cada carga conta pela transportadora dela: terceirizado dirigindo caminhão nosso (carga lançada como TRANSP. LOJAS MAIA) entra nos próprios.",
-    alinhar: "left",
-  },
+const COLUNAS: { key: SortKey; label: string; hint: string }[] = [
   { key: "cargas", label: "Cargas", hint: "Cargas despachadas com o motorista, pela data da carga (previsão do CD)." },
   {
     key: "visitas",
@@ -51,19 +44,19 @@ const COLUNAS: { key: SortKey; label: string; hint: string; alinhar?: "left" }[]
   },
   { key: "parciais", label: "Parciais", hint: "Visitas em que só parte do pedido foi entregue." },
   {
-    key: "devolucoes",
-    label: "≈ Devoluções",
-    hint: "Notas de devolução no Protheus até 30 dias depois de uma entrega ao mesmo CPF, ligadas ao motorista dessa entrega. Estimado, por isso o ≈.",
-  },
-  {
     key: "indiceVolta",
     label: "Volta total",
-    hint: "De cada 100 visitas, quantas voltaram com problema: (insucessos + parciais + devoluções) ÷ visitas. Mede o retrabalho, não a culpa do motorista (cliente ausente entra aqui). Verde até 5%, amarelo até 10%, vermelho acima.",
+    hint: "De cada 100 visitas, quantas voltaram com problema: (insucessos + parciais) ÷ visitas. Mede o retrabalho, não a culpa do motorista (cliente ausente entra aqui). Verde até 5%, amarelo até 10%, vermelho acima.",
   },
   {
     key: "indiceVoltaLogistica",
     label: "Volta logística",
     hint: "Só a parte que é falha do transporte: insucessos com motivo de logística (L01 rota estourada, L02 veículo quebrado...) ÷ visitas. L06 (pedido não carregado) é do CD e fica fora.",
+  },
+  {
+    key: "assistencias",
+    label: "Assistências",
+    hint: "Chamados de assistência técnica abertos no período (troca, peça, recolhimento, entrega de produto novo) ligados a uma entrega deste motorista. Não entram no Índice de Volta. Ligação: carga informada no chamado, ou entrega ao mesmo cliente com o produto do chamado; sem o produto, a entrega mais recente ao cliente (≈). Clique no número pra ver os chamados.",
   },
 ]
 
@@ -71,8 +64,6 @@ function valorOrdenavel(m: MotoristaEntregas, key: SortKey, produtos: Record<str
   switch (key) {
     case "nome":
       return m.nome ?? m.codigo;
-    case "vinculo":
-      return m.vinculo ?? "";
     case "cargas":
       return m.cargas;
     case "visitas":
@@ -85,8 +76,8 @@ function valorOrdenavel(m: MotoristaEntregas, key: SortKey, produtos: Record<str
       return m.insucessos.total;
     case "parciais":
       return m.parciais;
-    case "devolucoes":
-      return m.devolucoes;
+    case "assistencias":
+      return m.assistencias.total;
     case "indiceVolta":
       return m.indiceVolta ?? -1;
     case "indiceVoltaLogistica":
@@ -94,7 +85,7 @@ function valorOrdenavel(m: MotoristaEntregas, key: SortKey, produtos: Record<str
   }
 }
 
-const th = "px-2 py-1.5 font-semibold whitespace-nowrap";
+const th = "px-1.5 py-1.5 font-semibold whitespace-nowrap";
 const thStyle = { color: "var(--text-secondary)" };
 
 export function VinculoTag({ vinculo, transportadora }: { vinculo: string | null; transportadora?: string | null }) {
@@ -116,6 +107,7 @@ export function TabelaMotoristasOrdenavel({
   produtos,
   filtroCodigo,
   onLimparFiltro,
+  onAbrirAssistencias,
 }: {
   motoristas: MotoristaEntregas[];
   // Produtos (unidades) nas cargas de cada motorista -- ver produtosPorMotorista.
@@ -125,6 +117,7 @@ export function TabelaMotoristasOrdenavel({
   // LogisticaTerminal.tsx, dono do estado de seleção).
   filtroCodigo: string | null;
   onLimparFiltro: () => void;
+  onAbrirAssistencias: (m: MotoristaEntregas) => void;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "indiceVolta", dir: "desc" });
 
@@ -173,7 +166,7 @@ export function TabelaMotoristasOrdenavel({
                 </button>
               </th>
               {COLUNAS.map((c, i) => (
-                <th key={c.key} className={`${th} ${c.alinhar === "left" ? "text-left" : "text-right"}`} style={thStyle}>
+                <th key={c.key} className={`${th} text-right`} style={thStyle}>
                   <ThHint hint={c.hint} lado={i >= COLUNAS.length / 2 ? "direita" : "esquerda"}>
                     <button type="button" onClick={() => toggleSort(c.key)} className="inline-flex items-center gap-1">
                       {c.label}
@@ -197,17 +190,15 @@ export function TabelaMotoristasOrdenavel({
               const poucas = m.visitas < VISITAS_MINIMAS;
               return (
                 <tr key={m.codigo} className="border-b" style={{ borderColor: "var(--border)", opacity: poucas ? 0.55 : 1 }}>
-                  <td className="px-2 py-1.5">
-                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                  <td className="px-2 py-1.5 min-w-[150px]">
+                    <span className="block font-semibold" style={{ color: "var(--text-primary)" }}>
                       {m.nome ?? "Sem nome"}
                     </span>
-                    <span className="ml-2 tabular-nums" style={{ color: "var(--text-muted)" }}>
+                    <span className="flex items-center gap-1.5 mt-0.5 tabular-nums" style={{ color: "var(--text-muted)" }}>
+                      <VinculoTag vinculo={m.vinculo} transportadora={m.transportadora} />
                       {m.codigo}
                       {poucas ? " · poucas visitas" : ""}
                     </span>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <VinculoTag vinculo={m.vinculo} transportadora={m.transportadora} />
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.cargas}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.visitas}</td>
@@ -232,12 +223,26 @@ export function TabelaMotoristasOrdenavel({
                     )}
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.parciais}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.devolucoes}</td>
                   <td className="px-2 py-1.5 text-right">
                     <StatusPill label={pct(m.indiceVolta)} tone={toneIndiceVolta(m.indiceVolta)} />
                   </td>
                   <td className="px-2 py-1.5 text-right">
                     <StatusPill label={pct(m.indiceVoltaLogistica)} tone={toneIndiceVolta(m.indiceVoltaLogistica)} />
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">
+                    {m.assistencias.total > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => onAbrirAssistencias(m)}
+                        className="underline decoration-dotted underline-offset-2 font-bold"
+                        style={{ color: "var(--brand-green)" }}
+                        title={`${m.assistencias.porCarga} pela carga do chamado · ${m.assistencias.porProduto} pelo cliente + produto · ${m.assistencias.porCliente} só pelo cliente (≈). Clique pra ver.`}
+                      >
+                        {m.assistencias.total}
+                      </button>
+                    ) : (
+                      <span style={{ color: "var(--text-muted)" }}>0</span>
+                    )}
                   </td>
                 </tr>
               );
