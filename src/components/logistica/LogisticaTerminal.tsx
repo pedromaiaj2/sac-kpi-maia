@@ -7,8 +7,9 @@ import { CausasVoltaChart } from "./CausasVoltaChart";
 import { TabelaMotoristasOrdenavel } from "./TabelaMotoristasOrdenavel";
 import { ThHint } from "./ThHint";
 import { MotivosInsucesso } from "./MotivosInsucesso";
+import { AssistenciasMotorista } from "./AssistenciasMotorista";
 import { VISITAS_MINIMAS } from "@/lib/logisticaFormat";
-import type { CargaEntregas, MotoristaEntregas, CausasVolta, MotivoInsucesso, VolumeDia } from "@/lib/kpisLogistica";
+import type { AssistenciaEntrega, CargaEntregas, MotoristaEntregas, CausasVolta, MotivoInsucesso, VolumeDia } from "@/lib/kpisLogistica";
 
 // Densidade alta (pedido do Victor 09/10/2026, 2ª rodada de refino:
 // "p-1.5, space-y-1, text-xs... remova todo texto cinza explicativo
@@ -48,6 +49,7 @@ export function LogisticaTerminal({
   causasVolta,
   motivos,
   produtos,
+  assistencias,
 }: {
   cargas: CargaEntregas[];
   motoristas: MotoristaEntregas[];
@@ -58,7 +60,9 @@ export function LogisticaTerminal({
   // (produtosPorMotorista) -- kpisLogistica.ts carrega o cliente do
   // Supabase e não pode entrar no bundle do navegador.
   produtos: Record<string, number>;
+  assistencias: AssistenciaEntrega[];
 }) {
+  const [assistAberto, setAssistAberto] = useState<MotoristaEntregas | null>(null);
   const [selecionado, setSelecionado] = useState<{ codigo: string; nome: string | null } | null>(null);
 
   function handleSelect(c: CargaEntregas) {
@@ -82,7 +86,7 @@ export function LogisticaTerminal({
         </Secao>
         <Secao
           titulo="Causas da Volta"
-          hint="Tudo o que entra no Índice de Volta, por tipo: insucessos (pela categoria do motivo), entregas parciais e devoluções. A soma das barras é o total de voltas do período."
+          hint="Tudo o que entra no Índice de Volta, por tipo: insucessos (pela categoria do motivo) e entregas parciais. A soma das barras é o total de voltas do período."
         >
           <CausasVoltaChart causas={causasVolta} />
         </Secao>
@@ -99,7 +103,20 @@ export function LogisticaTerminal({
         titulo="Índice de Volta por motorista"
         hint={`Um motorista por linha. Passe o mouse no "i" de cada coluna pra ver o que ela significa. Motoristas com menos de ${VISITAS_MINIMAS} visitas aparecem apagados (índice instável). Clique num cabeçalho pra ordenar.`}
       >
-        <TabelaMotoristasOrdenavel motoristas={motoristas} produtos={produtos} filtroCodigo={selecionado?.codigo ?? null} onLimparFiltro={() => setSelecionado(null)} />
+        <TabelaMotoristasOrdenavel
+          motoristas={motoristas}
+          produtos={produtos}
+          filtroCodigo={selecionado?.codigo ?? null}
+          onLimparFiltro={() => setSelecionado(null)}
+          onAbrirAssistencias={setAssistAberto}
+        />
+        {assistAberto && (
+          <AssistenciasMotorista
+            nome={assistAberto.nome ?? assistAberto.codigo}
+            itens={assistencias.filter((a) => a.motoristaCodigo === assistAberto.codigo)}
+            onFechar={() => setAssistAberto(null)}
+          />
+        )}
       </Secao>
     </div>
   );

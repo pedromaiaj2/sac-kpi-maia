@@ -26,7 +26,8 @@ function motorista(visitas: number, entregues: number, extra: Partial<MotoristaE
     cargas: 1, visitas, entregues, entregasRealizadas: entregues,
     entregasPorVeiculo: { Carro: 0, "Caminhão": entregues },
     insucessos: { total: 0, cliente: 0, logistica: 0, cd: 0, outros: 0 },
-    parciais: 0, devolucoes: 0,
+    parciais: 0,
+    assistencias: { total: 0, porCarga: 0, porProduto: 0, porCliente: 0 },
     indiceVolta: null, indiceVoltaLogistica: null,
     ...extra,
   };
@@ -39,7 +40,8 @@ const base: KpisEntregas = {
   motoristas: [
     motorista(80, 60, {
       insucessos: { total: 10, cliente: 7, logistica: 1, cd: 2, outros: 0 },
-      parciais: 2, devolucoes: 3,
+      parciais: 2,
+      assistencias: { total: 4, porCarga: 1, porProduto: 2, porCliente: 1 },
       entregasPorVeiculo: { Carro: 0, "Caminhão": 60 },
     }),
     motorista(20, 20, { vinculo: "Terceirizado", entregasPorVeiculo: { Carro: 5, "Caminhão": 15 } }),
@@ -50,6 +52,8 @@ const base: KpisEntregas = {
     { vinculo: "Terceirizado", tipoVeiculo: "Caminhão", cargas: 0, pedidos: 0, entregas: 15 },
   ],
   motivosInsucesso: [{ codigo: "C01", descricao: "Cliente Ausente", categoria: "Cliente", total: 7 }],
+  assistencias: [],
+  assistenciasPeriodo: { total: 6, vinculadas: 4 },
 };
 
 describe("resumirLogistica", () => {
@@ -57,17 +61,16 @@ describe("resumirLogistica", () => {
     const r = resumirLogistica(base);
     expect(r).toMatchObject({ cargas: 3, dias: 2, pedidos: 6, visitas: 100, entregues: 80, insucessosCd: 2 });
     expect(r.volumes).toEqual({ P: 3, M: 3, G: 5, naoClassificado: 1, total: 12 });
-    expect(r.indiceVolta).toBeCloseTo(15 / 100);
+    expect(r.indiceVolta).toBeCloseTo(12 / 100);
     expect(r.indiceVoltaLogistica).toBeCloseTo(1 / 100);
     expect(r).toMatchObject({ entregasRealizadas: 80, entregasCarro: 5, entregasCaminhao: 75 });
-    // Soma das causas bate com o numerador de indiceVolta (15/100 acima).
+    // Soma das causas bate com o numerador de indiceVolta (12/100 acima).
     expect(r.causasVolta).toEqual({
       insucessoCliente: 7,
       insucessoLogistica: 1,
       insucessoCd: 2,
       insucessoOutros: 0,
       parciais: 2,
-      devolucoes: 3,
     });
   });
 

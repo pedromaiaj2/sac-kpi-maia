@@ -218,7 +218,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   const base = sel.preset === "custom" ? { de: sel.de, ate: sel.ate } : { periodo: sel.preset };
 
   // Tela só de entregas (RPC kpis_entregas, migração 0162) -- pedido do
-  // Victor 13/10/2026: nada da assistência técnica aqui.
+  // Victor 13/10/2026: Índice de Volta só com a entrega; as assistências
+  // vêm à parte por motorista (migração 0163).
   // Período anterior (mesma duração, ver periodoAnterior) buscado em
   // paralelo, só pra alimentar o ticker de variação -- pedido do Victor
   // 09/10/2026 ("estilo home broker", comparação com período anterior).
@@ -242,7 +243,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     ? [
         {
           key: "volta",
-          hint: "De cada 100 visitas, quantas voltaram com problema: (insucessos + entregas parciais + devoluções) ÷ visitas. Visita = cada vez que um pedido saiu numa carga e voltou com resultado. Mede o retrabalho, não a culpa do motorista. Verde até 5%, amarelo até 10%, vermelho acima.",
+          hint: "De cada 100 visitas, quantas voltaram com problema: (insucessos + entregas parciais) ÷ visitas. Visita = cada vez que um pedido saiu numa carga e voltou com resultado. Mede o retrabalho, não a culpa do motorista. Verde até 5%, amarelo até 10%, vermelho acima.",
           label: "Índice de Volta",
           valor: pct(resumo.indiceVolta),
           variacao: variar(resumo.indiceVolta, resumoAnterior?.indiceVolta ?? null, true),
@@ -318,8 +319,9 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             Logística
           </h1>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Só entregas: cargas despachadas pelo CD, entregas por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada
-            um, sem dados da assistência técnica. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). A conta de treinamento (000058) fica fora.
+            Cargas despachadas pelo CD, entregas por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que
+            aconteceu na entrega). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a
+            previsão definida pelo CD (ZAG_DTPREV). A conta de treinamento (000058) fica fora.
           </p>
         </div>
         {/* Página é force-dynamic (sem cache) -- esse horário é o do
@@ -420,6 +422,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             causasVolta={resumo.causasVolta}
             motivos={kpis.motivosInsucesso}
             produtos={produtosPorMotorista(kpis.cargas)}
+            assistencias={kpis.assistencias}
           />
         </>
       )}
