@@ -142,8 +142,16 @@ function GradeVeiculos({ linhas, dias }: { linhas: LinhaVeiculo[]; dias: number 
               <ThHint hint="Fiat Strada: as placas fixas do Eduardo, Joalison e Joanderson (e a TPA9E78, compartilhada).">Strada (carro)</ThHint>
             </th>
             <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="Todo veículo que não é Strada." lado="direita">
+              <ThHint hint="Placa que não é de Strada, e carga de terceirizado (terceirizado não tem Strada). Carga própria sem placa fica em Não identificado." lado="direita">
                 Caminhão
+              </ThHint>
+            </th>
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint
+                hint="Carga da frota própria lançada sem placa no Protheus (veículo 'AIAM', 'FRETIST'...): não dá pra saber se foi Strada ou caminhão, então fica à parte em vez de distorcer a média dos caminhões. Some quando o Protheus trouxer a placa."
+                lado="direita"
+              >
+                Não identificado
               </ThHint>
             </th>
             <th className={`${th} text-right`} style={thStyle}>
@@ -171,6 +179,7 @@ function GradeVeiculos({ linhas, dias }: { linhas: LinhaVeiculo[]; dias: number 
                 </td>
                 <Celula c={l.Carro} total={total} dias={dias} veiculo="Stradas" />
                 <Celula c={l["Caminhão"]} total={total} dias={dias} veiculo="caminhões" />
+                <Celula c={l["Não identificado"]} total={total} dias={dias} veiculo="sem placa" />
                 <Celula c={l.total} total={total} dias={dias} veiculo="veículos" destaque />
               </tr>
             );
@@ -253,7 +262,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
           label: "Média por dia",
           destaque: true,
           valor: `${decimal(resumo ? porDiaDe(resumo.pedidos, resumo.dias) : null)} notas · ${decimal(entregasDia)} entregas`,
-          complemento: `${decimal(resumo ? porDiaDe(resumo.volumes.total, resumo.dias) : null)} produtos · ${decimal(resumo?.caminhoesDia ?? null)} caminhões · ${decimal(resumo?.stradasDia ?? null)} Stradas`,
+          complemento: `${decimal(resumo ? porDiaDe(resumo.volumes.total, resumo.dias) : null)} produtos · ${decimal(resumo?.caminhoesDia ?? null)} caminhões · ${decimal(resumo?.stradasDia ?? null)} Stradas · ${decimal(resumo?.naoIdentificadosDia ?? null)} sem placa`,
           variacao: variar(entregasDia, entregasDiaAnterior),
           formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
         },
@@ -291,7 +300,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         },
         {
           key: "entregas-caminhao",
-          hint: "Entregas (completas ou parciais) feitas em caminhão (todo veículo que não é Strada).",
+          hint: "Entregas (completas ou parciais) feitas em caminhão. Cargas próprias sem placa ficam fora (Não identificado, na grade de veículos), então Strada + Caminhão pode não somar o total.",
           label: "Caminhão",
           valor: num(resumo.entregasCaminhao),
           variacao: variar(resumo.entregasCaminhao, resumoAnterior?.entregasCaminhao ?? null),
@@ -344,7 +353,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         vinculo={sel.vinculo}
         presets={PRESETS.map((p) => ({ valor: p.key, rotulo: p.label }))}
         tipos={TIPOS_CARGA.filter((t) => t !== "Retirada").map((t) => ({ valor: t, rotulo: t }))}
-        veiculos={TIPOS_VEICULO.map((v) => ({ valor: v, rotulo: v === "Carro" ? "Carro (Strada)" : v }))}
+        veiculos={TIPOS_VEICULO.map((v) => ({ valor: v, rotulo: v === "Carro" ? "Carro (Strada)" : v === "Não identificado" ? "Sem placa (não identificado)" : v }))}
         vinculos={VINCULOS.map((v) => ({ valor: v, rotulo: ROTULO_VINCULO[v] }))}
         atualizadoEm={new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }).format(new Date())}
       />

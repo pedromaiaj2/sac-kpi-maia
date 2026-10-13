@@ -52,6 +52,10 @@ describe("parsePeriodoKpis", () => {
       ok: true,
       periodo: { tipoVeiculo: "Caminhão" },
     });
+    expect(parse("de=2026-10-01&ate=2026-10-02&tipoVeiculo=N%C3%A3o%20identificado")).toMatchObject({
+      ok: true,
+      periodo: { tipoVeiculo: "Não identificado" },
+    });
     expect(parse("de=2026-10-01&ate=2026-10-02&tipoVeiculo=Strada")).toMatchObject({
       ok: false,
       erro: { erro: "tipo_veiculo_invalido" },

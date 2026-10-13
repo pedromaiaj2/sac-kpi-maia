@@ -6,7 +6,8 @@ import { createHash, timingSafeEqual } from "crypto";
 export const JANELA_MAXIMA_DIAS = 92;
 export const TIPOS_CARGA = ["Entrega", "Express", "Retirada"] as const;
 // Carro = Fiat Strada (placas em veiculos_logistica, migração 0158).
-export const TIPOS_VEICULO = ["Carro", "Caminhão"] as const;
+// "Não identificado" = carga própria sem placa lançada (0169).
+export const TIPOS_VEICULO = ["Carro", "Caminhão", "Não identificado"] as const;
 
 export type ErroApi = { erro: string; mensagem: string };
 
