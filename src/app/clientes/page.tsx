@@ -25,6 +25,7 @@ import {
   listRecompraNaoContatarCompleto,
   listClvProjetadoPorCliente,
   listPadroesEDeadsRecompra,
+  listConversaoRecompra,
   isRecompraSegmento,
   RECOMPRA_SEGMENTOS,
   RECOMPRA_SEGMENTO_LABELS,
@@ -34,6 +35,7 @@ import {
   type RecompraSegmento,
   type RecompraCandidato,
   type PadraoAssociacao,
+  type ConversaoRecompraTaxa,
 } from "@/lib/recompra";
 import { listEstornos, type EstornoRow } from "@/lib/estornos";
 import { listAllEstornoRequests, type EstornoRequestStatus } from "@/lib/estornoRequests";
@@ -73,6 +75,7 @@ function buildHref(params: {
   inativo?: string;
   loja?: string;
   urgencia?: string;
+  conv?: string;
   page?: number;
 }): string {
   const sp = new URLSearchParams();
@@ -85,6 +88,7 @@ function buildHref(params: {
   if (params.inativo) sp.set("inativo", params.inativo);
   if (params.loja) sp.set("loja", params.loja);
   if (params.urgencia) sp.set("urgencia", params.urgencia);
+  if (params.conv) sp.set("conv", params.conv);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/clientes?${qs}` : "/clientes";
@@ -103,24 +107,27 @@ export default async function ClientesPage({
     inativo?: string;
     loja?: string;
     urgencia?: string;
+    conv?: string;
     page?: string;
   }>;
 }) {
   await requireDashboardAuth();
-  const { view: viewParam, q, status, nivel, segmento, padrao, inativo, loja, urgencia, page: pageParam } = await searchParams;
+  const { view: viewParam, q, status, nivel, segmento, padrao, inativo, loja, urgencia, conv, page: pageParam } = await searchParams;
   // Nível de relacionamento é a aba de aterrissagem (pedido do Victor
-  // 15/08/2026) -- "status"/"recompra"/"estornos"/"frequencia" só aparecem
-  // quando pedidos explicitamente na URL.
+  // 15/08/2026) -- "status"/"recompra"/"estornos"/"frequencia"/"conversao"
+  // só aparecem quando pedidos explicitamente na URL.
   const view =
     viewParam === "status"
       ? "status"
       : viewParam === "recompra"
         ? "recompra"
-        : viewParam === "frequencia"
-          ? "frequencia"
-          : viewParam === "estornos"
-            ? "estornos"
-            : "nivel";
+        : viewParam === "conversao"
+          ? "conversao"
+          : viewParam === "frequencia"
+            ? "frequencia"
+            : viewParam === "estornos"
+              ? "estornos"
+              : "nivel";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   return (
@@ -140,6 +147,7 @@ export default async function ClientesPage({
         <UnderlineTab href={buildHref({ view: "status" })} label="Status (Protheus)" active={view === "status"} color="var(--brand-orange)" />
         <UnderlineTab href={buildHref({ view: "nivel" })} label="Nível de relacionamento" active={view === "nivel"} color="var(--brand-orange)" />
         <UnderlineTab href={buildHref({ view: "recompra" })} label="Propensão a recompra" active={view === "recompra"} color="var(--brand-orange)" />
+        <UnderlineTab href={buildHref({ view: "conversao" })} label="Conversão 1ª → 2ª Compra" active={view === "conversao"} color="var(--brand-orange)" />
         <UnderlineTab
           href={buildHref({ view: "frequencia" })}
           label="Frequência & Potencial de Recompra"
@@ -153,6 +161,8 @@ export default async function ClientesPage({
         <StatusView q={q} status={status} page={page} />
       ) : view === "recompra" ? (
         <RecompraView q={q} segmento={segmento} page={page} />
+      ) : view === "conversao" ? (
+        <ConversaoView q={q} conv={conv} page={page} />
       ) : view === "frequencia" ? (
         <FrequenciaView q={q} padrao={padrao} page={page} />
       ) : view === "estornos" ? (
@@ -796,6 +806,285 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
       ) : null}
 
       <RecompraNaoContatarManager items={naoContatar} />
+    </>
+  );
+}
+
+// Barra de taxa (não é BarRanking de propósito -- esse componente calcula
+// "% do total somado das barras", semântica errada aqui: cada linha já É
+// uma taxa 0-100% independente, não uma fração de um bolo só). CSS puro,
+// sem Recharts -- server component, sem necessidade de client-side.
+function TaxaBarRow({ item }: { item: ConversaoRecompraTaxa }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between text-xs">
+        <span style={{ color: "var(--text-primary)" }}>{item.label}</span>
+        <span style={{ color: "var(--text-secondary)" }}>
+          {item.taxaPct.toFixed(1)}% ({item.convertidos} de {item.totalBase})
+        </span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+        <div className="h-full rounded-full" style={{ width: `${item.taxaPct}%`, background: "var(--brand-green)" }} />
+      </div>
+    </div>
+  );
+}
+
+// Aba "Conversão 1ª → 2ª Compra" -- pedido do Victor 13/10/2026: coorte de
+// quem comprou a 1ª vez há 6-12 meses + tempo médio até a 2ª compra + taxa
+// de recompra por loja/forma de pagamento. As 3 métricas agregadas usam
+// TODA a base de clientes (confirmado com o Victor), não só a coorte --
+// a coorte é só a lista accionável embaixo. Ver listConversaoRecompra
+// (recompra.ts) pro cálculo completo, em cima da materialized view
+// v_clientes_primeira_segunda_compra (migration 0161).
+async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; page: number }) {
+  const data = await listConversaoRecompra();
+
+  const filtroConv = conv === "sim" || conv === "nao" ? conv : undefined;
+  let filtrados = data.coorte6a12Meses;
+  if (filtroConv === "sim") filtrados = filtrados.filter((c) => c.converteu);
+  if (filtroConv === "nao") filtrados = filtrados.filter((c) => !c.converteu);
+  const qLower = q?.trim().toLowerCase();
+  if (qLower) filtrados = filtrados.filter((c) => (c.nome ?? "").toLowerCase().includes(qLower));
+
+  const total = filtrados.length;
+  const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
+  const pageClamped = Math.min(page, totalPages);
+  const pageItemsRaw = filtrados.slice((pageClamped - 1) * LIST_PAGE_SIZE, pageClamped * LIST_PAGE_SIZE);
+
+  const clientIdsNaPagina = [...new Set(pageItemsRaw.map((c) => c.clientId))];
+  const phonePorCliente = await listPhonePorClienteIds(clientIdsNaPagina);
+  const pageItems = pageItemsRaw.map((c) => ({ ...c, phone: phonePorCliente.get(c.clientId) ?? null }));
+
+  const coorteConvertidos = data.coorte6a12Meses.filter((c) => c.converteu).length;
+  const tempoMedioMeses =
+    data.tempoMedioDiasAteSegundaCompra !== null ? Math.round(data.tempoMedioDiasAteSegundaCompra / 30) : null;
+  const taxaGeralPct = data.totalBase > 0 ? (data.totalComSegundaCompra / data.totalBase) * 100 : 0;
+
+  return (
+    <>
+      <p className="text-xs -mt-4 max-w-2xl" style={{ color: "var(--text-muted)" }}>
+        As 3 métricas abaixo (tempo médio, taxa por loja, taxa por forma de pagamento) usam toda a base de clientes com
+        histórico de compra -- a lista no fim da página é só a coorte de quem comprou a 1ª vez há 6-12 meses, o recorte
+        maduro o bastante pra já ter tido chance real de voltar.
+      </p>
+
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div className="rounded-xl border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <span className="text-2xl font-bold" style={{ color: "var(--brand-orange)" }}>
+            {tempoMedioMeses !== null ? `~${tempoMedioMeses} ${tempoMedioMeses === 1 ? "mês" : "meses"}` : "—"}
+          </span>
+          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            Tempo médio até a 2ª compra ({data.totalComSegundaCompra.toLocaleString("pt-BR")} clientes que já converteram)
+          </span>
+        </div>
+        <div className="rounded-xl border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <span className="text-2xl font-bold" style={{ color: "var(--brand-green)" }}>
+            {taxaGeralPct.toFixed(1)}%
+          </span>
+          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            Taxa de recompra geral ({data.totalComSegundaCompra.toLocaleString("pt-BR")} de {data.totalBase.toLocaleString("pt-BR")} clientes)
+          </span>
+        </div>
+        <div className="rounded-xl border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <span className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+            {data.coorte6a12Meses.length.toLocaleString("pt-BR")}
+          </span>
+          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            Clientes na coorte de 6-12 meses -- {coorteConvertidos} já compraram de novo
+          </span>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="rounded-xl border p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Taxa de recompra por loja
+          </h3>
+          {data.porLoja.length === 0 ? (
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Sem lojas com amostra suficiente ainda.
+            </p>
+          ) : (
+            data.porLoja.map((item) => <TaxaBarRow key={item.label} item={item} />)
+          )}
+        </div>
+        <div className="rounded-xl border p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <h3 className="text-sm font-medium flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>
+            Taxa de recompra por forma de pagamento
+            <span
+              title="Código cru do TOTVS na 1ª compra do cliente (CC, PIX, CD, CRD...) -- não existe um dicionário oficial desses códigos no sistema, por isso aparece como vem. Pagamento combinado considera só o 1º método."
+              aria-label="Sobre os códigos de forma de pagamento"
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+              style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+            >
+              i
+            </span>
+          </h3>
+          {data.porFormaPagamento.length === 0 ? (
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Sem formas de pagamento com amostra suficiente ainda.
+            </p>
+          ) : (
+            data.porFormaPagamento.map((item) => <TaxaBarRow key={item.label} item={item} />)
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterPill href={buildHref({ view: "conversao", q })} label="Todos" selected={!filtroConv} />
+        <FilterPill href={buildHref({ view: "conversao", q, conv: "nao" })} label="Ainda não comprou de novo" selected={filtroConv === "nao"} />
+        <FilterPill href={buildHref({ view: "conversao", q, conv: "sim" })} label="Já comprou de novo" selected={filtroConv === "sim"} />
+      </div>
+
+      <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
+        <input type="hidden" name="view" value="conversao" />
+        {filtroConv ? <input type="hidden" name="conv" value={filtroConv} /> : null}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Buscar por nome…"
+          className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+        />
+        <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
+          Buscar
+        </button>
+        {q ? (
+          <Link href={buildHref({ view: "conversao", conv: filtroConv })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            Limpar
+          </Link>
+        ) : null}
+      </form>
+
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {total} cliente{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"}
+        {totalPages > 1 ? ` · página ${pageClamped} de ${totalPages}` : ""}
+      </p>
+
+      {pageItems.length === 0 ? (
+        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhum cliente encontrado.
+          </p>
+        </div>
+      ) : (
+        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-orange)" }}>
+          <DualScrollTable>
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-[11px] uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-orange) 10%, var(--surface-1))" }}
+                >
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">1ª compra</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Forma de pagamento</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Converteu?</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {pageItems.map((c) => (
+                  <ClienteHistoricoRow
+                    key={c.clientId}
+                    clientId={c.clientId}
+                    name={
+                      <>
+                        {c.nome ?? c.clientId}
+                        <br />
+                        {nivelBadge(c.nivel)}
+                      </>
+                    }
+                    accentColor={c.converteu ? "var(--status-good)" : "var(--status-warning)"}
+                  >
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateOnly(c.primeiraCompra)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {c.lojaPrimeiraCompra ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {c.formaPagamentoPrimeiraCompra ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {c.converteu ? (
+                        <div>
+                          <span
+                            className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ color: "var(--status-good)", background: "color-mix(in srgb, var(--status-good) 15%, transparent)" }}
+                          >
+                            Sim
+                          </span>
+                          <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                            {formatDateOnly(c.segundaCompra)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <span
+                            className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ color: "var(--status-warning)", background: "color-mix(in srgb, var(--status-warning) 15%, transparent)" }}
+                          >
+                            Ainda não
+                          </span>
+                          <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                            há {c.diasSemComprar?.toLocaleString("pt-BR")} dias
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {c.converteu ? (
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          —
+                        </span>
+                      ) : (
+                        <AcionarClienteButton
+                          nome={c.nome}
+                          phone={c.phone}
+                          mensagem={`Olá${c.nome ? `, ${c.nome}` : ""}! Notamos que faz uns meses desde sua primeira compra na Lojas Maia -- queremos te ajudar a continuar equipando sua casa. Quer ver uma condição especial pra sua próxima compra?`}
+                        />
+                      )}
+                    </td>
+                  </ClienteHistoricoRow>
+                ))}
+              </tbody>
+            </table>
+          </DualScrollTable>
+        </div>
+      )}
+
+      {totalPages > 1 ? (
+        <div className="flex items-center gap-2">
+          <Link
+            href={buildHref({ view: "conversao", q, conv: filtroConv, page: Math.max(1, pageClamped - 1) })}
+            aria-disabled={pageClamped <= 1}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped <= 1 ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped <= 1 ? "none" : undefined,
+            }}
+          >
+            ← Anterior
+          </Link>
+          <Link
+            href={buildHref({ view: "conversao", q, conv: filtroConv, page: Math.min(totalPages, pageClamped + 1) })}
+            aria-disabled={pageClamped >= totalPages}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped >= totalPages ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped >= totalPages ? "none" : undefined,
+            }}
+          >
+            Próxima →
+          </Link>
+        </div>
+      ) : null}
     </>
   );
 }

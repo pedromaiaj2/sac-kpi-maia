@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { listClientesPorNivel, diasEntre, type ClienteNivel, type ClienteNivelInfo } from "./clientes";
+import { listStores } from "./serviceRequests";
 import { DELIVERY_REQUEST_TYPES, CAUSA_RAIZ_ERRO_INTERNO } from "./assistenciaLabels";
 
 // Motor de Recompra, Fase 1 -- pedido do Victor 07/09/2026 ("desenho
@@ -859,4 +860,149 @@ export async function desmarcarNaoContatar(clientId: string): Promise<void> {
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("recompra_nao_contatar").delete().eq("client_id", clientId);
   if (error) throw new Error(error.message);
+}
+
+// -----------------------------------------------------------------------
+// Conversão 1ª -> 2ª compra -- pedido do Victor 13/10/2026: coorte de
+// clientes com a 1ª compra há 6-12 meses + tempo médio até a 2ª compra +
+// taxa de recompra por loja/forma de pagamento. Em cima de
+// v_clientes_primeira_segunda_compra (migration 0161, materialized view --
+// mesmo padrão de v_clientes_agregado_nivel/v_recompra_categorias_por_cliente,
+// refresh pelo pg_cron existente, ver comentário na migration 0124 sobre o
+// incidente de produção que uma view normal recalculada ao vivo causou).
+// -----------------------------------------------------------------------
+
+type PrimeiraSegundaCompraRow = {
+  client_id: string;
+  primeira_compra: string;
+  loja_primeira_compra: string | null;
+  forma_pagamento_primeira_compra: string | null;
+  segunda_compra: string | null;
+};
+
+// Extrai o código cru do TOTVS ("PIX 500.00" -> "PIX", "CC 350.00 (7x) |
+// R$ 40.00" -> "CC") -- pega só o 1º método quando é pagamento combinado.
+// Sem dicionário de nomes (não existe um oficial no sistema pra esses
+// códigos), mostra como vem.
+function extrairCodigoFormaPagamento(raw: string | null): string {
+  if (!raw) return "(sem forma)";
+  const primeiro = raw.split("|")[0].trim();
+  const m = primeiro.match(/^([A-Za-z$]+)/);
+  return m ? m[1].toUpperCase() : "(sem forma)";
+}
+
+export type ConversaoRecompraCliente = {
+  clientId: string;
+  nome: string | null;
+  nivel: ClienteNivel;
+  primeiraCompra: string;
+  lojaPrimeiraCompra: string | null;
+  formaPagamentoPrimeiraCompra: string | null;
+  converteu: boolean;
+  segundaCompra: string | null;
+  diasAteSegundaCompra: number | null;
+  diasSemComprar: number | null;
+};
+
+export type ConversaoRecompraTaxa = { label: string; totalBase: number; convertidos: number; taxaPct: number };
+
+export type ConversaoRecompraData = {
+  totalBase: number;
+  totalComSegundaCompra: number;
+  tempoMedioDiasAteSegundaCompra: number | null;
+  porLoja: ConversaoRecompraTaxa[];
+  porFormaPagamento: ConversaoRecompraTaxa[];
+  coorte6a12Meses: ConversaoRecompraCliente[];
+};
+
+// Mesmo threshold usado nos pares de cross-sell da aba Frequência -- corta
+// grupo com amostra pequena demais pra a taxa não virar 100%/0% irrelevante.
+const TAXA_AMOSTRA_MINIMA = 20;
+const COORTE_DIAS_MIN = 180;
+const COORTE_DIAS_MAX = 365;
+
+export async function listConversaoRecompra(): Promise<ConversaoRecompraData> {
+  const admin = getSupabaseAdmin();
+  const [niveis, rows, stores] = await Promise.all([
+    listClientesPorNivel(),
+    fetchAllPagesParallel<PrimeiraSegundaCompraRow>(
+      (from, to) =>
+        admin
+          .from("v_clientes_primeira_segunda_compra")
+          .select("client_id, primeira_compra, loja_primeira_compra, forma_pagamento_primeira_compra, segunda_compra", {
+            count: "exact",
+          })
+          .range(from, to) as unknown as PromiseLike<PagedQueryResult<PrimeiraSegundaCompraRow>>,
+      { pageSize: 1000 }
+    ),
+    listStores(),
+  ]);
+
+  const nivelPorCliente = new Map(niveis.map((n) => [n.clientId, n]));
+  const storeNameById = new Map(stores.map((s) => [s.id, s.name]));
+  const hoje = new Date();
+
+  const clientes: ConversaoRecompraCliente[] = [];
+  for (const r of rows) {
+    // Mesma exclusão de clientes internos/CONSUMIDOR FINAL de sempre --
+    // reaproveita listClientesPorNivel em vez de duplicar isClienteInterno.
+    const info = nivelPorCliente.get(r.client_id);
+    if (!info) continue;
+    const converteu = r.segunda_compra !== null;
+    clientes.push({
+      clientId: r.client_id,
+      nome: info.nome,
+      nivel: info.nivel,
+      primeiraCompra: r.primeira_compra,
+      lojaPrimeiraCompra: r.loja_primeira_compra ? storeNameById.get(r.loja_primeira_compra) ?? r.loja_primeira_compra : null,
+      formaPagamentoPrimeiraCompra: r.forma_pagamento_primeira_compra,
+      converteu,
+      segundaCompra: r.segunda_compra,
+      diasAteSegundaCompra: converteu ? diasEntre(r.primeira_compra, new Date(`${r.segunda_compra}T00:00:00`)) : null,
+      diasSemComprar: converteu ? null : diasEntre(r.primeira_compra, hoje),
+    });
+  }
+
+  const totalComSegundaCompra = clientes.filter((c) => c.converteu).length;
+  const temposConversao = clientes.map((c) => c.diasAteSegundaCompra).filter((d): d is number => d !== null);
+  const tempoMedioDiasAteSegundaCompra =
+    temposConversao.length > 0 ? temposConversao.reduce((s, d) => s + d, 0) / temposConversao.length : null;
+
+  function agrupar(chave: (c: ConversaoRecompraCliente) => string | null): ConversaoRecompraTaxa[] {
+    const porChave = new Map<string, { totalBase: number; convertidos: number }>();
+    for (const c of clientes) {
+      const k = chave(c);
+      if (!k) continue;
+      const acc = porChave.get(k) ?? { totalBase: 0, convertidos: 0 };
+      acc.totalBase++;
+      if (c.converteu) acc.convertidos++;
+      porChave.set(k, acc);
+    }
+    return [...porChave.entries()]
+      .filter(([, v]) => v.totalBase >= TAXA_AMOSTRA_MINIMA)
+      .map(([label, v]) => ({ label, totalBase: v.totalBase, convertidos: v.convertidos, taxaPct: (v.convertidos / v.totalBase) * 100 }))
+      .sort((a, b) => b.taxaPct - a.taxaPct);
+  }
+
+  const porLoja = agrupar((c) => c.lojaPrimeiraCompra);
+  const porFormaPagamento = agrupar((c) => extrairCodigoFormaPagamento(c.formaPagamentoPrimeiraCompra));
+
+  // Quem ainda não converteu aparece primeiro -- é a parte accionável da
+  // lista (candidato a "Gerar Oferta"), os já convertidos servem só de
+  // contexto/comparação.
+  const coorte6a12Meses = clientes
+    .filter((c) => {
+      const dias = diasEntre(c.primeiraCompra, hoje);
+      return dias >= COORTE_DIAS_MIN && dias <= COORTE_DIAS_MAX;
+    })
+    .sort((a, b) => Number(a.converteu) - Number(b.converteu));
+
+  return {
+    totalBase: clientes.length,
+    totalComSegundaCompra,
+    tempoMedioDiasAteSegundaCompra,
+    porLoja,
+    porFormaPagamento,
+    coorte6a12Meses,
+  };
 }
