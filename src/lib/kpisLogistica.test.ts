@@ -14,7 +14,7 @@ import {
 function carga(carga: string, dia: string, P: number, M: number, G: number, naoClassificado = 0, tipoVeiculo = "Caminhão"): CargaEntregas {
   return {
     carga, dia, tipo: "Entrega", veiculo: null, tipoVeiculo, tipoVeiculoOrigem: "placa", motorista: null,
-    vinculo: "Próprio", transportadora: "TRANSP. LOJAS MAIA",
+    vinculo: "Próprio", transportadora: "TRANSP. LOJAS MAIA", insucessosPorMotivo: {},
     pedidos: 2, entregues: 2, parciais: 0, naoEntregues: 0, canceladas: 0,
     volumes: { P, M, G, naoClassificado },
   };
@@ -54,6 +54,8 @@ const base: KpisEntregas = {
   motivosInsucesso: [{ codigo: "C01", descricao: "Cliente Ausente", categoria: "Cliente", total: 7 }],
   assistencias: [],
   assistenciasPeriodo: { total: 6, vinculadas: 4 },
+  ocorrencias: {},
+  insucessos: [],
 };
 
 describe("resumirLogistica", () => {

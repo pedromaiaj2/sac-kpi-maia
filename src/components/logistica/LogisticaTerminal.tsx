@@ -9,7 +9,16 @@ import { ThHint } from "./ThHint";
 import { MotivosInsucesso } from "./MotivosInsucesso";
 import { AssistenciasMotorista } from "./AssistenciasMotorista";
 import { VISITAS_MINIMAS } from "@/lib/logisticaFormat";
-import type { AssistenciaEntrega, CargaEntregas, MotoristaEntregas, CausasVolta, MotivoInsucesso, VolumeDia } from "@/lib/kpisLogistica";
+import type {
+  AssistenciaEntrega,
+  CargaEntregas,
+  MotoristaEntregas,
+  CausasVolta,
+  InsucessoDetalhe,
+  KpisEntregas,
+  MotivoInsucesso,
+  VolumeDia,
+} from "@/lib/kpisLogistica";
 
 // Densidade alta (pedido do Victor 09/10/2026, 2ª rodada de refino:
 // "p-1.5, space-y-1, text-xs... remova todo texto cinza explicativo
@@ -50,6 +59,8 @@ export function LogisticaTerminal({
   motivos,
   produtos,
   assistencias,
+  ocorrencias,
+  insucessos,
 }: {
   cargas: CargaEntregas[];
   motoristas: MotoristaEntregas[];
@@ -61,7 +72,10 @@ export function LogisticaTerminal({
   // Supabase e não pode entrar no bundle do navegador.
   produtos: Record<string, number>;
   assistencias: AssistenciaEntrega[];
+  ocorrencias: KpisEntregas["ocorrencias"];
+  insucessos: InsucessoDetalhe[];
 }) {
+  const nomes = Object.fromEntries(motoristas.map((m) => [m.codigo, m.nome ?? m.codigo]));
   const [assistAberto, setAssistAberto] = useState<MotoristaEntregas | null>(null);
   const [selecionado, setSelecionado] = useState<{ codigo: string; nome: string | null } | null>(null);
 
@@ -77,9 +91,9 @@ export function LogisticaTerminal({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         <Secao
           titulo="Monitor de Cargas"
-          hint="Cargas do período, da mais recente. Alerta = tem pedido não entregue ou cancelado; Concluída = tudo entregue; Em rota = ainda sem resultado de todos. Clique numa carga pra filtrar a tabela de motoristas pelo motorista dela; clique de novo pra limpar."
+          hint="Cargas do período, da mais recente. Falha logística (vermelho) = algum pedido voltou por falha do transporte (L01 rota estourada, L02 veículo quebrado...). Voltou (amarelo) = pedido não entregue por cliente, CD (L06) ou outro motivo, ou cancelado. Concluída = tudo entregue. Em rota = ainda sem resultado de todos. Passe o mouse na carga pra ver os motivos; clique pra filtrar a tabela de motoristas pelo motorista dela."
         >
-          <CargasMonitor cargas={cargas} selecionada={selecionado?.codigo ?? null} onSelect={handleSelect} />
+          <CargasMonitor cargas={cargas} ocorrencias={ocorrencias} selecionada={selecionado?.codigo ?? null} onSelect={handleSelect} />
         </Secao>
         <Secao
           titulo="Produtos por porte (P/M/G)"
@@ -99,10 +113,10 @@ export function LogisticaTerminal({
         </Secao>
         <Secao
           titulo="Motivos dos insucessos"
-          hint="Cada pedido que voltou sem entregar, pelo código de ocorrência lançado no Protheus. Nas barras: vermelho = logística (conta na Volta Logística); azul = L06, pedido não carregado (falha do CD); o resto é do cliente ou outros. Troque para Rosca pra ver a fatia de cada motivo."
+          hint="Cada pedido que voltou sem entregar, pelo código de ocorrência lançado no Protheus. Nas barras: vermelho = logística (conta na Volta Logística); azul = L06, pedido não carregado (falha do CD); o resto é do cliente ou outros. Troque para Rosca pra ver a fatia de cada motivo. Clique num motivo pra ver os pedidos com cliente, CPF e produto."
           className="lg:col-span-2"
         >
-          <MotivosInsucesso motivos={motivos} />
+          <MotivosInsucesso motivos={motivos} insucessos={insucessos} nomes={nomes} />
         </Secao>
       </div>
 

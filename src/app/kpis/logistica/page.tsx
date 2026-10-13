@@ -346,6 +346,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             motivos={kpis.motivosInsucesso}
             produtos={produtosPorMotorista(kpis.cargas)}
             assistencias={kpis.assistencias}
+            ocorrencias={kpis.ocorrencias}
+            insucessos={kpis.insucessos}
           />
         </>
       )}
