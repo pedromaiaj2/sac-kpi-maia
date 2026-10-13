@@ -102,7 +102,7 @@ export function LogisticaTerminal({
         </Secao>
         <Secao
           titulo="Produtos por porte (P/M/G)"
-          hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande. Passe o mouse numa barra pra ver os números do dia. Clique numa classe da legenda pra ver quais produtos são dela e as regras que a definem."
+          hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande. Passe o mouse numa barra pra ver os números do dia e quantos caminhões e Stradas estavam na rua. Clique numa classe da legenda pra ver quais produtos são dela e as regras que a definem."
           className="lg:col-span-2"
         >
           <VolumePorteChart data={porDia} produtos={produtosPorte} regras={regrasPorte} />

@@ -86,7 +86,20 @@ const COR_VINCULO: Record<string, string> = { "Próprio": "var(--brand-green)", 
 const porCarga = (n: number, cargas: number) =>
   cargas > 0 ? (n / cargas).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—";
 
-function Celula({ c, total, destaque }: { c: CelulaVeiculo; total: number; destaque?: boolean }) {
+function Celula({
+  c,
+  total,
+  dias,
+  veiculo,
+  destaque,
+}: {
+  c: CelulaVeiculo;
+  total: number;
+  dias: number;
+  // como chamar o veículo na média por dia ("Stradas", "caminhões", "veículos")
+  veiculo: string;
+  destaque?: boolean;
+}) {
   return (
     <td className="px-3 py-2 text-right align-top">
       <span className={`block tabular-nums ${destaque ? "text-lg font-bold" : "text-base font-semibold"}`} style={{ color: "var(--text-primary)" }}>
@@ -103,6 +116,9 @@ function Celula({ c, total, destaque }: { c: CelulaVeiculo; total: number; desta
       <span className="block text-[11px] tabular-nums whitespace-nowrap font-semibold" style={{ color: "var(--text-secondary)" }}>
         por carga: {porCarga(c.produtos, c.cargas)} produtos · {porCarga(c.pedidos, c.cargas)} pedidos
       </span>
+      <span className="block text-[11px] tabular-nums whitespace-nowrap font-semibold" style={{ color: "var(--text-secondary)" }}>
+        por dia: {porCarga(c.veiculos, dias)} {veiculo} na rua
+      </span>
     </td>
   );
 }
@@ -110,7 +126,7 @@ function Celula({ c, total, destaque }: { c: CelulaVeiculo; total: number; desta
 // Grade vínculo x veículo -- pedido do Victor 13/10/2026: separar os
 // motoristas nossos dos terceirizados e mostrar quantas entregas são
 // feitas pelas Stradas e pelos caminhões. % = fatia das entregas do período.
-function GradeVeiculos({ linhas }: { linhas: LinhaVeiculo[] }) {
+function GradeVeiculos({ linhas, dias }: { linhas: LinhaVeiculo[]; dias: number }) {
   const total = linhas[linhas.length - 1].total.entregas;
   return (
     <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
@@ -153,9 +169,9 @@ function GradeVeiculos({ linhas }: { linhas: LinhaVeiculo[] }) {
                     {ROTULO_VINCULO[l.vinculo] ?? l.vinculo}
                   </span>
                 </td>
-                <Celula c={l.Carro} total={total} />
-                <Celula c={l["Caminhão"]} total={total} />
-                <Celula c={l.total} total={total} destaque />
+                <Celula c={l.Carro} total={total} dias={dias} veiculo="Stradas" />
+                <Celula c={l["Caminhão"]} total={total} dias={dias} veiculo="caminhões" />
+                <Celula c={l.total} total={total} dias={dias} veiculo="veículos" destaque />
               </tr>
             );
           })}
@@ -233,11 +249,11 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     ? [
         {
           key: "media-dia",
-          hint: "Média por dia de operação (dias com carga no período): entregas (completas ou parciais) ÷ dias e produtos (unidades) nas cargas ÷ dias. A variação é das entregas por dia.",
+          hint: "Média por dia de operação (dias com carga no período): entregas (completas ou parciais), produtos (unidades) nas cargas e veículos na rua. Veículo = placa distinta nas cargas do dia; carga sem placa lançada usa a placa do motorista no dia ou conta pelo motorista (estimativa). A variação é das entregas por dia.",
           label: "Média por dia",
           destaque: true,
           valor: `${decimal(entregasDia)} entregas`,
-          complemento: `${decimal(resumo ? porDiaDe(resumo.volumes.total, resumo.dias) : null)} produtos`,
+          complemento: `${decimal(resumo ? porDiaDe(resumo.volumes.total, resumo.dias) : null)} produtos · ${decimal(resumo?.caminhoesDia ?? null)} caminhões · ${decimal(resumo?.stradasDia ?? null)} Stradas`,
           variacao: variar(entregasDia, entregasDiaAnterior),
           formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
         },
@@ -350,9 +366,9 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
 
           <Bloco
             titulo="Entregas e produtos por veículo"
-            hint="Entregas = visitas com o produto entregue (completa ou parcial), pela data da visita. Cargas, pedidos e produtos pela data da carga (ZAG_DTPREV). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das entregas do período."
+            hint="Entregas = visitas com o produto entregue (completa ou parcial), pela data da visita. Cargas, pedidos e produtos pela data da carga (ZAG_DTPREV). Por dia: média de veículos na rua nos dias com carga (placa distinta; sem placa, pelo motorista -- estimativa). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das entregas do período."
           >
-            <GradeVeiculos linhas={grade} />
+            <GradeVeiculos linhas={grade} dias={resumo.dias} />
           </Bloco>
 
           <LogisticaTerminal
