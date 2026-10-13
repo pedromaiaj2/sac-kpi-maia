@@ -6,8 +6,9 @@ import { VolumePorteChart } from "./VolumePorteChart";
 import { CausasVoltaChart } from "./CausasVoltaChart";
 import { TabelaMotoristasOrdenavel } from "./TabelaMotoristasOrdenavel";
 import { ThHint } from "./ThHint";
+import { MotivosInsucesso } from "./MotivosInsucesso";
 import { VISITAS_MINIMAS } from "@/lib/logisticaFormat";
-import type { CargaKpi, MotoristaVolta, CausasVolta, VolumeDia } from "@/lib/kpisLogistica";
+import type { CargaEntregas, MotoristaEntregas, CausasVolta, MotivoInsucesso, VolumeDia } from "@/lib/kpisLogistica";
 
 // Densidade alta (pedido do Victor 09/10/2026, 2ª rodada de refino:
 // "p-1.5, space-y-1, text-xs... remova todo texto cinza explicativo
@@ -45,15 +46,22 @@ export function LogisticaTerminal({
   motoristas,
   porDia,
   causasVolta,
+  motivos,
+  produtos,
 }: {
-  cargas: CargaKpi[];
-  motoristas: MotoristaVolta[];
+  cargas: CargaEntregas[];
+  motoristas: MotoristaEntregas[];
   porDia: VolumeDia[];
   causasVolta: CausasVolta;
+  motivos: MotivoInsucesso[];
+  // Produtos (unidades) por código de motorista, calculado no servidor
+  // (produtosPorMotorista) -- kpisLogistica.ts carrega o cliente do
+  // Supabase e não pode entrar no bundle do navegador.
+  produtos: Record<string, number>;
 }) {
   const [selecionado, setSelecionado] = useState<{ codigo: string; nome: string | null } | null>(null);
 
-  function handleSelect(c: CargaKpi) {
+  function handleSelect(c: CargaEntregas) {
     if (!c.motorista) return;
     const codigo = c.motorista.codigo;
     const nome = c.motorista.nome;
@@ -63,22 +71,35 @@ export function LogisticaTerminal({
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
-        <Secao titulo="Monitor de Cargas" hint="Clique numa carga pra filtrar a tabela de motoristas abaixo pelo motorista dela. Clique de novo pra limpar.">
+        <Secao
+          titulo="Monitor de Cargas"
+          hint="Cargas do período, da mais recente. Alerta = tem pedido não entregue ou cancelado; Concluída = tudo entregue; Em rota = ainda sem resultado de todos. Clique numa carga pra filtrar a tabela de motoristas pelo motorista dela; clique de novo pra limpar."
+        >
           <CargasMonitor cargas={cargas} selecionada={selecionado?.codigo ?? null} onSelect={handleSelect} />
         </Secao>
-        <Secao titulo="Volume por porte (P/M/G)" hint="Unidades despachadas por dia, agrupadas por porte do produto.">
+        <Secao titulo="Produtos por porte (P/M/G)" hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande.">
           <VolumePorteChart data={porDia} />
         </Secao>
-        <Secao titulo="Causas da Volta" hint="Distribuição do que compõe o Índice de Volta, por motivo -- a soma das barras é o mesmo numerador.">
+        <Secao
+          titulo="Causas da Volta"
+          hint="Tudo o que entra no Índice de Volta, por tipo: insucessos (pela categoria do motivo), entregas parciais e devoluções. A soma das barras é o total de voltas do período."
+        >
           <CausasVoltaChart causas={causasVolta} />
         </Secao>
       </div>
 
       <Secao
-        titulo="Índice de Volta por motorista"
-        hint={`Denominador: visitas (cada passagem de um pedido numa carga com resultado). Motoristas com menos de ${VISITAS_MINIMAS} visitas aparecem apagados. Clique num cabeçalho pra ordenar. Devoluções e assistências (≈) não dizem qual entrega originou o retorno -- são ligadas ao motorista da entrega mais recente ao mesmo CPF nos 30 dias anteriores, ou pela carga informada no chamado quando existe.`}
+        titulo="Motivos dos insucessos"
+        hint="Cada pedido que voltou sem entregar, pelo código de ocorrência lançado no Protheus. Vermelho = logística (conta na Volta Logística); L06 = pedido não carregado (falha do CD); o resto é do cliente ou outros."
       >
-        <TabelaMotoristasOrdenavel motoristas={motoristas} filtroCodigo={selecionado?.codigo ?? null} onLimparFiltro={() => setSelecionado(null)} />
+        <MotivosInsucesso motivos={motivos} />
+      </Secao>
+
+      <Secao
+        titulo="Índice de Volta por motorista"
+        hint={`Um motorista por linha. Passe o mouse no "i" de cada coluna pra ver o que ela significa. Motoristas com menos de ${VISITAS_MINIMAS} visitas aparecem apagados (índice instável). Clique num cabeçalho pra ordenar.`}
+      >
+        <TabelaMotoristasOrdenavel motoristas={motoristas} produtos={produtos} filtroCodigo={selecionado?.codigo ?? null} onLimparFiltro={() => setSelecionado(null)} />
       </Secao>
     </div>
   );

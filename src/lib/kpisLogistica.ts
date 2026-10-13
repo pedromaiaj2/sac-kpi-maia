@@ -1,6 +1,10 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type { PeriodoKpis } from "@/lib/logisticaApi";
 
+// Motorista próprio x terceirizado (migração 0162), pela transportadora
+// das cargas dele no Protheus.
+export const VINCULOS = ["Próprio", "Terceirizado"] as const;
+
 // Formato devolvido pela RPC kpis_logistica (migração 0157) -- o mesmo
 // JSON do GET /api/logistica/v1/kpis/logistica (schema KpisLogistica do
 // openapi.yaml em lojas-maia-integracao/apis/logistica-v1).
@@ -55,9 +59,65 @@ export type KpisLogistica = {
   posVendaPeriodo: PosVenda & { vinculadas: number };
 };
 
-// Lida direto no servidor (tela /kpis/logistica e a rota da API) -- a
-// X-API-Key só protege a rota HTTP para consumidores de fora; aqui o
-// service_role já fica no servidor e nada chega ao navegador.
+// Formato da RPC kpis_entregas (migração 0162), lida só pela tela
+// /kpis/logistica: as mesmas cargas e visitas, sem nada da assistência
+// técnica (pedido do Victor 13/10/2026: "quero só entregas").
+export type CargaEntregas = CargaKpi & { vinculo: string | null; transportadora: string | null };
+
+export type MotoristaEntregas = {
+  codigo: string;
+  nome: string | null;
+  vinculo: string | null;
+  transportadora: string | null;
+  cargas: number;
+  visitas: number;
+  entregues: number;
+  entregasRealizadas: number;
+  entregasPorVeiculo: { Carro: number; "Caminhão": number };
+  insucessos: { total: number; cliente: number; logistica: number; cd: number; outros: number };
+  parciais: number;
+  devolucoes: number;
+  // (insucessos + parciais + devoluções) ÷ visitas
+  indiceVolta: number | null;
+  // insucessos de logística (exceto L06) ÷ visitas
+  indiceVoltaLogistica: number | null;
+};
+
+// Cargas e pedidos pela data da carga; entregas pela data da visita.
+export type EntregasVeiculo = { vinculo: string; tipoVeiculo: string; cargas: number; pedidos: number; entregas: number };
+
+export type KpisEntregas = {
+  periodo: { de: string; ate: string; tipo: string | null; tipoVeiculo: string | null; vinculo: string | null };
+  cargasPorDia: { dia: string; cargas: number; pedidos: number }[];
+  cargas: CargaEntregas[];
+  motoristas: MotoristaEntregas[];
+  entregasPorVeiculo: EntregasVeiculo[];
+  // Insucessos do período pelo código de ocorrência do Protheus (C01
+  // cliente ausente, L01 rota estourada...), do mais comum ao menos.
+  motivosInsucesso: MotivoInsucesso[];
+};
+
+export type MotivoInsucesso = { codigo: string | null; descricao: string; categoria: string | null; total: number };
+
+export function unidades(v: VolumesPorte): number {
+  return v.P + v.M + v.G + v.naoClassificado;
+}
+
+export async function getKpisEntregas({ de, ate, tipo, tipoVeiculo, vinculo }: PeriodoKpis & { vinculo: string | null }): Promise<KpisEntregas> {
+  const { data, error } = await getSupabaseAdmin().rpc("kpis_entregas", {
+    p_de: de,
+    p_ate: ate,
+    p_tipo: tipo,
+    p_tipo_veiculo: tipoVeiculo,
+    p_vinculo: vinculo,
+  });
+  if (error) throw new Error(`kpis_entregas: ${error.message}`);
+  return data as KpisEntregas;
+}
+
+// Lida direto no servidor pela rota da API -- a X-API-Key só protege a
+// rota HTTP para consumidores de fora; aqui o service_role já fica no
+// servidor e nada chega ao navegador.
 export async function getKpisLogistica({ de, ate, tipo, tipoVeiculo }: PeriodoKpis): Promise<KpisLogistica> {
   const { data, error } = await getSupabaseAdmin().rpc("kpis_logistica", {
     p_de: de,
@@ -72,7 +132,7 @@ export async function getKpisLogistica({ de, ate, tipo, tipoVeiculo }: PeriodoKp
 // Quebra das causas que compõem o Índice de Volta (soma = numerador de
 // indiceVolta) -- pedido do Victor 09/10/2026: "detalhamento das causas da
 // volta" na tela. Cada chave já existia espalhada por motorista
-// (MotoristaVolta.insucessos/.parciais/.devolucoes/.assistencias); aqui é
+// (MotoristaEntregas.insucessos/.parciais/.devolucoes); aqui é
 // só a soma agregada do período inteiro, pra alimentar o gráfico de
 // distribuição sem recalcular nada.
 export type CausasVolta = {
@@ -82,7 +142,6 @@ export type CausasVolta = {
   insucessoOutros: number;
   parciais: number;
   devolucoes: number;
-  assistencias: number;
 };
 
 export type ResumoLogistica = {
@@ -97,13 +156,11 @@ export type ResumoLogistica = {
   insucessosCd: number;
   causasVolta: CausasVolta;
   entregasRealizadas: number;
-  pecas: number;
-  indicePecas: number | null;
-  posVenda: PosVenda;
-  indiceAssistencia: number | null;
+  entregasCarro: number;
+  entregasCaminhao: number;
 };
 
-export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
+export function resumirLogistica(k: KpisEntregas): ResumoLogistica {
   const volumes = { P: 0, M: 0, G: 0, naoClassificado: 0 };
   for (const c of k.cargas) {
     volumes.P += c.volumes.P;
@@ -117,8 +174,8 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
   let voltasLogistica = 0;
   let insucessosCd = 0;
   let entregasRealizadas = 0;
-  let pecas = 0;
-  const posVenda = { total: 0, pecas: 0, trocaProduto: 0, recolhimento: 0, entregaProduto: 0 };
+  let entregasCarro = 0;
+  let entregasCaminhao = 0;
   const causasVolta: CausasVolta = {
     insucessoCliente: 0,
     insucessoLogistica: 0,
@@ -126,20 +183,15 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     insucessoOutros: 0,
     parciais: 0,
     devolucoes: 0,
-    assistencias: 0,
   };
   for (const m of k.motoristas) {
     entregasRealizadas += m.entregasRealizadas;
-    pecas += m.pecas.total;
-    posVenda.total += m.posVenda.total;
-    posVenda.pecas += m.posVenda.pecas;
-    posVenda.trocaProduto += m.posVenda.trocaProduto;
-    posVenda.recolhimento += m.posVenda.recolhimento;
-    posVenda.entregaProduto += m.posVenda.entregaProduto;
+    entregasCarro += m.entregasPorVeiculo.Carro;
+    entregasCaminhao += m.entregasPorVeiculo["Caminhão"];
     visitas += m.visitas;
     entregues += m.entregues;
-    voltas += m.insucessos.total + m.parciais + m.devolucoes + m.assistencias.total;
-    voltasLogistica += m.insucessos.logistica + m.assistencias.transporte;
+    voltas += m.insucessos.total + m.parciais + m.devolucoes;
+    voltasLogistica += m.insucessos.logistica;
     insucessosCd += m.insucessos.cd;
     causasVolta.insucessoCliente += m.insucessos.cliente;
     causasVolta.insucessoLogistica += m.insucessos.logistica;
@@ -147,7 +199,6 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     causasVolta.insucessoOutros += m.insucessos.outros;
     causasVolta.parciais += m.parciais;
     causasVolta.devolucoes += m.devolucoes;
-    causasVolta.assistencias += m.assistencias.total;
   }
   return {
     cargas: k.cargas.length,
@@ -161,16 +212,14 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     insucessosCd,
     causasVolta,
     entregasRealizadas,
-    pecas,
-    indicePecas: entregasRealizadas > 0 ? pecas / entregasRealizadas : null,
-    posVenda,
-    indiceAssistencia: entregasRealizadas > 0 ? posVenda.total / entregasRealizadas : null,
+    entregasCarro,
+    entregasCaminhao,
   };
 }
 
 export type VolumeDia = { dia: string; cargas: number } & VolumesPorte;
 
-export function volumesPorDia(k: KpisLogistica): VolumeDia[] {
+export function volumesPorDia(k: KpisEntregas): VolumeDia[] {
   const porDia = new Map<string, VolumeDia>();
   for (const c of k.cargas) {
     const d = porDia.get(c.dia) ?? { dia: c.dia, cargas: 0, P: 0, M: 0, G: 0, naoClassificado: 0 };
@@ -184,26 +233,49 @@ export function volumesPorDia(k: KpisLogistica): VolumeDia[] {
   return [...porDia.values()].sort((a, b) => a.dia.localeCompare(b.dia));
 }
 
-export type ResumoVeiculo = { tipoVeiculo: string; cargas: number; pedidos: number; pedidosPorCarga: number; unidadesPorCarga: number };
+// produtos = unidades nas cargas (soma das quantidades dos itens).
+export type CelulaVeiculo = { cargas: number; pedidos: number; entregas: number; produtos: number };
+export type LinhaVeiculo = { vinculo: string; Carro: CelulaVeiculo; "Caminhão": CelulaVeiculo; total: CelulaVeiculo };
 
-export function resumoPorVeiculo(k: KpisLogistica): ResumoVeiculo[] {
-  const porTipo = new Map<string, { cargas: number; pedidos: number; unidades: number }>();
-  for (const c of k.cargas) {
-    const t = porTipo.get(c.tipoVeiculo) ?? { cargas: 0, pedidos: 0, unidades: 0 };
-    t.cargas += 1;
-    t.pedidos += c.pedidos;
-    t.unidades += c.volumes.P + c.volumes.M + c.volumes.G + c.volumes.naoClassificado;
-    porTipo.set(c.tipoVeiculo, t);
+// Grade vínculo (linhas) x veículo (colunas) a partir de entregasPorVeiculo,
+// com a linha "Total" no fim. Vínculos na ordem de VINCULOS; "Sem vínculo"
+// (carga sem motorista) só aparece se tiver algo. Os produtos vêm das
+// cargas da lista (mesma base das cargas da grade).
+export function gradeVeiculos(k: KpisEntregas): LinhaVeiculo[] {
+  const vazia = (): CelulaVeiculo => ({ cargas: 0, pedidos: 0, entregas: 0, produtos: 0 });
+  const somar = (a: CelulaVeiculo, b: Partial<CelulaVeiculo>) => {
+    a.cargas += b.cargas ?? 0;
+    a.pedidos += b.pedidos ?? 0;
+    a.entregas += b.entregas ?? 0;
+    a.produtos += b.produtos ?? 0;
+  };
+  const linhas = new Map<string, LinhaVeiculo>();
+  for (const v of VINCULOS) linhas.set(v, { vinculo: v, Carro: vazia(), "Caminhão": vazia(), total: vazia() });
+  const total: LinhaVeiculo = { vinculo: "Total", Carro: vazia(), "Caminhão": vazia(), total: vazia() };
+  for (const e of k.entregasPorVeiculo) {
+    const linha = linhas.get(e.vinculo) ?? { vinculo: e.vinculo, Carro: vazia(), "Caminhão": vazia(), total: vazia() };
+    linhas.set(e.vinculo, linha);
+    const coluna = e.tipoVeiculo === "Carro" ? "Carro" : "Caminhão";
+    for (const alvo of [linha[coluna], linha.total, total[coluna], total.total]) somar(alvo, e);
   }
-  return [...porTipo.entries()]
-    .map(([tipoVeiculo, t]) => ({
-      tipoVeiculo,
-      cargas: t.cargas,
-      pedidos: t.pedidos,
-      pedidosPorCarga: t.pedidos / t.cargas,
-      unidadesPorCarga: t.unidades / t.cargas,
-    }))
-    .sort((a, b) => a.tipoVeiculo.localeCompare(b.tipoVeiculo, "pt-BR"));
+  for (const c of k.cargas) {
+    const linha = linhas.get(c.vinculo ?? "Sem vínculo");
+    if (!linha) continue;
+    const coluna = c.tipoVeiculo === "Carro" ? "Carro" : "Caminhão";
+    const produtos = { produtos: unidades(c.volumes) };
+    for (const alvo of [linha[coluna], linha.total, total[coluna], total.total]) somar(alvo, produtos);
+  }
+  return [...linhas.values(), total];
+}
+
+// Produtos (unidades) nas cargas do período, por motorista.
+export function produtosPorMotorista(cargas: CargaEntregas[]): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const c of cargas) {
+    if (!c.motorista) continue;
+    m[c.motorista.codigo] = (m[c.motorista.codigo] ?? 0) + unidades(c.volumes);
+  }
+  return m;
 }
 
 // Período imediatamente anterior, com a MESMA duração em dias do período

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CargaKpi } from "@/lib/kpisLogistica";
+import type { CargaEntregas } from "@/lib/kpisLogistica";
 
 // Coluna 1 do "terminal" -- lista compacta e rolável das cargas do período
 // selecionado (pedido do Victor 09/10/2026: "monitor de cargas e rotas
@@ -13,7 +13,7 @@ import type { CargaKpi } from "@/lib/kpisLogistica";
 // naoEntregues/canceladas), mesmo dado que a tabela "Ver as N cargas"
 // (expandível, abaixo) já mostrava cru -- só resumido em uma palavra +
 // cor pra escaneamento rápido.
-function statusCarga(c: CargaKpi): { label: string; color: string } {
+function statusCarga(c: CargaEntregas): { label: string; color: string } {
   if (c.canceladas > 0 || c.naoEntregues > 0) return { label: "Alerta", color: "var(--status-critical)" };
   if (c.pedidos > 0 && c.entregues === c.pedidos) return { label: "Concluída", color: "var(--status-good)" };
   return { label: "Em rota", color: "var(--series-5)" };
@@ -32,9 +32,9 @@ export function CargasMonitor({
   selecionada,
   onSelect,
 }: {
-  cargas: CargaKpi[];
+  cargas: CargaEntregas[];
   selecionada: string | null;
-  onSelect: (carga: CargaKpi) => void;
+  onSelect: (carga: CargaEntregas) => void;
 }) {
   if (cargas.length === 0) {
     return (
@@ -56,7 +56,7 @@ export function CargasMonitor({
             onClick={() => onSelect(c)}
             className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs w-full"
             style={{ background: ativa ? "var(--surface-2)" : "transparent", borderColor: "var(--border)" }}
-            title={`${dataBr(c.dia)} · ${c.tipo ?? "Tipo não informado"} · ${c.tipoVeiculo}${c.veiculo ? ` (${c.veiculo})` : ""}`}
+            title={`${dataBr(c.dia)} · ${c.tipo ?? "Tipo não informado"} · ${c.tipoVeiculo}${c.veiculo ? ` (${c.veiculo})` : ""}${c.vinculo ? ` · ${c.vinculo}` : ""}${c.transportadora ? ` (${c.transportadora})` : ""}`}
           >
             <span className="flex flex-col min-w-0">
               <span className="font-semibold tabular-nums truncate" style={{ color: "var(--text-primary)" }}>

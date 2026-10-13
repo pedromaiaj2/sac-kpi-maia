@@ -1,17 +1,35 @@
-import { HelpCircle } from "lucide-react";
+import { Info } from "lucide-react";
 
-// Cabeçalho de coluna com explicação -- antes era só um `title` solto no
-// texto, sem nada indicando que tinha explicação pra ler (achado do
-// Victor 09/10/2026: "textos cinzas explicativos flutuando na tela").
-// Ícone "?" visível avisa que dá pra passar o mouse, mesmo tooltip nativo
-// de sempre por trás (sem JS novo, sem popover pra manter). Sem hooks --
-// renderiza igual em Server e Client Component (usado nas duas tabelas,
-// uma de cada tipo).
-export function ThHint({ children, hint }: { children: React.ReactNode; hint: string }) {
+// Rótulo com ícone "i" que abre a explicação -- pedido do Victor
+// 13/10/2026 ("coloque o i, dizendo o que cada uma significa"). Antes era
+// só o tooltip nativo (`title`), que demora a aparecer e não abre no
+// celular. Agora é uma caixinha só de CSS: abre ao passar o mouse e ao
+// tocar/focar o ícone (tabIndex), sem JS -- renderiza igual em Server e
+// Client Component. `hidden` (display none) enquanto fechada, pra não
+// criar rolagem horizontal. `lado="direita"` ancora a caixa pela direita,
+// pra colunas encostadas na borda direita.
+export function ThHint({ children, hint, lado = "esquerda" }: { children: React.ReactNode; hint: string; lado?: "esquerda" | "direita" }) {
   return (
-    <span className="inline-flex items-center gap-1" title={hint}>
+    <span className="group relative inline-flex items-center gap-1 min-w-0">
       {children}
-      <HelpCircle aria-hidden className="shrink-0" size={13} style={{ color: "var(--text-muted)" }} />
+      <span
+        tabIndex={0}
+        role="button"
+        aria-label={`O que é: ${hint}`}
+        className="shrink-0 inline-flex items-center justify-center rounded-full cursor-help focus:outline-none focus-visible:ring-2"
+        style={{ color: "var(--brand-green)" }}
+      >
+        <Info aria-hidden size={13} />
+      </span>
+      <span
+        role="tooltip"
+        className={`hidden group-hover:block group-focus-within:block absolute top-full z-30 mt-1 w-64 max-w-[80vw] rounded-lg border px-2.5 py-2 text-[11px] font-normal normal-case tracking-normal leading-snug text-left whitespace-normal shadow-lg ${
+          lado === "direita" ? "right-0" : "left-0"
+        }`}
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+      >
+        {hint}
+      </span>
     </span>
   );
 }
