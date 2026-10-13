@@ -1,5 +1,6 @@
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { Variacao } from "@/lib/kpisLogistica";
+import { ThHint } from "./ThHint";
 
 // "Ticker" compacto estilo home broker -- pedido do Victor 09/10/2026
 // (evolução do redesenho anterior, PR #584): fileira de mini-cards com
@@ -27,6 +28,7 @@ function corVariacao(melhorou: boolean | null): string {
 type TickerItem = {
   key: string;
   label: string;
+  hint: string;
   valor: string;
   variacao: Variacao;
   // Formata só o delta (sem o valor absoluto) -- cada métrica tem unidade
@@ -36,8 +38,8 @@ type TickerItem = {
 
 export function IndiceTicker({ items, labelComparacao }: { items: TickerItem[]; labelComparacao: string }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
-      {items.map((item) => {
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5">
+      {items.map((item, i) => {
         const cor = corVariacao(item.variacao.melhorou);
         return (
           <div
@@ -45,9 +47,11 @@ export function IndiceTicker({ items, labelComparacao }: { items: TickerItem[]; 
             className="rounded-lg px-2 py-1.5 flex flex-col gap-0.5 min-w-0"
             style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
           >
-            <span className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: "var(--text-muted)" }}>
-              {item.label}
-            </span>
+            <ThHint hint={item.hint} lado={i % 4 >= 2 ? "direita" : "esquerda"}>
+              <span className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: "var(--text-muted)" }}>
+                {item.label}
+              </span>
+            </ThHint>
             <span className="text-lg font-bold leading-tight tabular-nums" style={{ color: "var(--text-primary)" }}>
               {item.valor}
             </span>

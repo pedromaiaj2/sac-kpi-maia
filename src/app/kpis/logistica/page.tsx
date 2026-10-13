@@ -7,8 +7,20 @@ import { ThHint } from "@/components/logistica/ThHint";
 import { LogisticaTerminal } from "@/components/logistica/LogisticaTerminal";
 import { IndiceTicker, type TickerItem } from "@/components/logistica/IndiceTicker";
 import { parsePeriodoKpis, TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
-import { getKpisLogistica, resumirLogistica, volumesPorDia, periodoAnterior, calcularVariacao, type Variacao } from "@/lib/kpisLogistica";
-import { num, pct, dataBr, VISITAS_MINIMAS } from "@/lib/logisticaFormat";
+import {
+  getKpisEntregas,
+  gradeVeiculos,
+  produtosPorMotorista,
+  resumirLogistica,
+  volumesPorDia,
+  periodoAnterior,
+  calcularVariacao,
+  VINCULOS,
+  type CelulaVeiculo,
+  type LinhaVeiculo,
+  type Variacao,
+} from "@/lib/kpisLogistica";
+import { num, pct, dataBr } from "@/lib/logisticaFormat";
 
 export const dynamic = "force-dynamic";
 
@@ -35,20 +47,21 @@ function menosDias(dia: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-type Params = { periodo?: string; de?: string; ate?: string; tipo?: string; veiculo?: string };
+type Params = { periodo?: string; de?: string; ate?: string; tipo?: string; veiculo?: string; vinculo?: string };
 
 function resolverPeriodo(params: Params) {
   const hoje = hojeRecife();
   const tipo = params.tipo && (TIPOS_CARGA as readonly string[]).includes(params.tipo) ? params.tipo : undefined;
   const veiculo = params.veiculo && (TIPOS_VEICULO as readonly string[]).includes(params.veiculo) ? params.veiculo : undefined;
+  const vinculo = params.vinculo && (VINCULOS as readonly string[]).includes(params.vinculo) ? params.vinculo : undefined;
   if (params.de || params.ate) {
-    return { preset: "custom", de: params.de ?? "", ate: params.ate ?? hoje, tipo, veiculo };
+    return { preset: "custom", de: params.de ?? "", ate: params.ate ?? hoje, tipo, veiculo, vinculo };
   }
   const preset = PRESETS.find((p) => p.key === params.periodo) ?? PRESETS.find((p) => p.key === "30")!;
   const offsetDias = "offsetDias" in preset ? preset.offsetDias : 0;
   const ate = offsetDias > 0 ? menosDias(hoje, offsetDias) : hoje;
   const de = preset.dias === null ? `${hoje.slice(0, 8)}01` : menosDias(ate, preset.dias - 1);
-  return { preset: preset.key, de, ate, tipo, veiculo };
+  return { preset: preset.key, de, ate, tipo, veiculo, vinculo };
 }
 
 function href(base: Record<string, string | undefined>) {
@@ -65,11 +78,9 @@ function pillStyle(active: boolean) {
   };
 }
 
-// Título com ícone "?" (ThHint) quando tem hint -- pedido do Victor
+// Título com ícone "i" (ThHint) quando tem hint -- pedido do Victor
 // 09/10/2026, 2ª rodada de refino: "remova todo texto cinza explicativo
-// renderizado direto na tela". O antigo "AvisoPosVenda" (parágrafo fixo
-// sobre atribuição estimada) virou o hint do título dessa seção, mesmo
-// padrão de Secao em LogisticaTerminal.tsx.
+// renderizado direto na tela". Mesmo padrão de Secao em LogisticaTerminal.tsx.
 function Bloco({ titulo, hint, children }: { titulo: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl p-3 flex flex-col gap-2" style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
@@ -84,81 +95,82 @@ function Bloco({ titulo, hint, children }: { titulo: string; hint?: string; chil
 const th = "px-2 py-1.5 font-semibold whitespace-nowrap";
 const thStyle = { color: "var(--text-secondary)" };
 
-function TabelaPosVenda({ motoristas }: { motoristas: import("@/lib/kpisLogistica").MotoristaVolta[] }) {
-  const linhas = motoristas
-    .filter((m) => m.entregasRealizadas > 0 || m.posVenda.total > 0)
-    .sort((a, b) => {
-      const poucasA = a.entregasRealizadas < VISITAS_MINIMAS;
-      const poucasB = b.entregasRealizadas < VISITAS_MINIMAS;
-      if (poucasA !== poucasB) return poucasA ? 1 : -1;
-      return (b.indiceAssistencia ?? -1) - (a.indiceAssistencia ?? -1) || b.posVenda.total - a.posVenda.total;
-    });
-  if (linhas.length === 0) {
-    return (
-      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        Nenhuma entrega registrada no período.
-      </p>
-    );
-  }
+const ROTULO_VINCULO: Record<string, string> = { "Próprio": "Próprios", Terceirizado: "Terceirizados" };
+const COR_VINCULO: Record<string, string> = { "Próprio": "var(--brand-green)", Terceirizado: "var(--series-5)" };
+
+const porCarga = (n: number, cargas: number) =>
+  cargas > 0 ? (n / cargas).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—";
+
+function Celula({ c, total, destaque }: { c: CelulaVeiculo; total: number; destaque?: boolean }) {
+  return (
+    <td className="px-3 py-2 text-right align-top">
+      <span className={`block tabular-nums ${destaque ? "text-lg font-bold" : "text-base font-semibold"}`} style={{ color: "var(--text-primary)" }}>
+        {num(c.entregas)}
+        {total > 0 && (
+          <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--text-muted)" }}>
+            {pct(c.entregas / total, 0)}
+          </span>
+        )}
+      </span>
+      <span className="block text-[11px] tabular-nums whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+        {num(c.cargas)} cargas · {num(c.pedidos)} pedidos · {num(c.produtos)} produtos
+      </span>
+      <span className="block text-[11px] tabular-nums whitespace-nowrap font-semibold" style={{ color: "var(--text-secondary)" }}>
+        por carga: {porCarga(c.produtos, c.cargas)} produtos · {porCarga(c.pedidos, c.cargas)} pedidos
+      </span>
+    </td>
+  );
+}
+
+// Grade vínculo x veículo -- pedido do Victor 13/10/2026: separar os
+// motoristas nossos dos terceirizados e mostrar quantas entregas são
+// feitas pelas Stradas e pelos caminhões. % = fatia das entregas do período.
+function GradeVeiculos({ linhas }: { linhas: LinhaVeiculo[] }) {
+  const total = linhas[linhas.length - 1].total.entregas;
   return (
     <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
             <th className={`${th} text-left`} style={thStyle}>
-              Motorista
+              <ThHint hint="Próprios = cargas da nossa frota (TRANSP. LOJAS MAIA, EXPRESSA). Terceirizados = cargas de transportadora de fora (Ronaldo, THZ, D&A, Alenilson, Santos...). Vale a transportadora de cada carga.">
+                Motoristas
+              </ThHint>
             </th>
             <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="Visitas com o produto entregue (completa ou parcial)">Entregas</ThHint>
+              <ThHint hint="Fiat Strada: as placas fixas do Eduardo, Joalison e Joanderson (e a TPA9E78, compartilhada).">Strada (carro)</ThHint>
             </th>
             <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="Troca e envio de peça, e pedidos da fila de peças">Peças</ThHint>
+              <ThHint hint="Todo veículo que não é Strada." lado="direita">
+                Caminhão
+              </ThHint>
             </th>
             <th className={`${th} text-right`} style={thStyle}>
-              Troca de produto
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              Recolhimento
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="Entrega de produto novo decorrente de assistência">Entrega de produto</ThHint>
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="Ocorrências ligadas a uma entrega do motorista -- ver explicação no título da seção">≈ Total</ThHint>
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="ocorrências de pós-venda ÷ entregas">Índice de Assistência</ThHint>
+              <ThHint hint="Número grande = entregas (completas ou parciais) e a fatia do total. Abaixo: cargas, pedidos e produtos (unidades) nas cargas do período, e a média por carga." lado="direita">
+                Total
+              </ThHint>
             </th>
           </tr>
         </thead>
         <tbody>
-          {linhas.map((m) => {
-            const poucas = m.entregasRealizadas < VISITAS_MINIMAS;
+          {linhas.map((l) => {
+            const ehTotal = l.vinculo === "Total";
+            const cor = COR_VINCULO[l.vinculo] ?? "var(--text-muted)";
             return (
-              <tr key={m.codigo} className="border-b" style={{ borderColor: "var(--border)", opacity: poucas ? 0.55 : 1 }}>
-                <td className="px-2 py-1.5">
-                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {m.nome ?? "Sem nome"}
+              <tr
+                key={l.vinculo}
+                className="border-b"
+                style={{ borderColor: "var(--border)", background: ehTotal ? "var(--surface-2)" : undefined }}
+              >
+                <td className="px-3 py-2 align-top">
+                  <span className="flex items-center gap-2 font-bold text-sm" style={{ color: "var(--text-primary)" }}>
+                    {!ehTotal && <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: cor }} />}
+                    {ROTULO_VINCULO[l.vinculo] ?? l.vinculo}
                   </span>
-                  <span className="ml-2 tabular-nums" style={{ color: "var(--text-muted)" }}>
-                    {m.codigo}
-                    {poucas ? " · poucas entregas" : ""}
-                  </span>
                 </td>
-                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.entregasRealizadas}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.posVenda.pecas}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.posVenda.trocaProduto}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.posVenda.recolhimento}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.posVenda.entregaProduto}</td>
-                <td
-                  className="px-2 py-1.5 text-right tabular-nums font-semibold"
-                  title={`${m.posVenda.porCarga} pela carga do chamado · ${m.posVenda.porNf} pela NF · ${m.posVenda.porCliente} pelo cliente`}
-                >
-                  {m.posVenda.total}
-                </td>
-                <td className="px-2 py-1.5 text-right tabular-nums font-bold" style={{ color: "var(--text-primary)" }}>
-                  {pct(m.indiceAssistencia)}
-                </td>
+                <Celula c={l.Carro} total={total} />
+                <Celula c={l["Caminhão"]} total={total} />
+                <Celula c={l.total} total={total} destaque />
               </tr>
             );
           })}
@@ -193,6 +205,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   await requireDashboardAuth();
   const params = await searchParams;
   const sel = resolverPeriodo(params);
+  const filtros = { tipo: sel.tipo, veiculo: sel.veiculo, vinculo: sel.vinculo };
+  const vinculo = sel.vinculo ?? null;
   const parsed = parsePeriodoKpis(
     new URLSearchParams({
       de: sel.de,
@@ -203,6 +217,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   );
   const base = sel.preset === "custom" ? { de: sel.de, ate: sel.ate } : { periodo: sel.preset };
 
+  // Tela só de entregas (RPC kpis_entregas, migração 0162) -- pedido do
+  // Victor 13/10/2026: nada da assistência técnica aqui.
   // Período anterior (mesma duração, ver periodoAnterior) buscado em
   // paralelo, só pra alimentar o ticker de variação -- pedido do Victor
   // 09/10/2026 ("estilo home broker", comparação com período anterior).
@@ -211,8 +227,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   // de erro.
   const [kpis, kpisAnteriores] = parsed.ok
     ? await Promise.all([
-        getKpisLogistica(parsed.periodo),
-        getKpisLogistica({ ...periodoAnterior(sel.de, sel.ate), tipo: parsed.periodo.tipo, tipoVeiculo: parsed.periodo.tipoVeiculo }).catch(
+        getKpisEntregas({ ...parsed.periodo, vinculo }),
+        getKpisEntregas({ ...periodoAnterior(sel.de, sel.ate), tipo: parsed.periodo.tipo, tipoVeiculo: parsed.periodo.tipoVeiculo, vinculo }).catch(
           () => null,
         ),
       ])
@@ -220,11 +236,13 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   const resumo = kpis ? resumirLogistica(kpis) : null;
   const resumoAnterior = kpisAnteriores ? resumirLogistica(kpisAnteriores) : null;
   const porDia = kpis ? volumesPorDia(kpis) : [];
+  const grade = kpis ? gradeVeiculos(kpis) : [];
 
   const tickerItems: TickerItem[] = resumo
     ? [
         {
           key: "volta",
+          hint: "De cada 100 visitas, quantas voltaram com problema: (insucessos + entregas parciais + devoluções) ÷ visitas. Visita = cada vez que um pedido saiu numa carga e voltou com resultado. Mede o retrabalho, não a culpa do motorista. Verde até 5%, amarelo até 10%, vermelho acima.",
           label: "Índice de Volta",
           valor: pct(resumo.indiceVolta),
           variacao: variar(resumo.indiceVolta, resumoAnterior?.indiceVolta ?? null, true),
@@ -232,20 +250,39 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         },
         {
           key: "volta-logistica",
+          hint: "Só a parte da volta que é falha do transporte: insucessos com motivo de logística (L01 rota estourada, L02 veículo quebrado...) ÷ visitas. L06 (pedido não carregado) é do CD e fica fora.",
           label: "Volta Logística",
           valor: pct(resumo.indiceVoltaLogistica),
           variacao: variar(resumo.indiceVoltaLogistica, resumoAnterior?.indiceVoltaLogistica ?? null, true),
           formatarDelta: formatarDeltaPct,
         },
         {
-          key: "assistencia",
-          label: "Assistência",
-          valor: pct(resumo.indiceAssistencia),
-          variacao: variar(resumo.indiceAssistencia, resumoAnterior?.indiceAssistencia ?? null, true),
-          formatarDelta: formatarDeltaPct,
+          key: "entregas",
+          hint: "Visitas com o produto entregue (completa ou parcial), pela data da visita.",
+          label: "Entregas",
+          valor: num(resumo.entregasRealizadas),
+          variacao: variar(resumo.entregasRealizadas, resumoAnterior?.entregasRealizadas ?? null),
+          formatarDelta: formatarDeltaNum,
+        },
+        {
+          key: "entregas-strada",
+          hint: "Entregas (completas ou parciais) feitas nas Fiat Strada.",
+          label: "Strada",
+          valor: num(resumo.entregasCarro),
+          variacao: variar(resumo.entregasCarro, resumoAnterior?.entregasCarro ?? null),
+          formatarDelta: formatarDeltaNum,
+        },
+        {
+          key: "entregas-caminhao",
+          hint: "Entregas (completas ou parciais) feitas em caminhão (todo veículo que não é Strada).",
+          label: "Caminhão",
+          valor: num(resumo.entregasCaminhao),
+          variacao: variar(resumo.entregasCaminhao, resumoAnterior?.entregasCaminhao ?? null),
+          formatarDelta: formatarDeltaNum,
         },
         {
           key: "cargas",
+          hint: "Cargas despachadas pelo CD com previsão (ZAG_DTPREV) no período.",
           label: "Cargas",
           valor: num(resumo.cargas),
           variacao: variar(resumo.cargas, resumoAnterior?.cargas ?? null),
@@ -253,6 +290,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         },
         {
           key: "pedidos",
+          hint: "Pedidos dentro das cargas do período.",
           label: "Pedidos",
           valor: num(resumo.pedidos),
           variacao: variar(resumo.pedidos, resumoAnterior?.pedidos ?? null),
@@ -260,7 +298,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         },
         {
           key: "volume",
-          label: "Volume",
+          hint: "Produtos (unidades) dentro das cargas do período: soma das quantidades dos itens.",
+          label: "Produtos",
           valor: num(resumo.volumes.total),
           variacao: variar(resumo.volumes.total, resumoAnterior?.volumes.total ?? null),
           formatarDelta: formatarDeltaNum,
@@ -269,7 +308,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     : [];
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-10 flex flex-col gap-6">
       <AppHeader />
       <KpisSectionTabs active="logistica" />
 
@@ -279,8 +318,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             Logística
           </h1>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Cargas despachadas pelo CD, volume por porte e o Índice de Volta de cada motorista. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV).
-            A conta de treinamento (000058) fica fora.
+            Só entregas: cargas despachadas pelo CD, entregas por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada
+            um, sem dados da assistência técnica. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). A conta de treinamento (000058) fica fora.
           </p>
         </div>
         {/* Página é force-dynamic (sem cache) -- esse horário é o do
@@ -289,7 +328,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             pedido do Victor pra deixar explícito que os dados são ao
             vivo em telas de TV/reunião. */}
         <Link
-          href={href({ ...base, tipo: sel.tipo, veiculo: sel.veiculo })}
+          href={href({ ...base, ...filtros })}
           className="flex items-center gap-1.5 text-xs shrink-0 rounded-full px-3 py-1.5"
           style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
         >
@@ -302,7 +341,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {PRESETS.map((p) => (
-            <Link key={p.key} href={href({ periodo: p.key, tipo: sel.tipo, veiculo: sel.veiculo })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.preset === p.key)}>
+            <Link key={p.key} href={href({ periodo: p.key, ...filtros })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.preset === p.key)}>
               {p.label}
             </Link>
           ))}
@@ -324,6 +363,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             />
             {sel.tipo && <input type="hidden" name="tipo" value={sel.tipo} />}
             {sel.veiculo && <input type="hidden" name="veiculo" value={sel.veiculo} />}
+            {sel.vinculo && <input type="hidden" name="vinculo" value={sel.vinculo} />}
             <button type="submit" className="text-xs px-2 py-1 rounded" style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
               Aplicar
             </button>
@@ -332,14 +372,20 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         <div className="flex flex-wrap items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
           <span>Tipo:</span>
           {[undefined, ...TIPOS_CARGA.filter((t) => t !== "Retirada")].map((t) => (
-            <Link key={t ?? "todos"} href={href({ ...base, tipo: t, veiculo: sel.veiculo })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.tipo === t)}>
+            <Link key={t ?? "todos"} href={href({ ...base, ...filtros, tipo: t })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.tipo === t)}>
               {t ?? "Todos"}
             </Link>
           ))}
           <span className="ml-3">Veículo:</span>
           {[undefined, ...TIPOS_VEICULO].map((v) => (
-            <Link key={v ?? "todos"} href={href({ ...base, tipo: sel.tipo, veiculo: v })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.veiculo === v)}>
+            <Link key={v ?? "todos"} href={href({ ...base, ...filtros, veiculo: v })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.veiculo === v)}>
               {v === "Carro" ? "Carro (Strada)" : (v ?? "Todos")}
+            </Link>
+          ))}
+          <span className="ml-3">Motoristas:</span>
+          {[undefined, ...VINCULOS].map((v) => (
+            <Link key={v ?? "todos"} href={href({ ...base, ...filtros, vinculo: v })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.vinculo === v)}>
+              {v ? ROTULO_VINCULO[v] : "Todos"}
             </Link>
           ))}
         </div>
@@ -355,20 +401,26 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             {dataBr(kpis.periodo.de)} a {dataBr(kpis.periodo.ate)}
             {kpis.periodo.tipo ? ` · ${kpis.periodo.tipo}` : ""}
             {kpis.periodo.tipoVeiculo ? ` · ${kpis.periodo.tipoVeiculo}` : ""}
+            {kpis.periodo.vinculo ? ` · motoristas ${ROTULO_VINCULO[kpis.periodo.vinculo]?.toLowerCase() ?? kpis.periodo.vinculo}` : ""}
           </p>
 
           <IndiceTicker items={tickerItems} labelComparacao="período anterior" />
 
-          <LogisticaTerminal cargas={kpis.cargas} motoristas={kpis.motoristas} porDia={porDia} causasVolta={resumo.causasVolta} />
-
           <Bloco
-            titulo="Índice de Assistência por motorista"
-            hint={`Ocorrências de pós-venda da assistência criadas no período, ligadas ao motorista que fez a entrega original (${num(
-              kpis.posVendaPeriodo.vinculadas,
-            )} de ${num(kpis.posVendaPeriodo.total)} ocorrências do período acharam a entrega). Atribuição estimada: cada chamado de pós-venda é ligado à entrega que levou o produto, nesta ordem -- carga informada no chamado; entrega da NF de venda quando bate com o mesmo cliente; senão, a entrega mais recente ao mesmo cliente (CPF ou código no Protheus) nos 180 dias anteriores. Uma ocorrência conta uma vez só. Não separa defeito de fábrica de avaria no transporte, por isso fica fora do Índice de Volta.`}
+            titulo="Entregas e produtos por veículo"
+            hint="Entregas = visitas com o produto entregue (completa ou parcial), pela data da visita. Cargas, pedidos e produtos pela data da carga (ZAG_DTPREV). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das entregas do período."
           >
-            <TabelaPosVenda motoristas={kpis.motoristas} />
+            <GradeVeiculos linhas={grade} />
           </Bloco>
+
+          <LogisticaTerminal
+            cargas={kpis.cargas}
+            motoristas={kpis.motoristas}
+            porDia={porDia}
+            causasVolta={resumo.causasVolta}
+            motivos={kpis.motivosInsucesso}
+            produtos={produtosPorMotorista(kpis.cargas)}
+          />
         </>
       )}
     </div>
