@@ -76,14 +76,26 @@ export function PrintButton({ targets, isAdmin }: { targets: PrintTarget[]; isAd
     return () => window.removeEventListener("afterprint", onAfterPrint);
   }, []);
 
+  // Nota fiscal em PDF vira imagem no navegador antes de imprimir (ver
+  // NotaFiscalPdf.tsx): espera terminar (até 20 s) pra não sair em branco.
+  const [preparando, setPreparando] = useState(false);
+  async function imprimir() {
+    setPreparando(true);
+    for (let i = 0; i < 100 && document.querySelector('[data-nota-pdf="carregando"]'); i++) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    setPreparando(false);
+    window.print();
+  }
+
   function handleClick() {
     if (isAdmin) {
-      window.print();
+      void imprimir();
       return;
     }
     const already = targets.filter((t) => t.alreadyPrinted);
     if (already.length === 0) {
-      window.print();
+      void imprimir();
       return;
     }
     // Pelo menos uma já foi impressa -- mostra o aviso antes de imprimir
@@ -100,7 +112,7 @@ export function PrintButton({ targets, isAdmin }: { targets: PrintTarget[]; isAd
         className="print:hidden text-sm px-4 py-2 rounded font-medium self-start"
         style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
       >
-        Imprimir
+        {preparando ? "Preparando a nota fiscal…" : "Imprimir"}
       </button>
       {blocked ? (
         <div className="print:hidden fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(11,11,11,0.5)" }}>
@@ -135,7 +147,7 @@ export function PrintButton({ targets, isAdmin }: { targets: PrintTarget[]; isAd
                 <button
                   onClick={() => {
                     setBlocked(null);
-                    window.print();
+                    void imprimir();
                   }}
                   className="text-sm px-3 py-2 rounded font-medium"
                   style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
