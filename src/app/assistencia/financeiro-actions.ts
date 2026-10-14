@@ -50,7 +50,12 @@ export async function financeiroSignIn(_state: FinanceiroFormState, formData: Fo
   cookieStore.set(FINANCEIRO_COOKIE_NAME, signFinanceiroSession(data.name), {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
+    // "none" só na instância embutida (ESTORNO_EMBED) -- pedido do
+    // Gabriel/financeiro 14/10/2026: essa tela abre dentro de um iframe
+    // cross-site no portal de conciliação da AIAM, e o navegador recusa
+    // mandar cookie "lax" nesse contexto. Nas 4 instâncias de produção
+    // normais essa env var não existe, cookie continua "lax" como sempre.
+    sameSite: process.env.ESTORNO_EMBED ? "none" : "lax",
     maxAge: FINANCEIRO_SESSION_MAX_AGE,
     path: "/",
   });

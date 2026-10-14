@@ -59,6 +59,11 @@ const PASSTHROUGH_PREFIXES = [
   // API de logística (X-API-Key própria, ver src/lib/logisticaApi.ts): sem
   // isso cairia no redirect de login do painel, como os crons acima.
   "/api/logistica/v1",
+  // Resumo de estornos por loja (ver route.ts) -- pedido do Gabriel/
+  // financeiro 14/10/2026, só existe de verdade na instância embutida
+  // (ESTORNO_EMBED), mas o passthrough fica disponível sempre, mesmo
+  // padrão dos outros acima.
+  "/api/estornos/resumo",
   "/_next/static",
   "/_next/image",
   "/favicon.ico",
@@ -71,6 +76,27 @@ export async function proxy(req: NextRequest) {
 
   if (PASSTHROUGH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.next();
+  }
+
+  // Instância embutida (ESTORNO_EMBED) -- pedido do Gabriel/financeiro
+  // 14/10/2026: essa 5ª instância PM2 (mesmo código, mesmo Supabase das
+  // outras 4) é aberta dentro de um iframe cross-site no portal de
+  // conciliação da AIAM, então só deve servir estornos/financeiro (defesa
+  // em profundidade -- é alcançável por outra equipe, mesmo reusando este
+  // código todo) e precisa liberar frame-ancestors pra essa origem. Nunca
+  // roda nas 4 instâncias de produção normais (env var ausente lá).
+  if (process.env.ESTORNO_EMBED) {
+    const allowedPrefixes = ["/assistencia/estornos", "/assistencia/financeiro"];
+    if (!allowedPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+      const estornosUrl = req.nextUrl.clone();
+      estornosUrl.pathname = "/assistencia/estornos";
+      estornosUrl.search = "";
+      return NextResponse.redirect(estornosUrl, 307);
+    }
+    const response = NextResponse.next();
+    const allowedOrigin = process.env.ESTORNO_EMBED_ALLOWED_ORIGIN;
+    if (allowedOrigin) response.headers.set("Content-Security-Policy", `frame-ancestors 'self' ${allowedOrigin}`);
+    return response;
   }
 
   // Este projeto Vercel (o painel de KPIs do SAC) não hospeda mais o módulo de

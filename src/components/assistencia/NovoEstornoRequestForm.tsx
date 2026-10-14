@@ -49,11 +49,13 @@ function ProdutoRow({
   onChange,
   onRemove,
   showRemove,
+  filial,
 }: {
   value: ProdutoItem;
   onChange: (patch: Partial<ProdutoItem>) => void;
   onRemove: () => void;
   showRemove: boolean;
+  filial?: string;
 }) {
   const [status, setStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
 
@@ -64,7 +66,7 @@ function ProdutoRow({
         return;
       }
       setStatus("loading");
-      lookupTotvsProductForEstorno(value.codigo)
+      lookupTotvsProductForEstorno(value.codigo, filial)
         .then((match) => {
           if (!match) {
             setStatus("not_found");
@@ -124,7 +126,16 @@ function ProdutoRow({
 // Campos do print de referência do Victor (WhatsApp de estorno, 23/09/2026)
 // -- mesmo padrão de formulário de NewPartOrderForm.tsx (FormData + Server
 // Action, anexo obrigatório).
-export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: string; name: string }[] }) {
+export function NovoEstornoRequestForm({
+  storeOptions,
+  filial,
+}: {
+  storeOptions?: { id: string; name: string }[];
+  // Instância embutida (ESTORNO_EMBED) sem cookie -- a loja vem da URL
+  // (?filial=), precisa viajar no formData porque Server Actions não
+  // recebem query string (ver resolveEstornoRequester, estornoRequester.ts).
+  filial?: string;
+}) {
   const [state, formAction, pending] = useActionState<EstornoFormState, FormData>(createEstornoRequestAction, undefined);
 
   // Código do cliente puxa nome + CPF automaticamente -- pedido do Victor
@@ -145,7 +156,7 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
         return;
       }
       setClienteLookupStatus("loading");
-      lookupTotvsClientForEstorno(codigoCliente)
+      lookupTotvsClientForEstorno(codigoCliente, filial)
         .then((match) => {
           if (!match) {
             setClienteLookupStatus("not_found");
@@ -158,6 +169,7 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
         .catch(() => setClienteLookupStatus("not_found"));
     }, 400);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filial é fixo por sessão (prop, não muda), só o código deve reiniciar o debounce.
   }, [codigoCliente]);
 
   // Mais de um produto na mesma venda -- pedido do Victor 26/09/2026, mesmo
@@ -224,6 +236,7 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+      {filial ? <input type="hidden" name="filial" value={filial} /> : null}
       {storeOptions && storeOptions.length > 1 ? (
         <Field label="Loja" required>
           <select name="store_id" required className="rounded border px-3 py-2" style={inputStyle} defaultValue="">
@@ -376,6 +389,7 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
             onChange={(patch) => updateProduto(p.id, patch)}
             onRemove={() => removeProduto(p.id)}
             showRemove={produtos.length > 1}
+            filial={filial}
           />
         ))}
         <button type="button" onClick={addProduto} className="text-xs underline self-start" style={{ color: "var(--brand-green)" }}>

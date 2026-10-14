@@ -13,15 +13,15 @@ export type EstornoFormState = { error?: string } | undefined;
 // Código do cliente primeiro no formulário -- pedido do Victor 23/09/2026:
 // puxa nome + CPF automaticamente, mesmo padrão de lookupTotvsClientForEncomenda
 // (encomendas-actions.ts).
-export async function lookupTotvsClientForEstorno(code: string): Promise<TotvsClientMatch | null> {
-  const requester = await resolveEstornoRequester();
+export async function lookupTotvsClientForEstorno(code: string, filial?: string): Promise<TotvsClientMatch | null> {
+  const requester = await resolveEstornoRequester(filial);
   if (!requester) return null;
   return findTotvsClientByCode(code);
 }
 
 // Mesma ideia pro código do produto -- pedido do Victor 23/09/2026.
-export async function lookupTotvsProductForEstorno(code: string): Promise<TotvsProductMatch | null> {
-  const requester = await resolveEstornoRequester();
+export async function lookupTotvsProductForEstorno(code: string, filial?: string): Promise<TotvsProductMatch | null> {
+  const requester = await resolveEstornoRequester(filial);
   if (!requester) return null;
   return findTotvsProductByCode(code);
 }
@@ -38,7 +38,8 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
 // servicePhotos.ts) -- se o upload falhar, nenhuma
 // solicitação chega a ser criada.
 export async function createEstornoRequestAction(_state: EstornoFormState, formData: FormData): Promise<EstornoFormState> {
-  const requester = await resolveEstornoRequester();
+  const filial = emptyToNull(formData.get("filial"));
+  const requester = await resolveEstornoRequester(filial);
   if (!requester) return { error: "Sessão expirada. Faça login de novo." };
 
   const storeId = requester.kind === "gerente" ? String(formData.get("store_id") ?? requester.storeIds[0]) : requester.storeId;
@@ -73,7 +74,10 @@ export async function createEstornoRequestAction(_state: EstornoFormState, formD
   try {
     await createEstornoRequest(id, {
       storeId,
-      requesterRole: requester.kind,
+      // "embed" não existe no check constraint de requester_role (só
+      // caixa/gerente) -- grava como "caixa" (é funcionalmente o checkout
+      // da loja), o requesterName abaixo já identifica que veio do embed.
+      requesterRole: requester.kind === "embed" ? "caixa" : requester.kind,
       requesterName: requester.name,
       clienteNome,
       cpf: emptyToNull(formData.get("cpf")),

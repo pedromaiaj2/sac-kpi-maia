@@ -14,15 +14,31 @@ function formatMoney(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default async function EstornosPage({ searchParams }: { searchParams: Promise<{ enviado?: string }> }) {
-  const requester = await resolveEstornoRequester();
+export default async function EstornosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ enviado?: string; filial?: string }>;
+}) {
+  const { enviado, filial } = await searchParams;
+  const requester = await resolveEstornoRequester(filial);
   if (!requester) {
+    // Instância embutida (ESTORNO_EMBED): sem filial válida não tem pra onde
+    // cair -- redirecionar pra /assistencia/encomendas bateria de volta aqui
+    // (proxy.ts restringe essa instância só a estornos/financeiro), virando
+    // loop. Mostra erro inline em vez de redirecionar.
+    if (process.env.ESTORNO_EMBED) {
+      return (
+        <div className="w-full max-w-md mx-auto p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          Loja inválida ou não informada (parâmetro <code>filial</code>).
+        </div>
+      );
+    }
     // Sem sessão de caixa nem de gerente -- manda pra tela neutra que já
     // tem os dois logins (mesmo fallback de encomendas/caixa/page.tsx).
     redirect("/assistencia/encomendas");
   }
 
-  const { enviado } = await searchParams;
+  const filialQuery = requester.kind === "embed" ? `?filial=${requester.storeId}` : "";
   const storeIds = requester.kind === "gerente" ? requester.storeIds : [requester.storeId];
   const requests = await listEstornoRequestsForStores(storeIds);
   const signOutAction = requester.kind === "caixa" ? caixaSignOut : lojaGerenteSignOut;
@@ -32,17 +48,19 @@ export default async function EstornosPage({ searchParams }: { searchParams: Pro
       <AssistenciaHeader title="Estornos" subtitle="Solicitações de estorno enviadas pra o financeiro.">
         <div className="flex items-center gap-3">
           <Link
-            href="/assistencia/estornos/solicitar"
+            href={`/assistencia/estornos/solicitar${filialQuery}`}
             className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
             style={{ background: "#1B5E3C" }}
           >
             + Nova solicitação
           </Link>
-          <form action={signOutAction}>
-            <button type="submit" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-              Sair
-            </button>
-          </form>
+          {requester.kind === "embed" ? null : (
+            <form action={signOutAction}>
+              <button type="submit" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                Sair
+              </button>
+            </form>
+          )}
         </div>
       </AssistenciaHeader>
 
@@ -108,12 +126,14 @@ export default async function EstornosPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      <Link
-        href={requester.kind === "gerente" ? "/assistencia/loja" : "/assistencia/encomendas/caixa"}
-        className="text-sm underline self-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-      >
-        ← Voltar
-      </Link>
+      {requester.kind === "embed" ? null : (
+        <Link
+          href={requester.kind === "gerente" ? "/assistencia/loja" : "/assistencia/encomendas/caixa"}
+          className="text-sm underline self-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+        >
+          ← Voltar
+        </Link>
+      )}
     </div>
   );
 }

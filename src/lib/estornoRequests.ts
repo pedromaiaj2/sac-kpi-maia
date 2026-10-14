@@ -283,6 +283,27 @@ export async function getEstornoRequestsSummary(): Promise<EstornoRequestsSummar
   return summary;
 }
 
+export type EstornoRequestsSummaryByStore = { pendentes: number; valorPendente: number };
+
+// Resumo por loja -- pedido do Gabriel/financeiro 14/10/2026, pros cards da
+// tela dos caixas no portal de conciliação da AIAM (ver
+// src/app/api/estornos/resumo/route.ts). Mesmo padrão de
+// getEstornoRequestsSummary() acima, só filtrado por store_id quando
+// informado.
+export async function getEstornoRequestsSummaryByStore(storeId?: string): Promise<EstornoRequestsSummaryByStore> {
+  const admin = getSupabaseAdmin();
+  let query = admin.from("estorno_requests").select("valor_reembolso").eq("status", "pendente");
+  if (storeId) query = query.eq("store_id", storeId);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  return {
+    pendentes: rows.length,
+    valorPendente: rows.reduce((sum, r) => sum + Number(r.valor_reembolso), 0),
+  };
+}
+
 export async function recusarEstornoRequest(id: string, financeiroName: string, motivo: string): Promise<void> {
   const trimmed = motivo.trim();
   if (!trimmed) throw new Error("Informe o motivo da recusa.");
