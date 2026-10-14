@@ -63,6 +63,7 @@ export function VolumePorteChart({
   regras: KpisEntregas["regrasPorte"];
 }) {
   const [aberto, setAberto] = useState<ProdutoPorte["porte"] | null>(null);
+  const unidades = (key: (typeof SERIES)[number]["key"]) => data.reduce((t, d) => t + d[key], 0);
   return (
     <div>
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
@@ -73,11 +74,11 @@ export function VolumePorteChart({
             onClick={() => setAberto(s.porte)}
             className="flex items-center gap-1.5 rounded-full px-2.5 py-1 hover:bg-[var(--surface-2)]"
             style={{ border: "1px solid var(--border)", color: "var(--text-primary)" }}
-            title={`Ver os produtos ${s.label}`}
+            title={`Ver os ${produtos.filter((p) => p.porte === s.porte).length} produtos diferentes ${s.label}`}
           >
             <span className="inline-block w-3 h-3 rounded-sm" style={{ background: s.color }} />
             {s.label}
-            <span style={{ color: "var(--text-muted)" }}>· {produtos.filter((p) => p.porte === s.porte).length} produtos</span>
+            <span className="font-bold tabular-nums">· {fmt(unidades(s.key))} produtos</span>
           </button>
         ))}
       </div>

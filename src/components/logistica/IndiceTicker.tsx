@@ -30,7 +30,7 @@ type TickerItem = {
   label: string;
   hint: string;
   valor: string;
-  // segunda linha de valor, menor (ex.: "167 produtos" sob "70,7 entregas")
+  // segunda linha de valor, menor (ex.: "167 produtos" sob "70,7 notas")
   complemento?: string;
   // card principal: ocupa 2 colunas e valor maior
   destaque?: boolean;

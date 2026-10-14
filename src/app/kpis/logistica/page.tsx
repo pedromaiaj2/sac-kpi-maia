@@ -5,6 +5,7 @@ import { ThHint } from "@/components/logistica/ThHint";
 import { LogisticaTerminal } from "@/components/logistica/LogisticaTerminal";
 import { IndiceTicker, type TickerItem } from "@/components/logistica/IndiceTicker";
 import { FiltrosLogistica } from "@/components/logistica/FiltrosLogistica";
+import { GradeVeiculos } from "@/components/logistica/GradeVeiculos";
 import { parsePeriodoKpis, TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
 import {
   getKpisEntregas,
@@ -15,7 +16,6 @@ import {
   periodoAnterior,
   calcularVariacao,
   VINCULOS,
-  type CelulaVeiculo,
   type LinhaVeiculo,
   type Variacao,
 } from "@/lib/kpisLogistica";
@@ -77,118 +77,7 @@ function Bloco({ titulo, hint, children }: { titulo: string; hint?: string; chil
   );
 }
 
-const th = "px-2 py-1.5 font-semibold whitespace-nowrap";
-const thStyle = { color: "var(--text-secondary)" };
-
 const ROTULO_VINCULO: Record<string, string> = { "Próprio": "Próprios", Terceirizado: "Terceirizados" };
-const COR_VINCULO: Record<string, string> = { "Próprio": "var(--brand-green)", Terceirizado: "var(--series-5)" };
-
-const porCarga = (n: number, cargas: number) =>
-  cargas > 0 ? (n / cargas).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—";
-
-function Celula({
-  c,
-  total,
-  dias,
-  veiculo,
-  destaque,
-}: {
-  c: CelulaVeiculo;
-  total: number;
-  dias: number;
-  // como chamar o veículo na média por dia ("Stradas", "caminhões", "veículos")
-  veiculo: string;
-  destaque?: boolean;
-}) {
-  return (
-    <td className="px-3 py-2 text-right align-top">
-      <span className={`block tabular-nums ${destaque ? "text-lg font-bold" : "text-base font-semibold"}`} style={{ color: "var(--text-primary)" }}>
-        {num(c.entregas)}
-        {total > 0 && (
-          <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--text-muted)" }}>
-            {pct(c.entregas / total)}
-          </span>
-        )}
-      </span>
-      <span className="block text-[11px] tabular-nums whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-        {num(c.cargas)} cargas · {num(c.pedidos)} pedidos · {num(c.produtos)} produtos
-      </span>
-      <span className="block text-[11px] tabular-nums whitespace-nowrap font-semibold" style={{ color: "var(--text-secondary)" }}>
-        por carga: {porCarga(c.produtos, c.cargas)} produtos · {porCarga(c.pedidos, c.cargas)} pedidos
-      </span>
-      <span className="block text-[11px] tabular-nums whitespace-nowrap font-semibold" style={{ color: "var(--text-secondary)" }}>
-        por dia: {porCarga(c.veiculos, dias)} {veiculo} na rua
-      </span>
-    </td>
-  );
-}
-
-// Grade vínculo x veículo -- pedido do Victor 13/10/2026: separar os
-// motoristas nossos dos terceirizados e mostrar quantas entregas são
-// feitas pelas Stradas e pelos caminhões. % = fatia das entregas do período.
-function GradeVeiculos({ linhas, dias }: { linhas: LinhaVeiculo[]; dias: number }) {
-  const total = linhas[linhas.length - 1].total.entregas;
-  return (
-    <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
-      <table className="w-full text-xs border-collapse">
-        <thead>
-          <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
-            <th className={`${th} text-left`} style={thStyle}>
-              <ThHint hint="Próprios = cargas da nossa frota (TRANSP. LOJAS MAIA, EXPRESSA). Terceirizados = cargas de transportadora de fora (Ronaldo, THZ, D&A, Alenilson, Santos...). Vale a transportadora de cada carga.">
-                Motoristas
-              </ThHint>
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="Fiat Strada: as placas fixas do Eduardo, Joalison e Joanderson (e a TPA9E78, compartilhada).">Strada (carro)</ThHint>
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="Placa que não é de Strada, e carga de terceirizado (terceirizado não tem Strada). Carga própria sem placa fica em Não identificado." lado="direita">
-                Caminhão
-              </ThHint>
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              <ThHint
-                hint="Carga da frota própria lançada sem placa no Protheus (veículo 'AIAM', 'FRETIST'...): não dá pra saber se foi Strada ou caminhão, então fica à parte em vez de distorcer a média dos caminhões. Some quando o Protheus trouxer a placa."
-                lado="direita"
-              >
-                Não identificado
-              </ThHint>
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              <ThHint hint="Número grande = entregas (completas ou parciais) e a fatia do total. Abaixo: cargas, pedidos e produtos (unidades) nas cargas do período, e a média por carga." lado="direita">
-                Total
-              </ThHint>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {linhas.map((l) => {
-            const ehTotal = l.vinculo === "Total";
-            const cor = COR_VINCULO[l.vinculo] ?? "var(--text-muted)";
-            return (
-              <tr
-                key={l.vinculo}
-                className="border-b"
-                style={{ borderColor: "var(--border)", background: ehTotal ? "var(--surface-2)" : undefined }}
-              >
-                <td className="px-3 py-2 align-top">
-                  <span className="flex items-center gap-2 font-bold text-sm" style={{ color: "var(--text-primary)" }}>
-                    {!ehTotal && <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: cor }} />}
-                    {ROTULO_VINCULO[l.vinculo] ?? l.vinculo}
-                  </span>
-                </td>
-                <Celula c={l.Carro} total={total} dias={dias} veiculo="Stradas" />
-                <Celula c={l["Caminhão"]} total={total} dias={dias} veiculo="caminhões" />
-                <Celula c={l["Não identificado"]} total={total} dias={dias} veiculo="sem placa" />
-                <Celula c={l.total} total={total} dias={dias} veiculo="veículos" destaque />
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 function formatarDeltaPct(d: number): string {
   return `${d >= 0 ? "+" : ""}${(d * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pp`;
@@ -198,7 +87,7 @@ function formatarDeltaNum(d: number): string {
   return `${d >= 0 ? "+" : ""}${num(d)}`;
 }
 
-// `atual` pode ser null (sem visita/entrega no período) -- calcularVariacao
+// `atual` pode ser null (sem nota no período) -- calcularVariacao
 // exige número, então aqui vira "sem variação" direto, sem forçar 0 (0
 // seria uma mentira: não significa "zero", significa "não dá pra medir").
 function variar(atual: number | null, anterior: number | null, menorEhMelhor?: boolean): Variacao {
@@ -246,29 +135,33 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   const resumoAnterior = kpisAnteriores ? resumirLogistica(kpisAnteriores) : null;
   const porDia = kpis ? volumesPorDia(kpis) : [];
   const grade = kpis ? gradeVeiculos(kpis) : [];
+  const gradeAnterior = kpisAnteriores ? gradeVeiculos(kpisAnteriores) : [];
+  const totalVeiculos = grade.at(-1);
+  const totalVeiculosAnterior = gradeAnterior.at(-1);
+  const notasPorCaminhao = (l: LinhaVeiculo | undefined) => (l && l["Caminhão"].cargas > 0 ? l["Caminhão"].pedidos / l["Caminhão"].cargas : null);
 
   // Média por dia de operação (dias com carga no período) -- pedido do
-  // Victor 13/10/2026: o 1º card de KPIs mostra entregas e produtos por dia.
+  // Victor 13/10/2026: o 1º card de KPIs mostra notas e produtos por dia.
   const porDiaDe = (n: number, dias: number) => (dias > 0 ? n / dias : null);
-  const entregasDia = resumo ? porDiaDe(resumo.entregasRealizadas, resumo.dias) : null;
-  const entregasDiaAnterior = resumoAnterior ? porDiaDe(resumoAnterior.entregasRealizadas, resumoAnterior.dias) : null;
+  const notasDia = resumo ? porDiaDe(resumo.pedidos, resumo.dias) : null;
+  const notasDiaAnterior = resumoAnterior ? porDiaDe(resumoAnterior.pedidos, resumoAnterior.dias) : null;
   const decimal = (n: number | null) => (n === null ? "—" : n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 
   const tickerItems: TickerItem[] = resumo
     ? [
         {
           key: "media-dia",
-          hint: "Média por dia de operação (dias com carga no período; domingo sem carga não conta). Notas = pedidos que saíram nas cargas (o volume despachado pelo CD; nota que volta e sai de novo conta de novo). Entregas = pedidos que chegaram ao cliente (completas ou parciais), pelo dia da entrega. A diferença entre as duas é o que voltou sem entregar. Também: produtos (unidades) nas cargas e veículos na rua. Veículo = placa distinta nas cargas do dia; carga sem placa lançada usa a placa do motorista no dia ou conta pelo motorista (estimativa). A variação é das entregas por dia.",
+          hint: "Média por dia de operação (dias com carga no período; domingo sem carga não conta). Notas = notas que saíram nas cargas do CD (nota que volta e sai de novo conta de novo). Também: produtos (unidades) nas cargas e veículos na rua. Veículo = placa distinta nas cargas do dia; carga sem placa lançada usa a placa do motorista no dia ou conta pelo motorista (estimativa). A variação é das notas por dia.",
           label: "Média por dia",
           destaque: true,
-          valor: `${decimal(resumo ? porDiaDe(resumo.pedidos, resumo.dias) : null)} notas · ${decimal(entregasDia)} entregas`,
+          valor: `${decimal(notasDia)} notas`,
           complemento: `${decimal(resumo ? porDiaDe(resumo.volumes.total, resumo.dias) : null)} produtos · ${decimal(resumo?.caminhoesDia ?? null)} caminhões · ${decimal(resumo?.stradasDia ?? null)} Stradas · ${decimal(resumo?.naoIdentificadosDia ?? null)} sem placa`,
-          variacao: variar(entregasDia, entregasDiaAnterior),
+          variacao: variar(notasDia, notasDiaAnterior),
           formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
         },
         {
           key: "volta",
-          hint: "De cada 100 visitas, quantas voltaram com problema: (insucessos + entregas parciais) ÷ visitas. Visita = cada vez que um pedido saiu numa carga e voltou com resultado. Mede o retrabalho, não a culpa do motorista. Verde até 5%, amarelo até 10%, vermelho acima.",
+          hint: "De cada 100 notas que saíram e voltaram com resultado, quantas voltaram com problema: (insucessos + parciais) ÷ notas. Nota que sai duas vezes conta duas. Mede o retrabalho, não a culpa do motorista. Verde até 5%, amarelo até 10%, vermelho acima.",
           label: "Índice de Volta",
           valor: pct(resumo.indiceVolta),
           variacao: variar(resumo.indiceVolta, resumoAnterior?.indiceVolta ?? null, true),
@@ -276,35 +169,11 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         },
         {
           key: "volta-logistica",
-          hint: "Só a parte da volta que é falha do transporte: insucessos com motivo de logística (L01 rota estourada, L02 veículo quebrado...) ÷ visitas. L06 (pedido não carregado) é do CD e fica fora.",
+          hint: "Só a parte da volta que é falha do transporte: insucessos com motivo de logística (L01 rota estourada, L02 veículo quebrado...) ÷ notas. L06 (pedido não carregado) é do CD e fica fora.",
           label: "Volta Logística",
           valor: pct(resumo.indiceVoltaLogistica),
           variacao: variar(resumo.indiceVoltaLogistica, resumoAnterior?.indiceVoltaLogistica ?? null, true),
           formatarDelta: formatarDeltaPct,
-        },
-        {
-          key: "entregas",
-          hint: "Visitas com o produto entregue (completa ou parcial), pela data da visita.",
-          label: "Entregas",
-          valor: num(resumo.entregasRealizadas),
-          variacao: variar(resumo.entregasRealizadas, resumoAnterior?.entregasRealizadas ?? null),
-          formatarDelta: formatarDeltaNum,
-        },
-        {
-          key: "entregas-strada",
-          hint: "Entregas (completas ou parciais) feitas nas Fiat Strada.",
-          label: "Strada",
-          valor: num(resumo.entregasCarro),
-          variacao: variar(resumo.entregasCarro, resumoAnterior?.entregasCarro ?? null),
-          formatarDelta: formatarDeltaNum,
-        },
-        {
-          key: "entregas-caminhao",
-          hint: "Entregas (completas ou parciais) feitas em caminhão. Cargas próprias sem placa ficam fora (Não identificado, na grade de veículos), então Strada + Caminhão pode não somar o total.",
-          label: "Caminhão",
-          valor: num(resumo.entregasCaminhao),
-          variacao: variar(resumo.entregasCaminhao, resumoAnterior?.entregasCaminhao ?? null),
-          formatarDelta: formatarDeltaNum,
         },
         {
           key: "cargas",
@@ -315,9 +184,9 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
           formatarDelta: formatarDeltaNum,
         },
         {
-          key: "pedidos",
-          hint: "Pedidos dentro das cargas do período.",
-          label: "Pedidos",
+          key: "notas",
+          hint: "Notas dentro das cargas do período.",
+          label: "Notas",
           valor: num(resumo.pedidos),
           variacao: variar(resumo.pedidos, resumoAnterior?.pedidos ?? null),
           formatarDelta: formatarDeltaNum,
@@ -330,6 +199,30 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
           variacao: variar(resumo.volumes.total, resumoAnterior?.volumes.total ?? null),
           formatarDelta: formatarDeltaNum,
         },
+        {
+          key: "notas-strada",
+          hint: "Notas nas cargas das Fiat Strada.",
+          label: "Notas Strada",
+          valor: num(totalVeiculos?.Carro.pedidos ?? 0),
+          variacao: variar(totalVeiculos?.Carro.pedidos ?? null, totalVeiculosAnterior?.Carro.pedidos ?? null),
+          formatarDelta: formatarDeltaNum,
+        },
+        {
+          key: "notas-caminhao",
+          hint: "Notas nas cargas de caminhão. Cargas próprias sem placa ficam fora (Não identificado, na grade de veículos), então Strada + Caminhão pode não somar o total.",
+          label: "Notas caminhão",
+          valor: num(totalVeiculos?.["Caminhão"].pedidos ?? 0),
+          variacao: variar(totalVeiculos?.["Caminhão"].pedidos ?? null, totalVeiculosAnterior?.["Caminhão"].pedidos ?? null),
+          formatarDelta: formatarDeltaNum,
+        },
+        {
+          key: "notas-por-caminhao",
+          hint: "Média de notas por carga de caminhão (próprios e terceirizados). A logística considera normal de 16 a 20.",
+          label: "Notas por caminhão",
+          valor: decimal(notasPorCaminhao(totalVeiculos)),
+          variacao: variar(notasPorCaminhao(totalVeiculos), notasPorCaminhao(totalVeiculosAnterior)),
+          formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
+        },
       ]
     : [];
 
@@ -339,7 +232,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
       <KpisSectionTabs active="logistica" />
 
       <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
-        <ThHint hint="Cargas despachadas pelo CD, entregas por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que aconteceu na entrega). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). O código 000058 (LOJAS MAIA TREINAMENTO) é o motorista em treinamento e entra nos números como qualquer outro.">
+        <ThHint hint="Cargas despachadas pelo CD, notas e produtos por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que aconteceu com a nota na rua). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). O código 000058 (LOJAS MAIA TREINAMENTO) é o motorista em treinamento e entra nos números como qualquer outro.">
           Logística
         </ThHint>
       </h1>
@@ -374,8 +267,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
           <IndiceTicker items={tickerItems} labelComparacao="período anterior" />
 
           <Bloco
-            titulo="Entregas e produtos por veículo"
-            hint="Entregas = visitas com o produto entregue (completa ou parcial), pela data da visita. Cargas, pedidos e produtos pela data da carga (ZAG_DTPREV). Por dia: média de veículos na rua nos dias com carga (placa distinta; sem placa, pelo motorista -- estimativa). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das entregas do período."
+            titulo="Notas e produtos por veículo"
+            hint="Cargas, notas e produtos pela data da carga (ZAG_DTPREV). Por dia: média de veículos na rua nos dias com carga (placa distinta; sem placa, pelo motorista -- estimativa). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das notas do período."
           >
             <GradeVeiculos linhas={grade} dias={resumo.dias} />
           </Bloco>

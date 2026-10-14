@@ -24,7 +24,7 @@ function motivosTexto(c: CargaEntregas, ocorrencias: Ocorrencias): string {
     .sort((a, b) => b[1] - a[1])
     .map(([cod, n]) => `${n} × ${cod === "—" ? "sem motivo informado" : `${cod} ${ocorrencias[cod]?.descricao ?? ""}`.trim()}`);
   const linhas = [];
-  if (c.naoEntregues > 0) linhas.push(`${c.naoEntregues} não entregue${c.naoEntregues === 1 ? "" : "s"}: ${partes.join(", ")}`);
+  if (c.naoEntregues > 0) linhas.push(`${c.naoEntregues} nota${c.naoEntregues === 1 ? "" : "s"} ${c.naoEntregues === 1 ? "voltou" : "voltaram"}: ${partes.join(", ")}`);
   if (c.canceladas > 0) linhas.push(`${c.canceladas} cancelado${c.canceladas === 1 ? "" : "s"}`);
   return linhas.join(" · ");
 }
