@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setNpsDetratorStatusAction } from "@/app/kpis/actions";
 import {
@@ -111,6 +112,16 @@ function DetratorRow({ item }: { item: NpsDetrator }) {
             {error}
           </p>
         ) : null}
+        {/* Leva só origem:id -- o nome/telefone/CPF são buscados no servidor
+            (vouchers/novo), nunca pela URL. */}
+        <Link
+          href={`/assistencia/vouchers/novo?nps=${encodeURIComponent(`${item.origem}:${item.origemId}`)}`}
+          prefetch={false}
+          className="block text-[11px] font-semibold underline mt-1"
+          style={{ color: "var(--brand-orange)" }}
+        >
+          🎟 Emitir voucher
+        </Link>
       </td>
     </tr>
   );

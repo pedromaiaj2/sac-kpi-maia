@@ -126,6 +126,15 @@ export default async function EncomendasCaixaPage({
               Estornos
             </Link>
           ) : null}
+          {requester.kind === "caixa" ? (
+            <Link
+              href="/assistencia/caixa/vouchers"
+              className="text-sm px-4 py-2.5 rounded-lg font-semibold whitespace-nowrap border transition-all duration-200 hover:brightness-95"
+              style={{ borderColor: "var(--brand-green)", color: "var(--brand-green)" }}
+            >
+              Validar voucher
+            </Link>
+          ) : null}
           <form action={signOutAction}>
             <button type="submit" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               Sair
