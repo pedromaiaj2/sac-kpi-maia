@@ -30,6 +30,10 @@ type TickerItem = {
   label: string;
   hint: string;
   valor: string;
+  // valor clicável (Client Component) no lugar do texto
+  valorNode?: React.ReactNode;
+  // ocupa 2 colunas sem o destaque
+  largo?: boolean;
   // segunda linha de valor, menor (ex.: "167 produtos" sob "70,7 notas")
   complemento?: string;
   // card principal: ocupa 2 colunas e valor maior
@@ -42,24 +46,24 @@ type TickerItem = {
 
 export function IndiceTicker({ items, labelComparacao }: { items: TickerItem[]; labelComparacao: string }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
       {items.map((item, i) => {
         const cor = corVariacao(item.variacao.melhorou);
         return (
           <div
             key={item.key}
-            className={`rounded-lg px-2.5 py-2 flex flex-col gap-0.5 min-w-0 ${item.destaque ? "lg:col-span-2" : ""}`}
+            className={`rounded-lg px-2.5 py-2 flex flex-col gap-0.5 min-w-0 ${item.destaque || item.largo ? "lg:col-span-2" : ""}`}
             style={{ background: "var(--surface-1)", border: item.destaque ? "2px solid var(--brand-green)" : "1px solid var(--border)" }}
           >
-            {/* na grade de 5 (1º card ocupando 2), os índices 2, 3, 7 e 8 ficam
-                encostados na direita: a caixa do "i" abre pra esquerda */}
-            <ThHint hint={item.hint} lado={[2, 3, 7, 8].includes(i) ? "direita" : "esquerda"}>
+            {/* na grade de 6 (1º e último cards ocupando 2), os índices 3, 4, 8 e
+                9 ficam encostados na direita: a caixa do "i" abre pra esquerda */}
+            <ThHint hint={item.hint} lado={[3, 4, 8, 9].includes(i) ? "direita" : "esquerda"}>
               <span className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: "var(--text-muted)" }}>
                 {item.label}
               </span>
             </ThHint>
             <span className={`${item.destaque ? "text-2xl" : "text-lg"} font-bold leading-tight tabular-nums`} style={{ color: "var(--text-primary)" }}>
-              {item.valor}
+              {item.valorNode ?? item.valor}
             </span>
             {item.complemento && (
               <span className="text-xs font-semibold tabular-nums leading-tight" style={{ color: "var(--text-secondary)" }}>
