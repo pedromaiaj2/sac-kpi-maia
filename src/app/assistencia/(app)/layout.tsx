@@ -89,6 +89,11 @@ export default async function AssistenciaAppLayout({
                 </Link>
               ) : null}
               {isAdmin ? (
+                <Link href="/assistencia/vouchers" className="text-sm font-semibold" style={{ color: "var(--brand-orange)" }}>
+                  Vouchers
+                </Link>
+              ) : null}
+              {isAdmin ? (
                 <Link href="/assistencia/reclamacoes" className="text-sm font-semibold" style={{ color: "var(--brand-orange)" }}>
                   Reclamações
                 </Link>

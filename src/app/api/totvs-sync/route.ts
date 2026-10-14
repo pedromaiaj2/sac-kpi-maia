@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { runTotvsSync } from "@/lib/totvsSync";
+import { expirarVouchers } from "@/lib/vouchers";
 
 // Histórico: não estava no cron do Vercel (vercel.json) porque o firewall do
 // Protheus derrubava (timeout) o IP de nuvem do Vercel -- o sync real rodava
@@ -27,8 +28,11 @@ export async function GET(req: NextRequest) {
   try {
     // Trava ocupada também sai com 200 ({ skipped: "em_execucao", ... }), para
     // não marcar falha no GitHub Actions a cada sobreposição.
+    // Vouchers vencidos viram "expirado" aqui (cron da VPS, a cada 30 min).
+    // A baixa já recusa vencido sozinha: falha aqui não derruba o sync.
+    const vouchersExpirados = await expirarVouchers().catch(() => null);
     const summary = await runTotvsSync(getSupabaseAdmin(), "rota");
-    return NextResponse.json(summary);
+    return NextResponse.json({ ...summary, vouchersExpirados });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }

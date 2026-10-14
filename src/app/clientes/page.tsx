@@ -48,6 +48,8 @@ import { RecompraNaoContatarManager } from "@/components/RecompraNaoContatarMana
 import { CanalAquisicaoSelect } from "@/components/CanalAquisicaoSelect";
 import { EstornoFormCard } from "@/components/clientes/EstornoFormCard";
 import { AcionarClienteButton } from "@/components/clientes/AcionarClienteButton";
+import { VoucherResumo } from "@/components/vouchers/VoucherResumo";
+import { resumoVouchers } from "@/lib/vouchers";
 import { Shield, Cloud, BedDouble, Sofa, BedSingle, DoorClosed, Table2, Repeat, ArrowRight, Layers, Search } from "lucide-react";
 import { whatsappHref } from "@/lib/phone";
 
@@ -127,7 +129,9 @@ export default async function ClientesPage({
             ? "frequencia"
             : viewParam === "estornos"
               ? "estornos"
-              : "nivel";
+              : viewParam === "vouchers"
+                ? "vouchers"
+                : "nivel";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   return (
@@ -155,6 +159,7 @@ export default async function ClientesPage({
           color="var(--brand-orange)"
         />
         <UnderlineTab href={buildHref({ view: "estornos" })} label="Estornos" active={view === "estornos"} color="var(--brand-orange)" />
+        <UnderlineTab href={buildHref({ view: "vouchers" })} label="Vouchers" active={view === "vouchers"} color="var(--brand-orange)" />
       </div>
 
       {view === "status" ? (
@@ -167,6 +172,8 @@ export default async function ClientesPage({
         <FrequenciaView q={q} padrao={padrao} page={page} />
       ) : view === "estornos" ? (
         <EstornosView q={q} loja={loja} urgencia={urgencia} page={page} />
+      ) : view === "vouchers" ? (
+        <VouchersView />
       ) : (
         <NivelView q={q} nivel={nivel} inativo={inativo} page={page} />
       )}
@@ -1773,6 +1780,16 @@ async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: st
                             sem telefone
                           </span>
                         )}
+                        {/* Só o id do estorno vai na URL; os dados do cliente
+                            são buscados na emissão (login de admin). */}
+                        <Link
+                          href={`/assistencia/vouchers/novo?estorno=${encodeURIComponent(e.id)}`}
+                          prefetch={false}
+                          className="block text-xs font-semibold underline mt-1.5"
+                          style={{ color: "var(--brand-orange)" }}
+                        >
+                          🎟 Emitir voucher
+                        </Link>
                       </td>
                     </tr>
                   );
@@ -1812,5 +1829,34 @@ async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: st
         </div>
       ) : null}
     </>
+  );
+}
+
+// Aba Vouchers -- pedido do Victor 14/10/2026. Aqui (senha do painel) só o
+// painel de números, sem dado de cliente; emitir, listar e cancelar ficam
+// em /assistencia/vouchers, com o login individual de admin (quem emitiu
+// fica registrado).
+async function VouchersView() {
+  const resumo = await resumoVouchers();
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          Vouchers de recuperação enviados a detratores e clientes que pediram estorno. Uso único, conferido no caixa da loja.
+        </p>
+        <Link
+          href="/assistencia/vouchers"
+          prefetch={false}
+          className="text-sm font-semibold px-4 py-2.5 rounded-lg"
+          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+        >
+          Emitir e gerenciar vouchers →
+        </Link>
+      </div>
+      <VoucherResumo r={resumo} />
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        Emitir, ver a lista e cancelar pede o login de admin da equipe. Também dá pra emitir direto da linha de um estorno (aba Estornos) ou de um detrator (Avaliações).
+      </p>
+    </div>
   );
 }
