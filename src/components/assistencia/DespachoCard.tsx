@@ -3,6 +3,7 @@ import { formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceReque
 import { formatDateOnlyBr } from "@/lib/formatDateTime";
 import { REQUEST_TYPE_LABELS, pickupDestinationLabel } from "@/lib/assistenciaLabels";
 import type { RequestPhoto } from "@/lib/servicePhotos";
+import { NotaFiscalPdf } from "./NotaFiscalPdf";
 
 // scheduledDate é "YYYY-MM-DD" puro (sem hora/fuso) -- new Date(iso) via
 // formatDateOnlyBr trataria como UTC meia-noite e, convertendo pro fuso de
@@ -100,20 +101,9 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
 // de imprimir, cada notificação saia junto com sua respectiva nota") --
 // sempre em folha própria (break-before), depois do cartão principal, pra
 // não disputar espaço com o resto do despacho nem risco de cortar a
-// imagem/PDF no meio. PDF usa <embed> (o navegador que imprime já sabe
-// renderizar PDF inline) -- sem lib nenhuma nova, mesmo espírito de "só o
-// que já existe" do resto do projeto.
-//
-// `#toolbar=0&navpanes=0&scrollbar=0` no fim da URL -- achado do Victor
-// 10/09/2026 (print anexo): sem isso, o visualizador de PDF nativo do
-// Chrome aparecia com a MOLDURA inteira (barra de zoom/página, painel de
-// miniatura lateral, fundo cinza-escuro de "página vazia") junto do
-// despacho, tanto na tela quanto impresso -- desperdiçando papel/espaço
-// com interface de visualizador em vez de só o conteúdo da nota. Esses
-// parâmetros são suportados pelo plugin de PDF do Chromium (não uma API
-// do Next/React) e escondem essa moldura, deixando só a página da nota.
+// imagem/PDF no meio. PDF vira imagem por página (NotaFiscalPdf) desde
+// 14/10/2026: o <embed> de antes saía em branco na impressão do Chrome 155.
 function InvoicePage({ photo }: { photo: RequestPhoto }) {
-  const pdfUrl = `${photo.url}#toolbar=0&navpanes=0&scrollbar=0`;
   return (
     <div
       // Moldura (borda arredondada + fundo + título "Nota fiscal") só na
@@ -142,7 +132,7 @@ function InvoicePage({ photo }: { photo: RequestPhoto }) {
       </div>
       <div className="px-4 py-3 flex justify-center print:p-0">
         {photo.isPdf ? (
-          <embed src={pdfUrl} type="application/pdf" style={{ width: "100%", height: "260mm" }} />
+          <NotaFiscalPdf url={photo.url} />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={photo.url} alt="Nota fiscal" style={{ maxWidth: "100%", maxHeight: "260mm", objectFit: "contain" }} />
