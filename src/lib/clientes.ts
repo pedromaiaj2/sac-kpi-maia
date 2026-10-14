@@ -299,7 +299,7 @@ export const CLIENTE_NIVEL_CRITERIA: Record<ClienteNivel, string> = {
 // direção de promover o cliente de nível cedo demais -- corrigido
 // comparando o dia também: se hoje ainda não chegou no dia do aniversário
 // deste mês, o mês corrente ainda não conta inteiro.
-function mesesEntre(dataIso: string, hoje: Date): number {
+export function mesesEntre(dataIso: string, hoje: Date): number {
   const d = new Date(`${dataIso}T00:00:00`);
   let meses = (hoje.getFullYear() - d.getFullYear()) * 12 + (hoje.getMonth() - d.getMonth());
   if (hoje.getDate() < d.getDate()) meses -= 1;

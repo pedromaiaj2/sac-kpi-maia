@@ -43,7 +43,7 @@ export async function preencherDeEstorno(id: string): Promise<PreenchimentoVouch
 export async function preencherDeNps(chave: string): Promise<PreenchimentoVoucher | null> {
   const [origem, origemId] = chave.split(":");
   if (!origem || !origemId) return null;
-  const d = (await listNpsDetratores()).find((x) => x.origem === origem && x.origemId === origemId);
+  const d = (await listNpsDetratores({ todoHistorico: true })).find((x) => x.origem === origem && x.origemId === origemId);
   if (!d) return null;
   const doCadastro = d.clientPhone ? await buscarClientePorTelefone(d.clientPhone) : null;
   const motivo = d.origem === "entrega" || d.origem === "compra" ? "atraso_entrega" : d.origem === "assistencia_tecnica" || d.origem === "montagem" ? "defeito_assistencia" : "outro";
