@@ -100,9 +100,11 @@ type StatusRow = { origem: string; origem_id: string; status: string; motivo: st
 // relatório histórico; sem esse corte só cresceria pra sempre.
 const LOOKBACK_MS = 180 * 24 * 60 * 60 * 1000;
 
-export async function listNpsDetratores(): Promise<NpsDetrator[]> {
+// `todoHistorico`: a Central de Recuperação (pedido do Victor 14/10/2026)
+// quer todos os detratores, sem o corte de 6 meses.
+export async function listNpsDetratores(opts: { todoHistorico?: boolean } = {}): Promise<NpsDetrator[]> {
   const admin = getSupabaseAdmin();
-  const sinceIso = new Date(Date.now() - LOOKBACK_MS).toISOString();
+  const sinceIso = opts.todoHistorico ? "1970-01-01T00:00:00Z" : new Date(Date.now() - LOOKBACK_MS).toISOString();
 
   const [
     { data: sacRows, error: sacError },

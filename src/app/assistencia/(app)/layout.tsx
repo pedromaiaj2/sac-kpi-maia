@@ -11,6 +11,7 @@ import { MobileNav } from "@/components/assistencia/MobileNav";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
 import { listAssistenciaTeamNotificationsAction } from "@/app/assistencia/notifications-actions";
 import { SupervisaoGuard } from "@/components/assistencia/SupervisaoGuard";
+import { RECUPERACAO_DONO_ID } from "@/lib/recuperacaoCore";
 
 export default async function AssistenciaAppLayout({
   children,
@@ -86,6 +87,11 @@ export default async function AssistenciaAppLayout({
               {isAdmin ? (
                 <Link href="/assistencia/financeiro" className="text-sm font-semibold" style={{ color: "var(--brand-orange)" }}>
                   Estornos
+                </Link>
+              ) : null}
+              {profile.id === RECUPERACAO_DONO_ID ? (
+                <Link href="/assistencia/recuperacao" className="text-sm font-semibold" style={{ color: "var(--brand-orange)" }}>
+                  Recuperação
                 </Link>
               ) : null}
               {isAdmin ? (
