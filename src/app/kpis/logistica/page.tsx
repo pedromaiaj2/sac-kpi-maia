@@ -6,6 +6,7 @@ import { LogisticaTerminal } from "@/components/logistica/LogisticaTerminal";
 import { IndiceTicker, type TickerItem } from "@/components/logistica/IndiceTicker";
 import { FiltrosLogistica } from "@/components/logistica/FiltrosLogistica";
 import { GradeVeiculos } from "@/components/logistica/GradeVeiculos";
+import { AssistenciasTotal } from "@/components/logistica/AssistenciasTotal";
 import { parsePeriodoKpis, TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
 import {
   getKpisEntregas,
@@ -147,7 +148,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   const notasDiaAnterior = resumoAnterior ? porDiaDe(resumoAnterior.pedidos, resumoAnterior.dias) : null;
   const decimal = (n: number | null) => (n === null ? "—" : n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 
-  const tickerItems: TickerItem[] = resumo
+  const tickerItems: TickerItem[] = resumo && kpis
     ? [
         {
           key: "media-dia",
@@ -222,6 +223,22 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
           valor: decimal(notasPorCaminhao(totalVeiculos)),
           variacao: variar(notasPorCaminhao(totalVeiculos), notasPorCaminhao(totalVeiculosAnterior)),
           formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
+        },
+        {
+          key: "assistencias",
+          hint: "Chamados de assistência técnica abertos no período (troca, peça, recolhimento, envio de produto novo) ligados a uma nota que saiu numa carga (carga do chamado, cliente + produto ou, sem o produto, a nota mais recente ao cliente, nos 180 dias antes). Não entram no Índice de Volta. Segue os filtros da tela. Clique no número pra ver cada chamado.",
+          label: "Assistências",
+          largo: true,
+          valor: num(kpis.assistencias.length),
+          valorNode: (
+            <AssistenciasTotal
+              itens={kpis.assistencias}
+              nomesMotoristas={Object.fromEntries(kpis.motoristas.map((m) => [m.codigo, m.nome ?? m.codigo]))}
+            />
+          ),
+          complemento: `${num(kpis.assistenciasPeriodo.total - kpis.assistenciasPeriodo.vinculadas)} sem nota ligada (retirada, sem CPF...)`,
+          variacao: variar(kpis.assistencias.length, kpisAnteriores?.assistencias.length ?? null, true),
+          formatarDelta: formatarDeltaNum,
         },
       ]
     : [];

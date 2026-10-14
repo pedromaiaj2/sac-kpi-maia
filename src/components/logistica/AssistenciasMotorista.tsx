@@ -36,7 +36,18 @@ function tipoLabel(a: AssistenciaEntrega) {
   return REQUEST_TYPE_LABELS[a.tipo] ?? a.tipo;
 }
 
-export function AssistenciasMotorista({ nome, itens, onFechar }: { nome: string; itens: AssistenciaEntrega[]; onFechar: () => void }) {
+export function AssistenciasMotorista({
+  nome,
+  itens,
+  onFechar,
+  nomesMotoristas,
+}: {
+  nome: string;
+  itens: AssistenciaEntrega[];
+  onFechar: () => void;
+  // com isto, mostra a coluna Motorista (lista de todos, card do topo)
+  nomesMotoristas?: Record<string, string>;
+}) {
   const porAtribuicao = (k: AssistenciaEntrega["atribuicao"]) => itens.filter((i) => i.atribuicao === k).length;
 
   return (
@@ -50,7 +61,7 @@ export function AssistenciasMotorista({ nome, itens, onFechar }: { nome: string;
       <table className="w-full text-xs border-collapse">
         <thead className="sticky top-0" style={{ background: "var(--surface-2)" }}>
           <tr>
-            {["Chamado", "Aberto em", "Tipo", "Produto", "Causa", "Saiu na carga", "Ligado por"].map((h) => (
+            {["Chamado", "Aberto em", "Tipo", "Produto", "Causa", ...(nomesMotoristas ? ["Motorista"] : []), "Saiu na carga", "Ligado por"].map((h) => (
               <th key={h} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                 {h}
               </th>
@@ -71,6 +82,7 @@ export function AssistenciasMotorista({ nome, itens, onFechar }: { nome: string;
                   {a.produto ?? "—"}
                 </td>
                 <td className="px-2 py-1.5 min-w-[120px]">{a.causaRaiz ? (CAUSA_RAIZ_LABELS[a.causaRaiz] ?? a.causaRaiz) : "—"}</td>
+                {nomesMotoristas && <td className="px-2 py-1.5 min-w-[140px]">{nomesMotoristas[a.motoristaCodigo] ?? a.motoristaCodigo}</td>}
                 <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">
                   #{a.carga}
                   <span className="block" style={{ color: "var(--text-muted)" }}>
