@@ -46,7 +46,7 @@ function Barras({ motivos, total, onAbrir }: { motivos: MotivoInsucesso[]; total
               type="button"
               onClick={() => onAbrir(m)}
               className="w-full flex flex-col gap-1 text-sm text-left rounded-md -mx-1.5 px-1.5 py-1 hover:bg-[var(--surface-2)]"
-              title="Clique pra ver os pedidos (cliente, CPF e produto)"
+              title="Clique pra ver as notas (cliente, CPF e produto)"
             >
               <span className="flex items-baseline justify-between gap-3">
                 <span className="flex items-center gap-2 min-w-0" style={{ color: "var(--text-primary)" }}>
@@ -132,7 +132,7 @@ function Rosca({ motivos, total, onAbrir }: { motivos: MotivoInsucesso[]; total:
               type="button"
               onClick={() => onAbrir(f.motivo)}
               className="w-full flex items-center justify-between gap-3 text-sm text-left rounded-md -mx-1.5 px-1.5 py-1 hover:bg-[var(--surface-2)]"
-              title="Clique pra ver os pedidos (cliente, CPF e produto)"
+              title="Clique pra ver as notas (cliente, CPF e produto)"
             >
               <span className="flex items-center gap-2 min-w-0" style={{ color: "var(--text-primary)" }}>
                 <span aria-hidden className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ background: f.cor }} />

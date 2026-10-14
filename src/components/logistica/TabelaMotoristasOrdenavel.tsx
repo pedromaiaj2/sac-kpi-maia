@@ -15,7 +15,6 @@ type SortKey =
   | "nome"
   | "cargas"
   | "visitas"
-  | "entregas"
   | "produtosPorCarga"
   | "insucessos"
   | "parciais"
@@ -27,35 +26,30 @@ const COLUNAS: { key: SortKey; label: string; hint: string }[] = [
   { key: "cargas", label: "Cargas", hint: "Cargas despachadas com o motorista, pela data da carga (previsão do CD)." },
   {
     key: "visitas",
-    label: "Visitas",
-    hint: "Cada vez que um pedido saiu numa carga dele e voltou com resultado (entregue, parcial ou não entregue). Pedido que sai duas vezes conta duas visitas. É a base dos índices de volta.",
-  },
-  {
-    key: "entregas",
-    label: "Entregas",
-    hint: "Visitas com o produto entregue, completa ou parcial. Passe o mouse no número pra ver quantas foram de Strada e de caminhão.",
+    label: "Notas",
+    hint: "Notas que saíram nas cargas dele e já voltaram com resultado (ficou com o cliente, ficou em parte ou voltou). Nota que sai duas vezes conta duas. É a base dos índices de volta. Passe o mouse no número pra ver quantas foram de Strada e de caminhão.",
   },
   { key: "produtosPorCarga", label: "Prod./carga", hint: "Média de produtos (unidades) por carga do motorista no período." },
   {
     key: "insucessos",
     label: "Insucessos",
-    hint: "Visitas em que o pedido voltou sem entregar. Passe o mouse no número pra ver por motivo: cliente (ausente, recusa, endereço), logística (rota estourada, veículo quebrado), CD (L06, pedido não carregado) e outros.",
+    hint: "Notas que voltaram (o cliente não ficou com nada). Passe o mouse no número pra ver por motivo: cliente (ausente, recusa, endereço), logística (rota estourada, veículo quebrado), CD (L06, pedido não carregado) e outros.",
   },
-  { key: "parciais", label: "Parciais", hint: "Visitas em que só parte do pedido foi entregue." },
+  { key: "parciais", label: "Parciais", hint: "Notas em que só parte dos produtos ficou com o cliente." },
   {
     key: "indiceVolta",
     label: "Volta total",
-    hint: "De cada 100 visitas, quantas voltaram com problema: (insucessos + parciais) ÷ visitas. Mede o retrabalho, não a culpa do motorista (cliente ausente entra aqui). Verde até 5%, amarelo até 10%, vermelho acima.",
+    hint: "De cada 100 notas, quantas voltaram com problema: (insucessos + parciais) ÷ notas. Mede o retrabalho, não a culpa do motorista (cliente ausente entra aqui). Verde até 5%, amarelo até 10%, vermelho acima.",
   },
   {
     key: "indiceVoltaLogistica",
     label: "Volta logística",
-    hint: "Só a parte que é falha do transporte: insucessos com motivo de logística (L01 rota estourada, L02 veículo quebrado...) ÷ visitas. L06 (pedido não carregado) é do CD e fica fora.",
+    hint: "Só a parte que é falha do transporte: insucessos com motivo de logística (L01 rota estourada, L02 veículo quebrado...) ÷ notas. L06 (pedido não carregado) é do CD e fica fora.",
   },
   {
     key: "assistencias",
     label: "Assistências",
-    hint: "Chamados de assistência técnica abertos no período (troca, peça, recolhimento, entrega de produto novo) ligados a uma entrega deste motorista. Não entram no Índice de Volta. Ligação: carga informada no chamado, ou entrega ao mesmo cliente com o produto do chamado; sem o produto, a entrega mais recente ao cliente (≈). Clique no número pra ver os chamados.",
+    hint: "Chamados de assistência técnica abertos no período (troca, peça, recolhimento, envio de produto novo) ligados a uma nota que saiu numa carga deste motorista. Não entram no Índice de Volta. Ligação: carga informada no chamado, ou nota ao mesmo cliente com o produto do chamado; sem o produto, a nota mais recente ao cliente (≈). Clique no número pra ver os chamados.",
   },
 ]
 
@@ -67,8 +61,6 @@ function valorOrdenavel(m: MotoristaEntregas, key: SortKey, produtos: Record<str
       return m.cargas;
     case "visitas":
       return m.visitas;
-    case "entregas":
-      return m.entregasRealizadas;
     case "produtosPorCarga":
       return m.cargas > 0 ? (produtos[m.codigo] ?? 0) / m.cargas : -1;
     case "insucessos":
@@ -93,7 +85,7 @@ const ROTULO_TOM: Record<"good" | "warning" | "critical" | "neutral", string> = 
   good: "dentro da meta (até 5%)",
   warning: "atenção (5% a 10%)",
   critical: "crítico (acima de 10%)",
-  neutral: "sem visitas",
+  neutral: "sem notas",
 };
 
 // Badge do semáforo da volta: fundo na cor do status, texto sempre neutro,
@@ -168,7 +160,7 @@ export function TabelaMotoristasOrdenavel({
   if (motoristas.length === 0) {
     return (
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        Nenhuma visita registrada no período.
+        Nenhuma nota com resultado no período.
       </p>
     );
   }
@@ -219,7 +211,7 @@ export function TabelaMotoristasOrdenavel({
               const poucas = m.visitas < VISITAS_MINIMAS;
               return (
                 <tr key={m.codigo} className="border-b" style={{ borderColor: "var(--border)", opacity: poucas ? 0.55 : 1 }}>
-                  <td className="px-1.5 py-1.5 min-w-[150px]" title={poucas ? `Menos de ${VISITAS_MINIMAS} visitas no período: índice instável` : undefined}>
+                  <td className="px-1.5 py-1.5 min-w-[150px]" title={poucas ? `Menos de ${VISITAS_MINIMAS} notas no período: índice instável` : undefined}>
                     <span className="block font-semibold" style={{ color: "var(--text-primary)" }}>
                       {m.nome ?? "Sem nome"}
                     </span>
@@ -229,12 +221,11 @@ export function TabelaMotoristasOrdenavel({
                     </span>
                   </td>
                   <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">{m.cargas}</td>
-                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">{m.visitas}</td>
                   <td
-                    className="px-2 py-1.5 text-right tabular-nums font-semibold"
-                    title={`Strada ${m.entregasPorVeiculo.Carro} · caminhão ${m.entregasPorVeiculo["Caminhão"]} · sem placa ${m.entregasPorVeiculo["Não identificado"] ?? 0}`}
+                    className="px-1.5 py-1.5 text-right tabular-nums font-semibold"
+                    title={`Notas que ficaram com o cliente (todas ou em parte): Strada ${m.entregasPorVeiculo.Carro} · caminhão ${m.entregasPorVeiculo["Caminhão"]} · sem placa ${m.entregasPorVeiculo["Não identificado"] ?? 0}`}
                   >
-                    {m.entregasRealizadas}
+                    {m.visitas}
                   </td>
                   <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
                     {m.cargas > 0 ? ((produtos[m.codigo] ?? 0) / m.cargas).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"}

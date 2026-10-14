@@ -17,12 +17,12 @@ const ATRIBUICAO: Record<AssistenciaEntrega["atribuicao"], { label: string; hint
   },
   produto: {
     label: "Cliente + produto",
-    hint: "Entrega a esse cliente (CPF ou código no Protheus) em que saiu o produto do chamado.",
+    hint: "Nota a esse cliente (CPF ou código no Protheus) em que saiu o produto do chamado.",
     cor: "var(--brand-green)",
   },
   cliente: {
     label: "≈ Só o cliente",
-    hint: "O produto não bateu com nenhuma entrega: ligado à entrega mais recente ao cliente. Provável, não certo.",
+    hint: "O produto não bateu com nenhuma nota: ligado à nota mais recente ao cliente. Provável, não certo.",
     cor: "var(--status-warning)",
   },
 };
@@ -50,7 +50,7 @@ export function AssistenciasMotorista({ nome, itens, onFechar }: { nome: string;
       <table className="w-full text-xs border-collapse">
         <thead className="sticky top-0" style={{ background: "var(--surface-2)" }}>
           <tr>
-            {["Chamado", "Aberto em", "Tipo", "Produto", "Causa", "Entrega", "Ligado por"].map((h) => (
+            {["Chamado", "Aberto em", "Tipo", "Produto", "Causa", "Saiu na carga", "Ligado por"].map((h) => (
               <th key={h} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                 {h}
               </th>

@@ -25,26 +25,26 @@ const CAUSAS: { key: keyof CausasVolta; label: string; color: string; hint: stri
     key: "insucessoLogistica",
     label: "Insucesso — logística",
     color: "var(--status-critical)",
-    hint: "Entrega não feita por falha do transporte/motorista -- a única causa 100% controlável por nós (conta em Volta Logística).",
+    hint: "Nota que voltou por falha do transporte/motorista -- a única causa 100% controlável por nós (conta em Volta Logística).",
   },
   {
     key: "insucessoCliente",
     label: "Insucesso — cliente",
     color: "var(--series-7)",
-    hint: "Entrega não feita por recusa, ausência ou indisponibilidade do cliente.",
+    hint: "Nota que voltou por recusa, ausência ou indisponibilidade do cliente.",
   },
   {
     key: "insucessoCd",
     label: "Insucesso — CD",
     color: "var(--series-5)",
-    hint: "Falha do CD antes de sair pra entrega (L06, pedido não carregado etc.) -- fica fora de Volta Logística de propósito.",
+    hint: "Falha do CD antes de a nota sair (L06, pedido não carregado etc.) -- fica fora de Volta Logística de propósito.",
   },
-  { key: "parciais", label: "Entrega parcial", color: "var(--series-3)", hint: "Visita que entregou só parte do pedido." },
+  { key: "parciais", label: "Parcial", color: "var(--series-3)", hint: "Nota em que só parte dos produtos ficou com o cliente." },
   {
     key: "insucessoOutros",
     label: "Insucesso — outros",
     color: "var(--text-muted)",
-    hint: "Entrega não feita por outro motivo, sem categoria própria.",
+    hint: "Nota que voltou por outro motivo, sem categoria própria.",
   },
 ];
 

@@ -3,7 +3,7 @@
 import { ModalLogistica } from "./ModalLogistica";
 import type { InsucessoDetalhe } from "@/lib/kpisLogistica";
 
-// Pedidos que voltaram sem entregar por um motivo -- abre ao clicar no
+// Pedidos que voltaram por um motivo -- abre ao clicar no
 // motivo (pedido do Victor 13/10/2026: "ao clicar, mostrar o nome do
 // cliente, cpf e produto"). Lista pronta da RPC (kpis_entregas.insucessos).
 function dataBr(dia: string) {
@@ -32,7 +32,7 @@ export function InsucessosMotivo({
   return (
     <ModalLogistica
       titulo={titulo}
-      subtitulo={`${itens.length} pedido${itens.length === 1 ? "" : "s"} que voltaram sem entregar no período, do mais recente.`}
+      subtitulo={`${itens.length} nota${itens.length === 1 ? "" : "s"} que voltaram no período, da mais recente.`}
       onFechar={onFechar}
     >
       <table className="w-full text-xs border-collapse">
