@@ -27,7 +27,7 @@ function motorista(visitas: number, entregues: number, extra: Partial<MotoristaE
     entregasPorVeiculo: { Carro: 0, "Caminhão": entregues, "Não identificado": 0 },
     insucessos: { total: 0, cliente: 0, logistica: 0, cd: 0, outros: 0 },
     parciais: 0,
-    assistencias: { total: 0, porCarga: 0, porProduto: 0, porCliente: 0 },
+    assistencias: { total: 0, porCarga: 0, porProduto: 0, porCliente: 0, porErroMotorista: 0, porAvariaTransporte: 0 },
     indiceVolta: null, indiceVoltaLogistica: null,
     ...extra,
   };
@@ -41,7 +41,7 @@ const base: KpisEntregas = {
     motorista(80, 60, {
       insucessos: { total: 10, cliente: 7, logistica: 1, cd: 2, outros: 0 },
       parciais: 2,
-      assistencias: { total: 4, porCarga: 1, porProduto: 2, porCliente: 1 },
+      assistencias: { total: 4, porCarga: 1, porProduto: 2, porCliente: 1, porErroMotorista: 1, porAvariaTransporte: 1 },
       entregasPorVeiculo: { Carro: 0, "Caminhão": 55, "Não identificado": 5 },
     }),
     motorista(20, 20, { vinculo: "Terceirizado", entregasPorVeiculo: { Carro: 5, "Caminhão": 15, "Não identificado": 0 } }),

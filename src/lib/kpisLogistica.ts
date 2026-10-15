@@ -82,8 +82,18 @@ export type MotoristaEntregas = {
   insucessos: { total: number; cliente: number; logistica: number; cd: number; outros: number };
   parciais: number;
   // Chamados de assistência ligados a entregas dele (migração 0163) -- à
-  // parte, não entram no Índice de Volta.
-  assistencias: { total: number; porCarga: number; porProduto: number; porCliente: number };
+  // parte, não entram no Índice de Volta. porErroMotorista/porAvariaTransporte
+  // (migração 0173) são um recorte por causa_raiz (erro_motorista/
+  // avaria_transporte) dentro do mesmo total -- um chamado só entra num dos
+  // dois (ou em nenhum, se a causa for outra) nunca nos dois.
+  assistencias: {
+    total: number;
+    porCarga: number;
+    porProduto: number;
+    porCliente: number;
+    porErroMotorista: number;
+    porAvariaTransporte: number;
+  };
   // (insucessos + parciais) ÷ visitas
   indiceVolta: number | null;
   // insucessos de logística (exceto L06) ÷ visitas

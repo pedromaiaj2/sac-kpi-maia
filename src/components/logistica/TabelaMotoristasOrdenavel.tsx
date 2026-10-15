@@ -19,6 +19,8 @@ type SortKey =
   | "insucessos"
   | "parciais"
   | "assistencias"
+  | "assistenciasErroMotorista"
+  | "assistenciasAvariaTransporte"
   | "indiceVolta"
   | "indiceVoltaLogistica";
 
@@ -51,6 +53,16 @@ const COLUNAS: { key: SortKey; label: string; hint: string }[] = [
     label: "Assistências",
     hint: "Chamados de assistência técnica abertos no período (troca, peça, recolhimento, envio de produto novo) ligados a uma nota que saiu numa carga deste motorista. Não entram no Índice de Volta. Ligação: carga informada no chamado, ou nota ao mesmo cliente com o produto do chamado; sem o produto, a nota mais recente ao cliente (≈). Clique no número pra ver os chamados.",
   },
+  {
+    key: "assistenciasErroMotorista",
+    label: "Erro motorista",
+    hint: "Das Assistências ao lado, quantas têm causa raiz \"Erro do motorista\" -- recorte dentro do mesmo total, não soma a mais. Também não entra no Índice de Volta.",
+  },
+  {
+    key: "assistenciasAvariaTransporte",
+    label: "Avaria transporte",
+    hint: "Das Assistências ao lado, quantas têm causa raiz \"Avaria no transporte\" (produto avariado no transporte) -- recorte dentro do mesmo total, não soma a mais. Também não entra no Índice de Volta.",
+  },
 ]
 
 function valorOrdenavel(m: MotoristaEntregas, key: SortKey, produtos: Record<string, number>): number | string {
@@ -69,6 +81,10 @@ function valorOrdenavel(m: MotoristaEntregas, key: SortKey, produtos: Record<str
       return m.parciais;
     case "assistencias":
       return m.assistencias.total;
+    case "assistenciasErroMotorista":
+      return m.assistencias.porErroMotorista;
+    case "assistenciasAvariaTransporte":
+      return m.assistencias.porAvariaTransporte;
     case "indiceVolta":
       return m.indiceVolta ?? -1;
     case "indiceVoltaLogistica":
@@ -262,6 +278,12 @@ export function TabelaMotoristasOrdenavel({
                     ) : (
                       <span style={{ color: "var(--text-muted)" }}>0</span>
                     )}
+                  </td>
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
+                    {m.assistencias.porErroMotorista > 0 ? m.assistencias.porErroMotorista : <span style={{ color: "var(--text-muted)" }}>0</span>}
+                  </td>
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
+                    {m.assistencias.porAvariaTransporte > 0 ? m.assistencias.porAvariaTransporte : <span style={{ color: "var(--text-muted)" }}>0</span>}
                   </td>
                 </tr>
               );
