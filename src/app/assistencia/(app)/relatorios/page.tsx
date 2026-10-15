@@ -18,6 +18,7 @@ import {
   STATUS_COLORS,
   SUPPLIER_RETURN_STATUS_LABELS,
   EQUIPE_INTERNA_ASSEMBLERS,
+  MONTADORES_FORA_DA_EQUIPE,
 } from "@/lib/assistenciaLabels";
 import { CausaRaizDonutChart } from "@/components/CausaRaizDonutChart";
 import { RelatorioExportButton } from "@/components/assistencia/RelatorioExportButton";
@@ -499,6 +500,14 @@ export default async function RelatoriosPage({
   const paymentTotal = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.total, 0);
   const paymentPending = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.pendente, 0);
   const paymentPaid = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.pago, 0);
+  // Linha do montador só desaparece da TABELA (e da sua contagem no título)
+  // quando ele está em MONTADORES_FORA_DA_EQUIPE e já não tem nada pendente
+  // -- ver comentário no array. assemblerRows em si continua intacto (usado
+  // acima nos totais e no export via RelatorioExportButton), pra manter o
+  // histórico completo em ambos.
+  const visibleAssemblerRows = assemblerRows.filter(
+    ([name, v]) => !(MONTADORES_FORA_DA_EQUIPE as readonly string[]).includes(name) || v.pendente > 0
+  );
 
   const indicatorsByAssembler = sortManoelLast(indicators.byAssembler, (a) => a.assemblerName);
 
@@ -739,9 +748,9 @@ export default async function RelatoriosPage({
                 um botão client component preso dentro de <summary> (ver
                 hotfix #301). */}
             <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
-              Pagamento por montador ({assemblerRows.length})
+              Pagamento por montador ({visibleAssemblerRows.length})
             </summary>
-            {assemblerRows.length === 0 ? (
+            {visibleAssemblerRows.length === 0 ? (
               <p className="text-sm p-4 text-gray-400 dark:text-gray-500">
                 Nenhum pagamento no período.
               </p>
@@ -749,7 +758,7 @@ export default async function RelatoriosPage({
               <div>
                 <ColumnsHeader columns={["Montador", "Itens", "Total", "Pago", "Pendente"]} />
                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {assemblerRows.map(([name, v]) => (
+                  {visibleAssemblerRows.map(([name, v]) => (
                     <div key={name}>
                       <ExpandableRow
                         label={name}

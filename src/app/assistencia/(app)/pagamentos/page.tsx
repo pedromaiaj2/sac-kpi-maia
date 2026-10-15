@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, listAssemblers, paymentStage, type PaymentItem } from "@/lib/payments";
-import { PAYMENTS_CONTROLLER_NAME, EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
+import { PAYMENTS_CONTROLLER_NAME, EQUIPE_INTERNA_ASSEMBLERS, MONTADORES_FORA_DA_EQUIPE } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { PaymentsExportButton } from "@/components/assistencia/PaymentsExportButton";
@@ -83,7 +83,17 @@ export default async function PagamentosPage({
   // aqui, o dia que algum item de qualquer um dos dois ganhasse valor
   // inflaria o "Total a pagar a montadores" em silêncio, sem aparecer em
   // lugar nenhum da tela pra explicar por quê.
-  const visibleGroups = groups.filter((g) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(g.assemblerName));
+  // LUCIANO216 (e outros em MONTADORES_FORA_DA_EQUIPE) só some da lista
+  // quando não tem mais nenhum item pendente de liberação -- ver comentário
+  // no próprio array. Continua contando nos totais abaixo (itemsForTotals
+  // não filtra por esse array), só a linha dele na lista some.
+  const visibleGroups = groups.filter((g) => {
+    if ((EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(g.assemblerName)) return false;
+    if ((MONTADORES_FORA_DA_EQUIPE as readonly string[]).includes(g.assemblerName)) {
+      return g.items.some((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente");
+    }
+    return true;
+  });
   const itemsForTotals = items.filter((i) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(i.assemblerName ?? ""));
   const grandTotal = itemsForTotals.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
   const pendingTotal = itemsForTotals

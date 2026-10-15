@@ -405,6 +405,18 @@ export const MANOEL_ONLY_ASSEMBLER = "Manoel";
 // já usava antes disso, só generalizado pra mais de um nome.
 export const EQUIPE_INTERNA_ASSEMBLERS = [MANOEL_ONLY_ASSEMBLER, "Adriel CD"] as const;
 
+// Montadores terceirizados que saíram da equipe -- pedido do Victor
+// 15/10/2026 (LUCIANO216 não faz mais parte da equipe). Diferente de
+// EQUIPE_INTERNA_ASSEMBLERS acima (que nunca aparecem na lista): esses só
+// somem do painel de Pagamentos e da tabela "Pagamento por montador" em
+// Relatórios quando NÃO têm mais nada pendente de liberação -- enquanto
+// tiver pendente, continua aparecendo normalmente, pra não esquecer de
+// acertar com ele. Os totais em R$ de ambas as telas continuam incluindo o
+// histórico dele (não tem por que esconder um "Pago" já conciliado). Mesmo
+// padrão de EQUIPE_INTERNA_ASSEMBLERS: lista explícita por nome, não existe
+// coluna "ativo" na tabela assemblers.
+export const MONTADORES_FORA_DA_EQUIPE = ["LUCIANO216"] as const;
+
 // Entram na Agenda independente de quem seja o montador -- pedido do Victor
 // 09/10/2026 (ver comentário acima). Troca de peça/vistoria de um montador
 // terceirizado qualquer, com data marcada, agora aparece aqui também (além
