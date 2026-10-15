@@ -12,7 +12,26 @@ import { useEffect } from "react";
 // jeito de tentar de novo sem sair da tela e voltar. Nenhuma rota sob
 // /assistencia tinha error.tsx até então -- Next usa o fallback padrão
 // (a tela crua) quando falta um.
-export default function AssistenciaError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+//
+// `retry` (não `reset`) -- achado na revisão de 15/10/2026 (reclamação:
+// "não consigo fazer solicitação de estorno, quando está quase finalizado
+// o sistema volta ao início"): essa tela usava a API antiga `reset()`, que
+// só LIMPA o estado de erro e re-renderiza com o MESMO bundle JS já
+// carregado -- sem buscar nada novo do servidor (ver node_modules/next/dist/docs/
+// .../file-conventions/error.md, "Version History": retry virou estável na
+// v16.3.0). O formulário de estorno é longo; sempre que um deploy reinicia
+// `sac`/`assistencia` enquanto alguém está com a página aberta, o ID da
+// Server Action que o navegador guardou fica obsoleto ("Failed to find
+// Server Action... This request might be from an older or newer
+// deployment" -- 3500+ ocorrências achadas nos logs de produção, não é
+// raro) e cai aqui. Com `reset()`, "Tentar de novo" só limpava o
+// formulário E MANTINHA o mesmo bundle obsoleto -- preencher tudo de novo
+// e enviar batia no MESMO erro, num loop sem saída real (exatamente o que
+// foi reportado). `retry()` busca o segmento de novo no servidor, troca
+// pros chunks/Server Actions da build atual -- preencher de novo e enviar
+// já funciona. Mesmo padrão já usado em src/app/error.tsx (global) desde
+// 10/09/2026.
+export default function AssistenciaError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error("[assistencia] erro não tratado:", error);
   }, [error]);
@@ -33,7 +52,7 @@ export default function AssistenciaError({ error, reset }: { error: Error & { di
           Pode ter sido a conexão. Toque em tentar de novo — se continuar, avise a assistência.
         </p>
         <button
-          onClick={() => reset()}
+          onClick={() => retry()}
           className="text-sm px-4 py-2.5 rounded-lg font-semibold w-full"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
