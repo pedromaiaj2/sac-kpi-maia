@@ -115,6 +115,21 @@ function buildPrefillQuery(cadastro: Cadastro, type?: string): string {
   return sp.toString();
 }
 
+// "Criar nova entrega" também pré-preenche o produto agora -- pedido do
+// Victor 15/10/2026: "ja está puxando os dados do cliente, mas preciso que
+// puxe tambem o produto". Mesmo recorte de buildPecaPrefillQuery abaixo: só
+// o primeiro produto (o formulário só tem 1 item por padrão, só vira lista
+// de mais de um quando a pessoa clica "+ adicionar produto" -- useFormPrefill
+// não dá pra mirar um item específico quando já tem mais de um no DOM, ver
+// comentário em useFormPrefill.ts). Nome do campo (`item_product`) é o mesmo
+// `namePrefix="item"` de NovaEntregaAssistenciaForm.tsx.
+function buildEntregaPrefillQuery(cadastro: Cadastro): string {
+  const sp = new URLSearchParams(buildPrefillQuery(cadastro));
+  const primeiroProduto = cadastro.produto?.split(";")[0]?.trim();
+  if (primeiroProduto) sp.set("item_product", primeiroProduto);
+  return sp.toString();
+}
+
 // Pedido de peça usa só o primeiro produto (o formulário é de uma peça por
 // vez; quem tiver mais de um produto no cadastro escolhe os demais na mão).
 function buildPecaPrefillQuery(cadastro: Cadastro): string {
@@ -230,7 +245,7 @@ export function CadastroDetalheModal({ cadastro }: { cadastro: Cadastro }) {
                 🛠️ Criar nova visita
               </Link>
               <Link
-                href={`/assistencia/nova-entrega?${buildPrefillQuery(cadastro)}`}
+                href={`/assistencia/nova-entrega?${buildEntregaPrefillQuery(cadastro)}`}
                 className="text-xs font-semibold px-2.5 py-1 rounded-lg border whitespace-nowrap"
                 style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
               >
