@@ -1875,8 +1875,14 @@ export async function getRequestsReport(
         count: "exact",
       })
       .range(from, to);
-    if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
-    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+    // Achado na revisão de 15/10/2026: sem "-03:00" explícito, o Postgres
+    // interpreta `created_at >= "2026-10-01"` como meia-noite EM UTC (21h
+    // do dia 30/09 no Brasil) e `<= "...T23:59:59"` também em UTC (20h59 do
+    // próprio dia "Até", não 23h59) -- "De" vazava ~3h do dia anterior e
+    // "Até" perdia as últimas ~3h do dia escolhido. Mesmo padrão já correto
+    // em getDailyServiceRequestCounts acima (linhas ~535/538).
+    if (opts.dateFrom) query = query.gte("created_at", `${opts.dateFrom}T00:00:00-03:00`);
+    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59-03:00`);
     // Sem filtro de `type` na query -- ver comentário acima, causa_raiz
     // precisa das linhas de troca_produto mesmo quando `types` pede só
     // montagem/desmontagem pro resto do relatório.
@@ -1978,8 +1984,9 @@ export async function getMontagemReconciliation(opts: {
       )
       .in("type", ["montagem", "desmontagem"])
       .range(from, to);
-    if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
-    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+    // Mesmo fuso de getRequestsReport acima (achado na revisão de 15/10/2026).
+    if (opts.dateFrom) query = query.gte("created_at", `${opts.dateFrom}T00:00:00-03:00`);
+    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59-03:00`);
     return query as unknown as PromiseLike<PagedQueryResult<Row>>;
   });
   const rows = opts.alvo
@@ -2088,8 +2095,9 @@ export async function getServiceTypeIndicators(
       })
       .in("type", types)
       .range(from, to);
-    if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
-    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+    // Mesmo fuso de getRequestsReport acima (achado na revisão de 15/10/2026).
+    if (opts.dateFrom) query = query.gte("created_at", `${opts.dateFrom}T00:00:00-03:00`);
+    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59-03:00`);
     return query as unknown as PromiseLike<PagedQueryResult<Row>>;
   });
   const rows = opts.alvo

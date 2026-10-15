@@ -597,6 +597,19 @@ const VENDA_VS_ASSISTENCIA_TYPES = ALL_REQUEST_TYPES.filter((t) => t !== "montag
 // garante cache hit).
 const ASSISTENCIA_CACHE_BUCKET_MS = 5 * 60 * 1000;
 
+// America/Fortaleza, UTC-3 -- mesmo valor de BUSINESS_TZ_OFFSET_MS em kpi.ts.
+const ASSISTENCIA_TZ_OFFSET_MS = -3 * 60 * 60 * 1000;
+
+// Devolve a data-calendário (YYYY-MM-DD) em America/Fortaleza de um instante
+// UTC -- usado pra comparar `range.to`/`range.from` (timestamps) contra
+// colunas DATE puras (ex: totvs_orders.issue_date). Achado na revisão de
+// 15/10/2026: um `.toISOString().slice(0, 10)` cru em `range.to` (que desde
+// a correção em dateRange.ts pode ser 23:59:59.999 LOCAL, caindo no dia
+// seguinte em UTC) devolveria um dia errado pra Taxa de Quebra/Prejuízo.
+function toLocalDateString(date: Date): string {
+  return new Date(date.getTime() + ASSISTENCIA_TZ_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 export async function getAssistenciaKpiData(range: DateRange): Promise<AssistenciaKpiData> {
   const bucketedTo = new Date(Math.floor(range.to.getTime() / ASSISTENCIA_CACHE_BUCKET_MS) * ASSISTENCIA_CACHE_BUCKET_MS);
   return getAssistenciaKpiDataCached(range.preset, range.from ? range.from.toISOString() : null, bucketedTo.toISOString());
@@ -975,28 +988,21 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   const codigosReais = [...breakagePorCodigo.keys()].filter((c) => c !== CODIGO_NAO_IDENTIFICADO);
   const descricoesPai = [...descricoesProdutoPaiEnvioPeca];
   const vendaRangeFrom = range.from
-    ? range.from.toISOString().slice(0, 10)
-    : ((await getEarliestSyncedOrderDate()) ?? range.to.toISOString().slice(0, 10));
-  const vendaRange = { from: vendaRangeFrom, to: range.to.toISOString().slice(0, 10) };
-  // Cuidado de fuso -- achado ao revisar esses números 14/09/2026: "to"
-  // customizado (RangePicker, De/Até) chega como "YYYY-MM-DD" puro, e
-  // `new Date("2026-09-14")` do JS interpreta isso como meia-noite EM UTC
-  // (não meia-noite no Brasil, UTC-3) -- então `toIso` (usado no `rows`
-  // principal acima, escopo DELIVERY_REQUEST_TYPES) corta às 21h do dia
-  // ANTERIOR no horário do Brasil, perdendo quase o dia inteiro de "Até"
-  // pra quem escolhe um período customizado. `vendaRange.to`, por outro
-  // lado, é comparado contra `issue_date` (coluna DATE, sem hora) -- não
-  // sofre esse corte, sempre inclui o dia inteiro. Comparar chamados
-  // (created_at, com hora) contra vendas (issue_date, sem hora) usando
-  // bordas DIFERENTES faria o numerador e o denominador cobrirem janelas
-  // de dias diferentes -- exatamente o tipo de inconsistência que
-  // invalidaria o percentual. Corrigido aqui recalculando bordas
-  // ALINHADAS ao mesmo dia-calendário de `vendaRange` (não reusa
-  // fromIso/toIso do `rows` acima, que continua como estava -- mudar o
-  // corte do resto da página é remexer em números que o Victor já
-  // conferiu noutros gráficos, fora do escopo desse cruzamento).
-  const chamadosFromIso = `${vendaRange.from}T00:00:00.000Z`;
-  const chamadosToIso = `${vendaRange.to}T23:59:59.999Z`;
+    ? toLocalDateString(range.from)
+    : ((await getEarliestSyncedOrderDate()) ?? toLocalDateString(range.to));
+  const vendaRange = { from: vendaRangeFrom, to: toLocalDateString(range.to) };
+  // Cuidado de fuso -- achado originalmente ao revisar esses números
+  // 14/09/2026, e corrigido de novo na revisão de 15/10/2026: a correção
+  // original realinhava `chamadosFromIso`/`chamadosToIso` ao mesmo
+  // dia-calendário de `vendaRange`, mas ainda usava sufixo "Z" (UTC) em vez
+  // de "-03:00" -- então o corte ficava em 21h-23h59 (horário de Brasília)
+  // do dia ANTERIOR ao "De" (vazava) e às 20h59 (não 23h59) do dia "Até"
+  // (perdia as últimas ~3h), um deslocamento de ~3h nas duas pontas em vez
+  // de bater exatamente com o dia-calendário de `vendaRange`. Resto da
+  // página (fromIso/toIso do `rows` principal, escopo DELIVERY_REQUEST_TYPES)
+  // continua como estava -- fora do escopo desse cruzamento específico.
+  const chamadosFromIso = `${vendaRange.from}T00:00:00.000-03:00`;
+  const chamadosToIso = `${vendaRange.to}T23:59:59.999-03:00`;
   const [vendaQtdPorCodigo, custoPorCodigo, custoPorDescricaoPai, custoMedioPorCategoria, vendasPorLoja, chamadosTodosTiposRows, allStores] =
     await Promise.all([
       getVendaQuantidadePorCodigoNoPeriodo(codigosReais, vendaRange),

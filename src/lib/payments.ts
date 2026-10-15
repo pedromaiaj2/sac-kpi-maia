@@ -323,8 +323,15 @@ export async function listPaymentItems(
 
   return items.filter((i) => {
     if (opts.assemblerName && i.assemblerName !== opts.assemblerName) return false;
-    if (opts.dateFrom && i.createdAt < opts.dateFrom) return false;
-    if (opts.dateTo && i.createdAt > `${opts.dateTo}T23:59:59`) return false;
+    // Achado na revisão de 15/10/2026: comparação de STRING crua (sem
+    // "-03:00") tratava "De"/"Até" como horário de Brasília só por
+    // coincidência de prefixo -- na prática cortava contra meia-noite EM
+    // UTC (21h do Brasil), vazando ~3h do dia anterior ao "De" e perdendo
+    // as últimas ~3h do dia "Até". Convertendo pra instante real (Date) e
+    // comparando contra o fuso de Brasília explícito, igual ao padrão já
+    // usado em serviceRequests.ts.
+    if (opts.dateFrom && new Date(i.createdAt).getTime() < new Date(`${opts.dateFrom}T00:00:00-03:00`).getTime()) return false;
+    if (opts.dateTo && new Date(i.createdAt).getTime() > new Date(`${opts.dateTo}T23:59:59.999-03:00`).getTime()) return false;
     if (opts.alvo && isMostruarioRequest(i.orderCode, i.clientName) !== (opts.alvo === "mostruario")) return false;
     return true;
   });

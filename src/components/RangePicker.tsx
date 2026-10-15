@@ -16,6 +16,15 @@ function pillStyle(active: boolean) {
   };
 }
 
+// Mesmo fuso de dateRange.ts (America/Fortaleza, UTC-3) -- desde a correção
+// de 15/10/2026, `range.to` de um período customizado é 23:59:59.999 LOCAL
+// (pode cair no dia seguinte em UTC), então um slice cru de `.toISOString()`
+// mostraria o dia errado de volta no input. Essa função devolve o dia-
+// calendário correto pro <input type="date">.
+function toLocalDateInputValue(date: Date): string {
+  return new Date(date.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 // `basePath` -- reaproveitado em /avaliacoes (pedido do Victor 19/08/2026:
 // nova aba própria com o NPS "duplicado" do SAC), default "/kpis" pra não
 // quebrar o uso original.
@@ -36,7 +45,7 @@ export function RangePicker({ range, basePath = "/kpis" }: { range: DateRange; b
         <input
           type="date"
           name="from"
-          defaultValue={range.preset === "custom" && range.from ? range.from.toISOString().slice(0, 10) : undefined}
+          defaultValue={range.preset === "custom" && range.from ? toLocalDateInputValue(range.from) : undefined}
           className="rounded px-2 py-1 text-xs"
           style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
         />
@@ -44,7 +53,7 @@ export function RangePicker({ range, basePath = "/kpis" }: { range: DateRange; b
         <input
           type="date"
           name="to"
-          defaultValue={range.preset === "custom" ? range.to.toISOString().slice(0, 10) : undefined}
+          defaultValue={range.preset === "custom" ? toLocalDateInputValue(range.to) : undefined}
           className="rounded px-2 py-1 text-xs"
           style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
         />

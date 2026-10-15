@@ -97,9 +97,14 @@ function variar(atual: number | null, anterior: number | null, menorEhMelhor?: b
 }
 
 // Sub-aba "Logística" de KPIs (08/10/2026, redesenhada 09/10/2026 em 2
-// rodadas -- ver PR #584 e o "terminal" em LogisticaTerminal.tsx). Mesmos
-// dados do GET /api/logistica/v1/kpis/logistica, lidos direto no servidor
-// (RPC kpis_logistica) -- definições em lojas-maia-integracao/apis/
+// rodadas -- ver PR #584 e o "terminal" em LogisticaTerminal.tsx). Lê a RPC
+// kpis_entregas (migração 0169), NÃO a mesma RPC do GET
+// /api/logistica/v1/kpis/logistica (kpis_logistica) -- são duas funções
+// diferentes desde que a tela ficou restrita a só entregas (13/10/2026, ver
+// comentário abaixo). indiceVolta/indiceVoltaLogistica foram realinhados
+// entre as duas na revisão de 15/10/2026 (migração 0172), mas o resto do
+// formato (posVenda/pecas agregado aqui vs. motivosInsucesso/produtosPorte
+// só na API) continua diferente -- definições em lojas-maia-integracao/apis/
 // logistica-v1/kpis-logistica.md.
 export default async function KpisLogisticaPage({ searchParams }: { searchParams: Promise<Params> }) {
   await requireDashboardAuth();

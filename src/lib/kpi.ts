@@ -572,6 +572,16 @@ function buildOpenTicketsList(openRows: TicketRow[], now: number): AttentionRow[
 // usando metodos UTC pra ficar independente do fuso do servidor onde o codigo roda.
 const BUSINESS_TZ_OFFSET_MS = -3 * 60 * 60 * 1000;
 
+// Devolve a data-calendário (YYYY-MM-DD) em America/Fortaleza de um instante
+// UTC -- usado pra comparar `range.to`/`range.from` (timestamps, já corrigidos
+// em dateRange.ts) contra colunas DATE puras (ex: totvs_orders.issue_date).
+// Achado na revisão de 15/10/2026: um `.toISOString().slice(0, 10)` cru em
+// `range.to` (que desde a correção pode ser 23:59:59.999 LOCAL, caindo no dia
+// seguinte em UTC) devolveria um dia errado pra contagem de vendas.
+function toLocalDateString(date: Date): string {
+  return new Date(date.getTime() + BUSINESS_TZ_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 function getPreviousWeekRange(nowUtc: Date): { from: Date; to: Date; fromLabel: string; toLabel: string } {
   const local = new Date(nowUtc.getTime() + BUSINESS_TZ_OFFSET_MS);
   const day = local.getUTCDay(); // 0=domingo, 1=segunda, ...
@@ -1052,9 +1062,9 @@ const getKpiDataCached = memoizeWithTtl(
   // 2021 -- achado 18/09/2026 ao investigar "Minified React error #441"
   // reportado pelo Victor. Sem filtro de data escolhido usa o início do
   // histórico sincronizado como piso, mesmo fallback de sempre.
-  const vendaRangeFromPromise = range.from ? Promise.resolve(range.from.toISOString().slice(0, 10)) : getEarliestSyncedOrderDate();
+  const vendaRangeFromPromise = range.from ? Promise.resolve(toLocalDateString(range.from)) : getEarliestSyncedOrderDate();
   const totalVendasNoPeriodoPromise = vendaRangeFromPromise.then((vendaRangeFrom) =>
-    getVendasCountTotal({ from: vendaRangeFrom ?? range.to.toISOString().slice(0, 10), to: range.to.toISOString().slice(0, 10) })
+    getVendasCountTotal({ from: vendaRangeFrom ?? toLocalDateString(range.to), to: toLocalDateString(range.to) })
   );
   const ticketRows = await fetchAllPagesParallel<TicketRow>(
     (from, to) =>
@@ -1366,24 +1376,38 @@ const MONTH_LABELS_PT_SAC = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "A
 // tipo), não só os que já têm loja/categoria marcada.
 export async function getKpiMonthlyEvolution(monthsBack: number = 12): Promise<KpiMonthlyEvolutionRow[]> {
   const supabase = getSupabaseAdmin();
-  const now = new Date();
+  const nowUtc = new Date();
+  // Mês "atual" calculado em America/Fortaleza, não no fuso do processo --
+  // achado na revisão de 15/10/2026: perto da virada do mês, as ~3h finais
+  // do dia 1º em UTC ainda são dia 1º em Brasília só algumas horas depois,
+  // então usar getFullYear()/getMonth() direto em `now` (fuso do processo,
+  // UTC na VPS) classificava o mês errado nessa janela.
+  const nowLocal = new Date(nowUtc.getTime() + BUSINESS_TZ_OFFSET_MS);
   const earliestSyncedDate = await getEarliestSyncedOrderDate();
   const earliestSyncedMonthKey = earliestSyncedDate ? earliestSyncedDate.slice(0, 7) : null;
 
   const months: { key: string; year: number; month: number }[] = [];
   for (let i = monthsBack - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const d = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth() - i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
     if (earliestSyncedMonthKey && key < earliestSyncedMonthKey) continue;
-    months.push({ key, year: d.getFullYear(), month: d.getMonth() });
+    months.push({ key, year: d.getUTCFullYear(), month: d.getUTCMonth() });
   }
 
   return Promise.all(
     months.map(async ({ key, year, month }) => {
-      const fromIso = new Date(Date.UTC(year, month, 1)).toISOString();
-      const toIsoExclusive = new Date(Date.UTC(year, month + 1, 1)).toISOString();
-      const fromDate = fromIso.slice(0, 10);
-      const toDateExclusive = toIsoExclusive.slice(0, 10);
+      const monthStartUtc = new Date(Date.UTC(year, month, 1));
+      const monthEndUtc = new Date(Date.UTC(year, month + 1, 1));
+      // Fronteira do chamado (timestamp, com hora) ajustada pro fuso de
+      // Brasília -- achado na revisão de 15/10/2026: comparar `opened_at`
+      // contra uma fronteira de mês em UTC puro contava chamados da noite
+      // (hora de Brasília) do último dia do mês dentro do mês seguinte. O
+      // lado de vendas (`issue_date`, DATE pura, sem hora) não sofre esse
+      // deslocamento, então continua usando a fronteira em calendário puro.
+      const fromIso = new Date(monthStartUtc.getTime() - BUSINESS_TZ_OFFSET_MS).toISOString();
+      const toIsoExclusive = new Date(monthEndUtc.getTime() - BUSINESS_TZ_OFFSET_MS).toISOString();
+      const fromDate = monthStartUtc.toISOString().slice(0, 10);
+      const toDateExclusive = monthEndUtc.toISOString().slice(0, 10);
 
       const [chamadosResult, vendasResult] = await Promise.all([
         supabase.from("v_ticket_enriched").select("conversation_id", { count: "exact", head: true }).gte("opened_at", fromIso).lt("opened_at", toIsoExclusive),
