@@ -185,7 +185,15 @@ export function DeliveryRequestActions({
               Cancelar
             </button>
           </>
-        ) : !canRequestNewExchange ? (
+        ) : (
+          // Achado 16/10/2026 (print do Victor: "ta faltando o botao de
+          // reverter para aberta" num chamado concluído de troca de
+          // produto): antes esse botão só aparecia quando
+          // !canRequestNewExchange, escondendo ele bem no caso mais comum
+          // de "marquei concluído sem querer" -- as duas situações são
+          // diferentes ("errei o clique" x "o produto chegou com
+          // problema, abrir uma troca nova") e não se excluem, mostra os
+          // dois sempre que isFinal.
           <button
             disabled={pending}
             onClick={() => run(() => updateStatus(requestId, "aberta"), "Status revertido para aberta.")}
@@ -193,7 +201,7 @@ export function DeliveryRequestActions({
           >
             ↩ Reverter pra Aberta (marquei errado)
           </button>
-        ) : null}
+        )}
       </div>
 
       {askingRemarcarReason ? (
