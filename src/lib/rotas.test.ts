@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveRotaForDate, type RotaWeekdayConfig, type RotaWeekdayScheduleEntry } from "./rotas";
+import { resolveRotaForDate, regiaoDoBairro, type RotaWeekdayConfig, type RotaWeekdayScheduleEntry } from "./rotas";
 
 // Padrão-base atual (segunda a sábado) usado nos testes -- mesmo que
 // rota_weekday_config tem hoje.
@@ -47,5 +47,34 @@ describe("resolveRotaForDate", () => {
     expect(resolveRotaForDate("2026-09-21", BASE, schedule)).toBe("sul");
     // Depois da 2ª mudança -- vale a mais recente.
     expect(resolveRotaForDate("2026-10-05", BASE, schedule)).toBe("praia");
+  });
+});
+
+describe("regiaoDoBairro", () => {
+  it("acha a região certa nas 3 rotas, sem acento e em qualquer caixa", () => {
+    expect(regiaoDoBairro("Manaíra")).toBe("praia");
+    expect(regiaoDoBairro("TAMBAUZINHO")).toBe("centro");
+    expect(regiaoDoBairro("mangabeira")).toBe("sul");
+  });
+
+  it("'Centro' sozinho cai em centro/oeste, o caso mais comum", () => {
+    expect(regiaoDoBairro("Centro")).toBe("centro");
+  });
+
+  it("'Centro' vira praia quando o texto menciona Cabedelo", () => {
+    expect(regiaoDoBairro("Centro - Cabedelo")).toBe("praia");
+    expect(regiaoDoBairro("Cabedelo")).toBe("praia");
+  });
+
+  it("aceita variação/complemento no texto digitado (endereço livre)", () => {
+    expect(regiaoDoBairro("Jardim Oceania, perto da praia")).toBe("praia");
+    expect(regiaoDoBairro("Mangabeira III")).toBe("sul");
+    expect(regiaoDoBairro("Tibiri II")).toBe("centro");
+  });
+
+  it("sem bairro ou sem bater com nada conhecido, devolve null", () => {
+    expect(regiaoDoBairro(null)).toBe(null);
+    expect(regiaoDoBairro("")).toBe(null);
+    expect(regiaoDoBairro("Bairro Inexistente De Outra Cidade")).toBe(null);
   });
 });

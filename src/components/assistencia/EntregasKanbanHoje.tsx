@@ -10,7 +10,7 @@ import { BulkRotaBar } from "./NotificacoesList";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { getDayRouteGroupsAction } from "@/app/assistencia/actions";
-import { ROTAS, driverNameForRota, addDays, JP_EXTRA_ROTA, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
+import { ROTAS, ROTA_LABELS, JP_PRIMARY_ROTAS, driverNameForRota, regiaoDoBairro, addDays, JP_EXTRA_ROTA, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
 import { ENTREGA_TYPES_SAC, ENTREGA_TYPES_ASSISTENCIA, ASSISTENCIA_ORIGEM_REQUESTERS, type QueueGroup } from "@/lib/entregaQueueGrouping";
 const isRotaKey = (key: string): key is Rota => (ROTAS as readonly string[]).includes(key);
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
@@ -418,6 +418,14 @@ export function EntregasKanbanHoje({
   // `requestedByName` distintos já visíveis (ver atendenteOptions abaixo),
   // sem ida nova ao banco.
   const [selectedAtendente, setSelectedAtendente] = useState<string | null>(null);
+  // Região real do bairro do cliente (ver regiaoDoBairro, rotas.ts) --
+  // pedido do Victor 16/10/2026: "mesmo que tenha a rota de junior, os
+  // atendentes podem colocar rotas mistas... preciso saber se dentro
+  // daquele dia, tem bairros para notificação de assistência de rotas
+  // diversas". Filtro independente de selectedRotaKey (que é a rota/
+  // motorista ATRIBUÍDO ao chamado, não necessariamente o que o bairro de
+  // fato pede) -- mesmo padrão de clique de SAC/Assistência acima.
+  const [selectedRegiao, setSelectedRegiao] = useState<Rota | null>(null);
 
   // "Rotas" -- pedido do Victor 03/09/2026: "um botão... quando eu clicar
   // ele aparece as rotas dos próximos 5 dias e se eu clicar em algum desses
@@ -648,8 +656,14 @@ export function EntregasKanbanHoje({
     ? [...new Set(origemRows.map((row) => row.r.requestedByName).filter((n): n is string => !!n))].sort((a, b) => a.localeCompare(b, "pt-BR"))
     : [];
   const atendenteRows = selectedAtendente ? origemRows.filter((row) => row.r.requestedByName === selectedAtendente) : origemRows;
+  // Regiões (praia/centro/sul) realmente presentes no que já está filtrado
+  // até aqui -- usado tanto pro badge "⚠ rotas mistas" (mais de uma região
+  // nesse recorte, ex.: dentro da rota do Junior) quanto pras contagens do
+  // dropdown abaixo.
+  const regioesPresentes = new Set(atendenteRows.map((row) => regiaoDoBairro(row.r.clientNeighborhood)).filter((r): r is Rota => r !== null));
+  const regiaoRows = selectedRegiao ? atendenteRows.filter((row) => regiaoDoBairro(row.r.clientNeighborhood) === selectedRegiao) : atendenteRows;
   const counts: HojeStatusCounts = { programado: 0, concluido: 0, cancelado: 0, nao_concluido: 0 };
-  for (const row of atendenteRows) counts[deliveryStatusTab(row.r.status)]++;
+  for (const row of regiaoRows) counts[deliveryStatusTab(row.r.status)]++;
   // Aba "Todos" -- pedido do Victor 02/09/2026: "coloque para baixo os que
   // forem sendo concluidos e fique em cima os ainda programados". `.sort` é
   // estável (garantido desde ES2019), então só separa concluído do resto --
@@ -657,8 +671,8 @@ export function EntregasKanbanHoje({
   // de cada grupo, só empurra concluído pro fim da lista.
   const visibleRows =
     tab === "todos"
-      ? [...atendenteRows].sort((a, b) => (a.r.status === "concluida" ? 1 : 0) - (b.r.status === "concluida" ? 1 : 0))
-      : atendenteRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
+      ? [...regiaoRows].sort((a, b) => (a.r.status === "concluida" ? 1 : 0) - (b.r.status === "concluida" ? 1 : 0))
+      : regiaoRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
 
   // Imprimir em bloco -- pedido do Victor 03/09/2026: "quando eu escolho a
   // data da próxima rota, e ele me traz a lista, tem que ter a opção de
@@ -845,6 +859,48 @@ export function EntregasKanbanHoje({
                 </option>
               ))}
             </select>
+          ) : null}
+        </div>
+
+        {/* Região (bairro) -- pedido do Victor 16/10/2026: "ao lado da
+            data, tenha mais um filtro por rota, pois mesmo que tenha a
+            rota de junior, os atendentes podem colocar rotas mistas...
+            preciso saber se dentro daquele dia, tem bairros para
+            notificação de assistência de rotas diversas". Diferente de
+            selectedRotaKey (cards de rota acima, que filtram pela rota/
+            motorista ATRIBUÍDO ao chamado) -- esse olha pro bairro de
+            cada cliente e calcula a região REAL (ver regiaoDoBairro,
+            rotas.ts, a partir do PDF de divisão de rotas que o Victor
+            passou), pra achar os casos em que o bairro não bate com a
+            rota esperada do dia. Badge de alerta aparece sempre que esse
+            recorte (já com SAC/Assistência/Atendente aplicados) tiver
+            bairro de mais de uma região -- não precisa abrir o dropdown
+            pra perceber. */}
+        <div className="flex items-center gap-1.5">
+          <select
+            value={selectedRegiao ?? ""}
+            onChange={(e) => setSelectedRegiao((e.target.value || null) as Rota | null)}
+            className="rounded-md border px-2 py-1.5 text-xs"
+            style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: selectedRegiao ? "var(--text-primary)" : "var(--text-secondary)" }}
+          >
+            <option value="">Região (bairro): todas</option>
+            {JP_PRIMARY_ROTAS.map((rota) => (
+              <option key={rota} value={rota}>
+                {ROTA_LABELS[rota]} ({atendenteRows.filter((row) => regiaoDoBairro(row.r.clientNeighborhood) === rota).length})
+              </option>
+            ))}
+          </select>
+          {regioesPresentes.size > 1 ? (
+            <span
+              className="text-[11px] font-semibold px-2 py-1 rounded-full whitespace-nowrap"
+              style={{
+                color: "light-dark(#fff, color-mix(in srgb, var(--status-warning) 88%, var(--foreground)))",
+                background: "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))",
+              }}
+              title="Tem bairro de mais de uma região nesse recorte -- confira se a rota de cada chamado está certa."
+            >
+              ⚠ rotas mistas
+            </span>
           ) : null}
         </div>
 

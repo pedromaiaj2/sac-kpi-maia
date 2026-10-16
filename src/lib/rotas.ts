@@ -97,6 +97,140 @@ export const CG_ROTAS: Rota[] = ROTAS_BY_CITY.campina_grande;
 // técnicas, não usa Campina Grande nem rota extra).
 export const JP_PRIMARY_ROTAS: Rota[] = ROTAS_BY_CITY.joao_pessoa.filter((r) => r !== JP_EXTRA_ROTA);
 
+// Divisão bairro -> região geográfica real (praia/centro/sul), fonte: PDF
+// "divisão das rotas -- região metropolitana de João Pessoa" que o Victor
+// passou 16/10/2026. Pedido: "mesmo que tenha a rota de junior, os
+// atendentes podem colocar rotas mistas... preciso saber se dentro daquele
+// dia, tem bairros para notificação de assistência de rotas diversas" --
+// isso é a região REAL do bairro do cliente (ver regiaoDoBairro abaixo),
+// independente da rota atribuída manualmente ao chamado (`rota` no banco é
+// o motorista/carro do dia, não é recalculada a partir do endereço -- os
+// dois podem divergir quando um atendente agenda um bairro fora da rota
+// esperada). Só cobre as 3 rotas "de verdade" de João Pessoa
+// (JP_PRIMARY_ROTAS) -- o PDF também lista Cabedelo (entra em "praia"),
+// Bayeux e Santa Rita (entram em "centro"), cidades da região
+// metropolitana sem rota própria no sistema.
+//
+// "Centro" sozinho é ambíguo (Cabedelo, João Pessoa, Bayeux e Santa Rita
+// têm cada uma o seu) -- tratado à parte em regiaoDoBairro (cai em
+// "centro", o caso mais comum, a menos que o texto também mencione
+// Cabedelo), por isso não entra neste mapa.
+const BAIRRO_REGIAO: Record<string, Rota> = {
+  // Praia/Norte
+  CAMALAU: "praia",
+  POCO: "praia",
+  "PONTA DE CAMPINA": "praia",
+  INTERMARES: "praia",
+  JACARE: "praia",
+  "PARQUE ESPERANCA": "praia",
+  RENASCER: "praia",
+  "RECANTO DO POCO": "praia",
+  BESSA: "praia",
+  "JARDIM OCEANIA": "praia",
+  AEROCLUBE: "praia",
+  MANAIRA: "praia",
+  BRISAMAR: "praia",
+  "JARDIM LUNA": "praia",
+  "SAO JOSE": "praia",
+  "JOAO AGRIPINO": "praia",
+  "PEDRO GONDIM": "praia",
+  TAMBAU: "praia",
+  "CABO BRANCO": "praia",
+  // Centro/Oeste
+  VARADOURO: "centro",
+  TAMBIA: "centro",
+  TRINCHEIRAS: "centro",
+  JAGUARIBE: "centro",
+  ROGER: "centro",
+  TORRE: "centro",
+  EXPEDICIONARIOS: "centro",
+  MIRAMAR: "centro",
+  TAMBAUZINHO: "centro",
+  "BAIRRO DOS ESTADOS": "centro",
+  MANDACARU: "centro",
+  "PADRE ZE": "centro",
+  "ALTO DO CEU": "centro",
+  "CRISTO REDENTOR": "centro",
+  RANGEL: "centro",
+  VARJAO: "centro",
+  OITIZEIRO: "centro",
+  "CRUZ DAS ARMAS": "centro",
+  "JARDIM VENEZA": "centro",
+  "BAIRRO DAS INDUSTRIAS": "centro",
+  "DISTRITO INDUSTRIAL": "centro",
+  "ILHA DO BISPO": "centro",
+  "ALTO DO MATEUS": "centro",
+  IMACULADA: "centro",
+  BRASILIA: "centro",
+  "SAO BENTO": "centro",
+  SESI: "centro",
+  "MARIO ANDREAZZA": "centro",
+  "ALTO DA BOA VISTA": "centro",
+  "JARDIM SAO SEVERINO": "centro",
+  "COMERCIAL NORTE": "centro",
+  TIBIRI: "centro",
+  "TIBIRI II": "centro",
+  "TIBIRI III": "centro",
+  POPULAR: "centro",
+  "VARZEA NOVA": "centro",
+  "ALTO DAS POPULARES": "centro",
+  "HEITEL SANTIAGO": "centro",
+  "MARCOS MOURA": "centro",
+  "EITEL SANTIAGO": "centro",
+  ACUDE: "centro",
+  // Sul
+  BANCARIOS: "sul",
+  ANATOLIA: "sul",
+  "JARDIM SAO PAULO": "sul",
+  "JARDIM CIDADE UNIVERSITARIA": "sul",
+  "AGUA FRIA": "sul",
+  "CASTELO BRANCO": "sul",
+  MANGABEIRA: "sul",
+  "JOSE AMERICO": "sul",
+  "CIDADE DOS COLIBRIS": "sul",
+  "ERNESTO GEISEL": "sul",
+  CUIA: "sul",
+  VALENTINA: "sul",
+  PARATIBE: "sul",
+  GRAMAME: "sul",
+  MUCUMAGRO: "sul",
+  "PLANALTO DA BOA ESPERANCA": "sul",
+  "NOVA MANGABEIRA": "sul",
+  "COLINAS DO SUL": "sul",
+};
+const BAIRRO_REGIAO_KEYS_BY_LENGTH = Object.keys(BAIRRO_REGIAO).sort((a, b) => b.length - a.length);
+
+function normalizeBairro(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+// Região real (praia/centro/sul) do bairro do cliente, a partir do texto
+// livre que fica em `client_neighborhood` -- ver comentário de
+// BAIRRO_REGIAO acima. Casamento exato primeiro; sem bater, tenta por
+// inclusão (texto digitado costuma ter variação/complemento, ex. "Jardim
+// Oceania - perto da praia" ou "Mangabeira III") testando as chaves mais
+// específicas (mais longas) primeiro pra não confundir "Tibiri" com
+// "Tibiri II". Retorna null quando o bairro está vazio ou não bate com
+// nada conhecido (endereço fora da região metropolitana de João Pessoa,
+// ou digitado de um jeito longe demais do nome oficial).
+export function regiaoDoBairro(bairro: string | null | undefined): Rota | null {
+  if (!bairro) return null;
+  const norm = normalizeBairro(bairro);
+  if (!norm) return null;
+  if (norm.includes("CABEDELO")) return "praia";
+  if (/\bCENTRO\b/.test(norm)) return "centro";
+  if (BAIRRO_REGIAO[norm]) return BAIRRO_REGIAO[norm];
+  for (const key of BAIRRO_REGIAO_KEYS_BY_LENGTH) {
+    if (norm.includes(key) || key.includes(norm)) return BAIRRO_REGIAO[key];
+  }
+  return null;
+}
+
 // Rótulo de uma atribuição disponível, considerando o caso especial da
 // rota extra genérica de João Pessoa -- pedido do Victor 24/08/2026:
 // "caso tenha mais de uma rota extra, fica: rota extra 1, rota extra
