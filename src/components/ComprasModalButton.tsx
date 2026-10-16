@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { getComprasDoClienteAction } from "@/app/clientes/actions";
 import type { ClienteCompra } from "@/lib/clientes";
+import type { CategoriaResumoCompra } from "@/lib/recompra";
 
 function formatDateOnly(value: string): string {
   const [y, m, d] = value.split("-");
@@ -31,6 +32,7 @@ export function ComprasModalButton({ clientId, count }: { clientId: string; coun
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compras, setCompras] = useState<ClienteCompra[] | null>(null);
+  const [categorias, setCategorias] = useState<CategoriaResumoCompra[] | null>(null);
 
   function handleOpen(e: React.MouseEvent) {
     e.preventDefault();
@@ -40,7 +42,10 @@ export function ComprasModalButton({ clientId, count }: { clientId: string; coun
     setLoading(true);
     setError(null);
     getComprasDoClienteAction(clientId)
-      .then((result) => setCompras(result.compras))
+      .then((result) => {
+        setCompras(result.compras);
+        setCategorias(result.categorias);
+      })
       .catch(() => setError("Não foi possível carregar as compras."))
       .finally(() => setLoading(false));
   }
@@ -114,6 +119,30 @@ export function ComprasModalButton({ clientId, count }: { clientId: string; coun
                   </span>
                   {totalDevolucoes !== 0 ? <span>Devolvido: {formatBRL(Math.abs(totalDevolucoes))}</span> : null}
                 </div>
+                {/* Resumo por categoria (evento de compra, janela de 7 dias) --
+                    pedido do Victor 16/10/2026: comparar por cliente individual
+                    o que a correção de contagem por evento (migration 0176)
+                    mudou. Recalculado ao vivo (não lê a materialized view, que
+                    só atualiza a cada 30min) -- mesma regra de categoria/evento
+                    que a view usa, ver inferCategoriaCiclo/contarEventosDeCompra
+                    (recompra.ts). */}
+                {categorias && categorias.length > 0 ? (
+                  <div className="flex flex-col gap-1.5 rounded border p-2.5" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                      Por categoria (evento de compra, até 7 dias conta como 1)
+                    </span>
+                    <div className="flex flex-col gap-1">
+                      {categorias.map((c) => (
+                        <div key={c.categoria} className="flex items-center justify-between gap-3 text-xs">
+                          <span style={{ color: "var(--text-primary)" }}>{c.label}</span>
+                          <span className="whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                            {c.qtdCompras} compra{c.qtdCompras === 1 ? "" : "s"} · {formatBRL(c.valorTotal)} · última {formatDateOnly(c.ultimaData)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="overflow-x-auto rounded border" style={{ borderColor: "var(--border)" }}>
                   <table className="w-full text-sm" style={{ background: "var(--surface-1)" }}>
                     <thead>

@@ -3,7 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { listComprasDoCliente, setCanalAquisicao, isCanalAquisicao, type ClienteCompra } from "@/lib/clientes";
-import { registrarContato, registrarResultadoContato, marcarNaoContatar, desmarcarNaoContatar, type RecompraResultado } from "@/lib/recompra";
+import {
+  registrarContato,
+  registrarResultadoContato,
+  marcarNaoContatar,
+  desmarcarNaoContatar,
+  listResumoCategoriasPorCompra,
+  type RecompraResultado,
+  type CategoriaResumoCompra,
+} from "@/lib/recompra";
 import { createEstorno, type NovoEstornoInput } from "@/lib/estornos";
 
 // Busca sob demanda, só quando o nome é clicado -- pedido do Victor
@@ -13,9 +21,15 @@ import { createEstorno, type NovoEstornoInput } from "@/lib/estornos";
 // desperdício -- a esmagadora maioria nunca chega a ser expandida.
 export async function getComprasDoClienteAction(
   clientId: string
-): Promise<{ nome: string | null; cpfCnpj: string | null; compras: ClienteCompra[] }> {
+): Promise<{ nome: string | null; cpfCnpj: string | null; compras: ClienteCompra[]; categorias: CategoriaResumoCompra[] }> {
   await requireDashboardAuth();
-  return listComprasDoCliente(clientId);
+  // Histórico cru (todas as notas) + resumo por categoria (evento de
+  // compra, mesma regra de v_recompra_categorias_por_cliente, migration
+  // 0176) na mesma busca -- pedido do Victor 16/10/2026, pra poder
+  // conferir por cliente individual o que a correção de contagem por
+  // evento mudou.
+  const [historico, categorias] = await Promise.all([listComprasDoCliente(clientId), listResumoCategoriasPorCompra(clientId)]);
+  return { ...historico, categorias };
 }
 
 // Fase 2 do Motor de Recompra -- pedido do Victor 07/09/2026: registrar

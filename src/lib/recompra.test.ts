@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inferCategoriaCiclo, calcularSegmento, sugerirCrossSell, extrairCodigosFormaPagamento, CATEGORIAS_CICLO } from "./recompra";
+import { inferCategoriaCiclo, calcularSegmento, sugerirCrossSell, extrairCodigosFormaPagamento, contarEventosDeCompra, CATEGORIAS_CICLO } from "./recompra";
 
 const colchao = CATEGORIAS_CICLO.find((c) => c.key === "colchao")!;
 const protetor = CATEGORIAS_CICLO.find((c) => c.key === "protetor")!;
@@ -97,5 +97,38 @@ describe("extrairCodigosFormaPagamento", () => {
 
   it("sempre maiúsculo, mesmo se o código vier em minúsculo", () => {
     expect(extrairCodigosFormaPagamento("crd 300.00")).toEqual(["CRD"]);
+  });
+});
+
+describe("contarEventosDeCompra", () => {
+  it("lista vazia -> 0 eventos", () => {
+    expect(contarEventosDeCompra([])).toBe(0);
+  });
+
+  it("uma data só -> 1 evento", () => {
+    expect(contarEventosDeCompra(["2026-01-10"])).toBe(1);
+  });
+
+  it("2ª data a 7 dias exatos da 1ª -> mesmo evento (limite inclusivo)", () => {
+    expect(contarEventosDeCompra(["2026-01-10", "2026-01-17"])).toBe(1);
+  });
+
+  it("2ª data a 8 dias da 1ª -> evento novo", () => {
+    expect(contarEventosDeCompra(["2026-01-10", "2026-01-18"])).toBe(2);
+  });
+
+  it("janela é FIXA a partir da âncora, não encadeada", () => {
+    // 01/01 (âncora), 07/01 (+6, mesmo evento), 13/01 (+12 da âncora,
+    // mesmo que só +6 da compra anterior) -- deveria abrir evento novo,
+    // porque conta a partir da âncora do evento, não da última compra.
+    expect(contarEventosDeCompra(["2026-01-01", "2026-01-07", "2026-01-13"])).toBe(2);
+  });
+
+  it("datas fora de ordem e duplicadas são tratadas igual (ordena e deduplica antes)", () => {
+    expect(contarEventosDeCompra(["2026-01-17", "2026-01-10", "2026-01-10"])).toBe(1);
+  });
+
+  it("3 grupos bem separados -> 3 eventos", () => {
+    expect(contarEventosDeCompra(["2026-01-01", "2026-03-01", "2026-06-01"])).toBe(3);
   });
 });

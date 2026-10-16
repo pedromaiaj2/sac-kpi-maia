@@ -60,6 +60,86 @@ export function inferCategoriaCiclo(description: string | null): CategoriaCiclo 
   return null;
 }
 
+// Conta quantos EVENTOS DE COMPRA existem numa lista de datas (YYYY-MM-DD)
+// de um cliente -- mesma regra das migrations 0175/0176 (janela FIXA de 7
+// dias a partir da âncora, não encadeada): compras em até 7 dias do INÍCIO
+// de um grupo contam como um evento só. Implementado em JS, não SQL, porque
+// aqui é sempre pra UM cliente só (poucas dezenas de datas no máximo) --
+// não precisa da CTE recursiva que a view usa pra base inteira.
+export function contarEventosDeCompra(datasIso: string[]): number {
+  const datas = [...new Set(datasIso)].sort();
+  if (datas.length === 0) return 0;
+  const DIA_MS = 24 * 60 * 60 * 1000;
+  let eventos = 1;
+  let ancora = new Date(`${datas[0]}T00:00:00Z`).getTime();
+  for (let i = 1; i < datas.length; i++) {
+    const t = new Date(`${datas[i]}T00:00:00Z`).getTime();
+    if ((t - ancora) / DIA_MS > 7) {
+      eventos++;
+      ancora = t;
+    }
+  }
+  return eventos;
+}
+
+// Resumo por categoria de UM cliente -- pedido do Victor 16/10/2026,
+// depois da correção de v_recompra_categorias_por_cliente (migration
+// 0176): "não tem um lugar explícito nas abas pra comparar... por cliente
+// individual". Mostrado no modal "Ver compras" (ComprasModalButton.tsx,
+// usado em todas as abas de /clientes) -- recalcula ao vivo pra ESSE
+// cliente em cima de totvs_order_items, com a MESMA regra de evento/
+// categoria da view (inferCategoriaCiclo/contarEventosDeCompra acima),
+// em vez de ler a materialized view (que só atualiza a cada 30min --
+// o resto do modal já é sempre ao vivo, via listComprasDoCliente).
+export type CategoriaResumoCompra = {
+  categoria: string;
+  label: string;
+  qtdCompras: number;
+  valorTotal: number;
+  ultimaData: string;
+};
+
+export async function listResumoCategoriasPorCompra(clientId: string): Promise<CategoriaResumoCompra[]> {
+  const admin = getSupabaseAdmin();
+  const { data: orders, error: ordersError } = await admin
+    .from("totvs_orders")
+    .select("id, issue_date")
+    .eq("client_id", clientId)
+    .eq("type", "Venda");
+  if (ordersError) throw new Error(ordersError.message);
+  const orderIds = (orders ?? []).map((o) => o.id as string);
+  if (orderIds.length === 0) return [];
+  const dataPorOrder = new Map(orders!.map((o) => [o.id as string, o.issue_date as string]));
+
+  const { data: itens, error: itensError } = await admin.from("totvs_order_items").select("order_id, description, total").in("order_id", orderIds);
+  if (itensError) throw new Error(itensError.message);
+
+  type Acumulado = { valorTotal: number; datas: Set<string>; ultimaData: string };
+  const porCategoria = new Map<string, Acumulado>();
+  for (const it of itens ?? []) {
+    const categoria = inferCategoriaCiclo(it.description as string | null);
+    if (!categoria) continue;
+    const issueDate = dataPorOrder.get(it.order_id as string);
+    if (!issueDate) continue;
+    const acc = porCategoria.get(categoria.key) ?? { valorTotal: 0, datas: new Set<string>(), ultimaData: issueDate };
+    acc.valorTotal += Number(it.total);
+    acc.datas.add(issueDate);
+    if (issueDate > acc.ultimaData) acc.ultimaData = issueDate;
+    porCategoria.set(categoria.key, acc);
+  }
+
+  return CATEGORIAS_CICLO.filter((c) => porCategoria.has(c.key)).map((c) => {
+    const acc = porCategoria.get(c.key)!;
+    return {
+      categoria: c.key,
+      label: c.label,
+      qtdCompras: contarEventosDeCompra([...acc.datas]),
+      valorTotal: acc.valorTotal,
+      ultimaData: acc.ultimaData,
+    };
+  });
+}
+
 // Índice >= 0,7 = "entrando na janela" -- pedido do Victor no desenho
 // original (motor-de-recompra.html): não precisa esperar o ciclo terminar
 // 100% pra virar candidato, 70% da vida útil já é sinal de que vale
