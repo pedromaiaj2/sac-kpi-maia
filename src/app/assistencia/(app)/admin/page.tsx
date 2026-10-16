@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { listStores } from "@/lib/serviceRequests";
 import { listGerentesWithPinStatus } from "@/lib/gerentes";
@@ -241,6 +242,19 @@ export default async function AdminPage() {
       </AdminSection>
 
       <AdminSection title="Cronograma do SAC" count={cronogramaItens.length}>
+        {/* Atalho pro Arsenal (pedido do Victor 16/10/2026) -- o editor de
+            verdade da árvore de atendimento mora na própria tela do Arsenal
+            (mesmo padrão das entradas clássicas, nunca ficaram aqui
+            também), isso aqui é só um link de acesso rápido, não duplica
+            nada. Colocado dentro desta seção a pedido dele, mesmo sendo
+            uma ferramenta separada do cronograma em si. */}
+        <Link
+          href="/assistencia/sac/arsenal"
+          className="self-start text-xs font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
+          style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
+        >
+          🧭 Arsenal do SAC — editar árvore de atendimento
+        </Link>
         <p className="text-xs text-gray-400 dark:text-gray-500">
           Itens que cada atendente do SAC confirma todo dia em{" "}
           <span className="font-mono">/assistencia/sac/cronograma</span>. Desativar não apaga o histórico de quem já
