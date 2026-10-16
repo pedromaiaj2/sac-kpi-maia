@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, MessageCircle, ClipboardCopy, Check } from "lucide-react";
 import { salvarRecuperacaoAction, historicoRecuperacaoAction, type SalvarRecuperacaoState } from "@/app/assistencia/recuperacao-actions";
@@ -40,13 +40,26 @@ function whatsapp(tel: string, nome: string) {
   return `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`;
 }
 
-// Botão "Copiar roteiro" -- pedido do Victor 16/10/2026. `roteiro` já vem
-// pronto do servidor (gerarRoteiro em recuperacao.ts, função pura montada
-// com os dados do cliente) -- esse componente só cuida do clique/feedback,
-// não gera texto nenhum (mesmo motivo de `niveis` vir por prop: lib do
-// servidor não pode entrar no bundle do cliente).
-function CopiarRoteiroButton({ roteiro }: { roteiro: string }) {
+// Modal com o roteiro completo -- pedido do Victor 16/10/2026 (1ª versão só
+// copiava direto pro clipboard sem mostrar nada; ele pediu pra abrir modal
+// com o texto inteiro). `roteiro` já vem pronto do servidor (gerarRoteiro
+// em recuperacao.ts, função pura montada com os dados do cliente) -- esse
+// componente só cuida de mostrar/copiar, não gera texto nenhum (mesmo
+// motivo de `niveis` vir por prop: lib do servidor não pode entrar no
+// bundle do cliente). Mesmo padrão visual de PrejuizoDetalheModal.tsx (esse
+// projeto não tem um <Modal> genérico -- cada tela monta o próprio overlay).
+function RoteiroButton({ nome, roteiro }: { nome: string; roteiro: string }) {
+  const [aberto, setAberto] = useState(false);
   const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    if (!aberto) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setAberto(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [aberto]);
 
   async function copiar() {
     try {
@@ -55,25 +68,60 @@ function CopiarRoteiroButton({ roteiro }: { roteiro: string }) {
       setTimeout(() => setCopiado(false), 1800);
     } catch {
       // Clipboard API pode falhar (navegador antigo, iframe sem permissão) --
-      // sem fallback de seleção de texto aqui porque não tem um <textarea>
-      // visível pra selecionar; só silencia, o botão continua clicável.
+      // o texto já está visível e selecionável no modal, então ainda dá pra
+      // copiar manualmente mesmo se isso falhar.
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={copiar}
-      title="Copiar roteiro de ligação pra esse cliente"
-      className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
-      style={{
-        border: `1px solid ${copiado ? "var(--status-good)" : "var(--border)"}`,
-        color: copiado ? "var(--status-good)" : "var(--text-primary)",
-      }}
-    >
-      {copiado ? <Check size={14} aria-hidden /> : <ClipboardCopy size={14} aria-hidden />}
-      {copiado ? "Copiado!" : "Roteiro"}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        title="Ver roteiro de ligação pra esse cliente"
+        className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+        style={{ border: "1px solid var(--border)", color: "var(--text-primary)" }}
+      >
+        <ClipboardCopy size={14} aria-hidden />
+        Roteiro
+      </button>
+
+      {aberto ? (
+        <>
+          <button aria-label="Fechar roteiro" onClick={() => setAberto(false)} className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.4)" }} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-x-4 top-[6vh] z-50 mx-auto max-w-xl max-h-[85vh] overflow-y-auto rounded-lg border p-4 shadow-lg flex flex-col gap-3"
+            style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                Roteiro — {nome}
+              </h3>
+              <button aria-label="Fechar" onClick={() => setAberto(false)} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-muted)" }}>
+                Fechar
+              </button>
+            </div>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: "var(--text-primary)", background: "var(--surface-2)", borderRadius: 8, padding: 12 }}>
+              {roteiro}
+            </p>
+            <button
+              type="button"
+              onClick={copiar}
+              className="self-start inline-flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-lg"
+              style={{
+                background: copiado ? "var(--status-good)" : "var(--brand-green)",
+                color: "var(--brand-green-ink)",
+              }}
+            >
+              {copiado ? <Check size={14} aria-hidden /> : <ClipboardCopy size={14} aria-hidden />}
+              {copiado ? "Copiado!" : "Copiar roteiro"}
+            </button>
+          </div>
+        </>
+      ) : null}
+    </>
   );
 }
 
@@ -189,7 +237,7 @@ export function LinhaRecuperacao({
               🎟 Voucher
             </Link>
           ) : null}
-          <CopiarRoteiroButton roteiro={roteiro} />
+          <RoteiroButton nome={c.nome} roteiro={roteiro} />
           <button
             type="button"
             onClick={abrir}
