@@ -884,19 +884,28 @@ type PrimeiraSegundaCompraRow = {
   client_id: string;
   primeira_compra: string;
   loja_primeira_compra: string | null;
-  forma_pagamento_primeira_compra: string | null;
+  formas_pagamento_primeira_compra: string[] | null;
   segunda_compra: string | null;
 };
 
-// Extrai o código cru do TOTVS ("PIX 500.00" -> "PIX", "CC 350.00 (7x) |
-// R$ 40.00" -> "CC") -- pega só o 1º método quando é pagamento combinado.
-// Sem dicionário de nomes (não existe um oficial no sistema pra esses
-// códigos), mostra como vem.
-function extrairCodigoFormaPagamento(raw: string | null): string {
-  if (!raw) return "(sem forma)";
-  const primeiro = raw.split("|")[0].trim();
-  const m = primeiro.match(/^([A-Za-z$]+)/);
-  return m ? m[1].toUpperCase() : "(sem forma)";
+// Extrai TODOS os códigos crus do TOTVS de uma nota ("PIX 500.00" ->
+// ["PIX"], "CC 350.00 (7x) | R$ 40.00" -> ["CC", "R$"]) -- achado do
+// Victor 16/10/2026: a versão anterior (extrairCodigoFormaPagamento,
+// singular) pegava só o 1º método num pagamento combinado, por isso o
+// crediário (CRD) aparecia com só 63 clientes na taxa por forma de
+// pagamento, apesar de ter ~300 vendas crediário/mês -- quando CRD era o
+// 2º método de um pagamento combinado, ou de uma 2ª nota do mesmo evento
+// (ver v_clientes_primeira_segunda_compra, migration 0175), ele nunca
+// contava. Sem dicionário de nomes (não existe um oficial no sistema pra
+// esses códigos), mostra como vem.
+export function extrairCodigosFormaPagamento(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split("|")
+    .map((s) => s.trim())
+    .map((s) => s.match(/^([A-Za-z$]+)/))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map((m) => m[1].toUpperCase());
 }
 
 export type ConversaoRecompraCliente = {
@@ -905,7 +914,11 @@ export type ConversaoRecompraCliente = {
   nivel: ClienteNivel;
   primeiraCompra: string;
   lojaPrimeiraCompra: string | null;
-  formaPagamentoPrimeiraCompra: string | null;
+  // Texto cru do TOTVS de cada nota do evento 1 (pode ter mais de uma --
+  // ver migration 0175) -- pra exibir na lista. Códigos extraídos (pro
+  // agrupamento "taxa por forma de pagamento") ficam em
+  // formasPagamentoCodigos, calculado à parte em listConversaoRecompra.
+  formasPagamentoPrimeiraCompra: string[];
   converteu: boolean;
   segundaCompra: string | null;
   diasAteSegundaCompra: number | null;
@@ -918,6 +931,11 @@ export type ConversaoRecompraData = {
   totalBase: number;
   totalComSegundaCompra: number;
   tempoMedioDiasAteSegundaCompra: number | null;
+  // Mediana -- pedido do Victor 16/10/2026: "troque o card... para
+  // mostrar a MEDIANA (e a média em texto menor), porque a média é
+  // puxada por uma cauda longa" (clientes que levam anos pra voltar
+  // distorcem a média bem mais que a mediana).
+  tempoMedianoDiasAteSegundaCompra: number | null;
   porLoja: ConversaoRecompraTaxa[];
   porFormaPagamento: ConversaoRecompraTaxa[];
   coorte6a12Meses: ConversaoRecompraCliente[];
@@ -937,7 +955,7 @@ export async function listConversaoRecompra(): Promise<ConversaoRecompraData> {
       (from, to) =>
         admin
           .from("v_clientes_primeira_segunda_compra")
-          .select("client_id, primeira_compra, loja_primeira_compra, forma_pagamento_primeira_compra, segunda_compra", {
+          .select("client_id, primeira_compra, loja_primeira_compra, formas_pagamento_primeira_compra, segunda_compra", {
             count: "exact",
           })
           // Achado na revisão de 16/10/2026: sem .order() aqui, paginação em
@@ -970,7 +988,7 @@ export async function listConversaoRecompra(): Promise<ConversaoRecompraData> {
       nivel: info.nivel,
       primeiraCompra: r.primeira_compra,
       lojaPrimeiraCompra: r.loja_primeira_compra ? storeNameById.get(r.loja_primeira_compra) ?? r.loja_primeira_compra : null,
-      formaPagamentoPrimeiraCompra: r.forma_pagamento_primeira_compra,
+      formasPagamentoPrimeiraCompra: r.formas_pagamento_primeira_compra ?? [],
       converteu,
       segundaCompra: r.segunda_compra,
       diasAteSegundaCompra: converteu ? diasEntre(r.primeira_compra, new Date(`${r.segunda_compra}T00:00:00`)) : null,
@@ -982,6 +1000,7 @@ export async function listConversaoRecompra(): Promise<ConversaoRecompraData> {
   const temposConversao = clientes.map((c) => c.diasAteSegundaCompra).filter((d): d is number => d !== null);
   const tempoMedioDiasAteSegundaCompra =
     temposConversao.length > 0 ? temposConversao.reduce((s, d) => s + d, 0) / temposConversao.length : null;
+  const tempoMedianoDiasAteSegundaCompra = temposConversao.length > 0 ? mediana(temposConversao) : null;
 
   function agrupar(chave: (c: ConversaoRecompraCliente) => string | null): ConversaoRecompraTaxa[] {
     const porChave = new Map<string, { totalBase: number; convertidos: number }>();
@@ -999,8 +1018,32 @@ export async function listConversaoRecompra(): Promise<ConversaoRecompraData> {
       .sort((a, b) => b.taxaPct - a.taxaPct);
   }
 
+  // Forma de pagamento -- pedido do Victor 16/10/2026: "considere todas as
+  // formas de pagamento da compra", não só a 1ª. Diferente de `agrupar`
+  // acima (1 chave por cliente): aqui um cliente que pagou com 2 métodos
+  // (nota combinada, ou 2 notas do mesmo evento com métodos diferentes --
+  // ver migration 0175) CONTA NOS DOIS grupos -- Set por cliente evita
+  // contar o mesmo código 2x se ele se repetir entre notas/segmentos.
+  function agruparFormaPagamento(): ConversaoRecompraTaxa[] {
+    const porChave = new Map<string, { totalBase: number; convertidos: number }>();
+    for (const c of clientes) {
+      const codigos = c.formasPagamentoPrimeiraCompra.flatMap(extrairCodigosFormaPagamento);
+      const chaves = codigos.length > 0 ? new Set(codigos) : new Set(["(sem forma)"]);
+      for (const k of chaves) {
+        const acc = porChave.get(k) ?? { totalBase: 0, convertidos: 0 };
+        acc.totalBase++;
+        if (c.converteu) acc.convertidos++;
+        porChave.set(k, acc);
+      }
+    }
+    return [...porChave.entries()]
+      .filter(([, v]) => v.totalBase >= TAXA_AMOSTRA_MINIMA)
+      .map(([label, v]) => ({ label, totalBase: v.totalBase, convertidos: v.convertidos, taxaPct: (v.convertidos / v.totalBase) * 100 }))
+      .sort((a, b) => b.taxaPct - a.taxaPct);
+  }
+
   const porLoja = agrupar((c) => c.lojaPrimeiraCompra);
-  const porFormaPagamento = agrupar((c) => extrairCodigoFormaPagamento(c.formaPagamentoPrimeiraCompra));
+  const porFormaPagamento = agruparFormaPagamento();
 
   // Quem ainda não converteu aparece primeiro -- é a parte accionável da
   // lista (candidato a "Gerar Oferta"), os já convertidos servem só de
@@ -1016,6 +1059,7 @@ export async function listConversaoRecompra(): Promise<ConversaoRecompraData> {
     totalBase: clientes.length,
     totalComSegundaCompra,
     tempoMedioDiasAteSegundaCompra,
+    tempoMedianoDiasAteSegundaCompra,
     porLoja,
     porFormaPagamento,
     coorte6a12Meses,

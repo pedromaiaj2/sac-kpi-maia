@@ -864,25 +864,33 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
   const pageItems = pageItemsRaw.map((c) => ({ ...c, phone: phonePorCliente.get(c.clientId) ?? null }));
 
   const coorteConvertidos = data.coorte6a12Meses.filter((c) => c.converteu).length;
-  const tempoMedioMeses =
-    data.tempoMedioDiasAteSegundaCompra !== null ? Math.round(data.tempoMedioDiasAteSegundaCompra / 30) : null;
+  const tempoMedianoDias = data.tempoMedianoDiasAteSegundaCompra !== null ? Math.round(data.tempoMedianoDiasAteSegundaCompra) : null;
+  const tempoMedioDias = data.tempoMedioDiasAteSegundaCompra !== null ? Math.round(data.tempoMedioDiasAteSegundaCompra) : null;
   const taxaGeralPct = data.totalBase > 0 ? (data.totalComSegundaCompra / data.totalBase) * 100 : 0;
 
   return (
     <>
       <p className="text-xs -mt-4 max-w-2xl" style={{ color: "var(--text-muted)" }}>
-        As 3 métricas abaixo (tempo médio, taxa por loja, taxa por forma de pagamento) usam toda a base de clientes com
-        histórico de compra -- a lista no fim da página é só a coorte de quem comprou a 1ª vez há 6-12 meses, o recorte
-        maduro o bastante pra já ter tido chance real de voltar.
+        Compras do mesmo cliente feitas em até 7 dias da 1ª contam como um evento só (ex.: colchão + protetor/travesseiro
+        em nota separada dias depois não é recompra) -- &ldquo;2ª compra&rdquo; aqui é sempre o próximo evento, não a próxima nota.
+        As 3 métricas abaixo (tempo até a 2ª compra, taxa por loja, taxa por forma de pagamento) usam toda a base de
+        clientes com histórico de compra -- a lista no fim da página é só a coorte de quem comprou a 1ª vez há 6-12
+        meses, o recorte maduro o bastante pra já ter tido chance real de voltar.
       </p>
 
       <div className="grid sm:grid-cols-3 gap-4">
         <div className="rounded-xl border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <span className="text-2xl font-bold" style={{ color: "var(--brand-orange)" }}>
-            {tempoMedioMeses !== null ? `~${tempoMedioMeses} ${tempoMedioMeses === 1 ? "mês" : "meses"}` : "—"}
+            {tempoMedianoDias !== null ? `${tempoMedianoDias.toLocaleString("pt-BR")} dias` : "—"}
           </span>
           <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            Tempo médio até a 2ª compra ({data.totalComSegundaCompra.toLocaleString("pt-BR")} clientes que já converteram)
+            Mediana até a 2ª compra ({data.totalComSegundaCompra.toLocaleString("pt-BR")} clientes que já converteram)
+            {tempoMedioDias !== null ? (
+              <>
+                {" "}
+                · <span style={{ color: "var(--text-muted)" }}>média {tempoMedioDias.toLocaleString("pt-BR")} dias</span>
+              </>
+            ) : null}
           </span>
         </div>
         <div className="rounded-xl border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -920,7 +928,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
           <h3 className="text-sm font-medium flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>
             Taxa de recompra por forma de pagamento
             <span
-              title="Código cru do TOTVS na 1ª compra do cliente (CC, PIX, CD, CRD...) -- não existe um dicionário oficial desses códigos no sistema, por isso aparece como vem. Pagamento combinado considera só o 1º método."
+              title="Código cru do TOTVS usado no evento da 1ª compra (CC, PIX, CD, CRD...) -- não existe um dicionário oficial desses códigos no sistema, por isso aparece como vem. Conta TODAS as formas usadas (nota com pagamento combinado, ou mais de uma nota no mesmo evento) -- um cliente que usou 2 formas entra nos 2 grupos."
               aria-label="Sobre os códigos de forma de pagamento"
               className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
               style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
@@ -1014,7 +1022,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
                       {c.lojaPrimeiraCompra ?? "—"}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {c.formaPagamentoPrimeiraCompra ?? "—"}
+                      {c.formasPagamentoPrimeiraCompra.length > 0 ? c.formasPagamentoPrimeiraCompra.join(" · ") : "—"}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       {c.converteu ? (

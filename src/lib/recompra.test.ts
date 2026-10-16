@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inferCategoriaCiclo, calcularSegmento, sugerirCrossSell, CATEGORIAS_CICLO } from "./recompra";
+import { inferCategoriaCiclo, calcularSegmento, sugerirCrossSell, extrairCodigosFormaPagamento, CATEGORIAS_CICLO } from "./recompra";
 
 const colchao = CATEGORIAS_CICLO.find((c) => c.key === "colchao")!;
 const protetor = CATEGORIAS_CICLO.find((c) => c.key === "protetor")!;
@@ -79,5 +79,23 @@ describe("sugerirCrossSell", () => {
   it("já tem todas as associadas de tudo que possui -> null", () => {
     const afinidade = new Map([[colchao.key, [{ categoria: protetor, score: 0.8 }]]]);
     expect(sugerirCrossSell(new Set([colchao.key, protetor.key]), afinidade)).toBeNull();
+  });
+});
+
+describe("extrairCodigosFormaPagamento", () => {
+  it("extrai um código só de uma forma simples", () => {
+    expect(extrairCodigosFormaPagamento("PIX 500.00")).toEqual(["PIX"]);
+  });
+
+  it("extrai TODOS os códigos de um pagamento combinado (achado 16/10/2026: antes só pegava o 1º)", () => {
+    expect(extrairCodigosFormaPagamento("CC 350.00 (7x) | R$ 40.00")).toEqual(["CC", "R$"]);
+  });
+
+  it("nulo vira lista vazia, não '(sem forma)' (isso é tratado em agruparFormaPagamento)", () => {
+    expect(extrairCodigosFormaPagamento(null)).toEqual([]);
+  });
+
+  it("sempre maiúsculo, mesmo se o código vier em minúsculo", () => {
+    expect(extrairCodigosFormaPagamento("crd 300.00")).toEqual(["CRD"]);
   });
 });
