@@ -3,7 +3,7 @@ import { listNpsDetratores, registrarStatusDetrator, NPS_DETRATOR_ORIGEM_LABELS,
 import { listEstornos } from "./estornos";
 import { listAllEstornoRequests } from "./estornoRequests";
 import { calcularNivel, mesesEntre, type ClienteNivel } from "./clientes";
-import { statusEfetivo, hojeRecife, type StatusVoucher } from "./vouchersCore";
+import { statusEfetivo, hojeRecife, primeiroNome, type StatusVoucher } from "./vouchersCore";
 import {
   chaveCliente,
   calcularPrioridade,
@@ -328,4 +328,80 @@ export async function listarHistorico(chave: string): Promise<{ campo: string; d
     .limit(50);
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+// Roteiro de ligação pronto pra cada cliente da fila -- pedido do Victor
+// 16/10/2026: "um botão em cada um dos clientes em que eu possa copiar o
+// roteiro de conversa". Função pura (sem I/O), montada só com o que já está
+// em ClienteRecuperacao -- mesmo espírito de calcularPrioridade
+// (recuperacaoCore.ts). Não tenta ser definitivo: é um rascunho que já
+// parte das informações reais do caso, pra economizar o trabalho de reler
+// tudo antes de ligar -- o Victor ajusta/completa antes de usar.
+const brlRoteiro = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const diaBrRoteiro = (s: string) => s.slice(0, 10).split("-").reverse().join("/");
+
+export function gerarRoteiro(c: ClienteRecuperacao): string {
+  const nome = primeiroNome(c.nome) || "cliente";
+  const linhas: string[] = [];
+
+  if (!c.telefone) {
+    linhas.push("⚠️ Sem telefone cadastrado — resolver isso antes de ligar (checar com a loja ou o Protheus).", "");
+  }
+
+  const estornos = c.casos.filter((x): x is Extract<CasoRecuperacao, { tipo: "estorno" }> => x.tipo === "estorno");
+  const detratores = c.casos.filter((x): x is Extract<CasoRecuperacao, { tipo: "detrator" }> => x.tipo === "detrator");
+  const pendentes = estornos.filter((e) => e.pendente);
+  const recusados = estornos.filter((e) => !e.pendente && /recusad/i.test(e.situacao));
+  const concluidos = estornos.filter((e) => !e.pendente && !/recusad/i.test(e.situacao));
+  const piorNota = detratores.length ? Math.min(...detratores.map((d) => d.nota)) : null;
+
+  // "Já em contato" com anotação registrada = retomar de onde parou, não
+  // abrir como se fosse a 1ª vez (mesmo cuidado que já foi pedido antes
+  // pra casos assim -- ver conversa sobre a Edilene, 15/10/2026).
+  const jaEmContato = (c.status === "em_contato" || c.status === "aguardando_cliente") && !!c.anotacao;
+
+  if (jaEmContato) {
+    linhas.push(`${nome}, retomando o que já estava sendo tratado com você:`, `"${c.anotacao}"`, "", "Roteiro de confirmação (NÃO é o 1º contato):");
+  } else {
+    linhas.push(`Oi ${nome}, aqui é o Victor, da Lojas Maia.`);
+  }
+
+  if (estornos.length > 1) {
+    linhas.push("", `Esse cliente tem ${estornos.length} casos de estorno — revise cada um antes de ligar, pra não misturar:`);
+    for (const e of estornos) linhas.push(`- ${diaBrRoteiro(e.data)} · ${brlRoteiro(e.valor)} · ${e.situacao}${e.detalhe ? ` · ${e.detalhe}` : ""}`);
+  }
+
+  if (pendentes.length) {
+    const e = pendentes[0];
+    linhas.push(
+      "",
+      `Reconheça o problema sem rodeio${e.detalhe ? ` (${e.detalhe})` : ""} e confirme que você está acompanhando o caso.`,
+      `Dê uma posição concreta sobre o estorno de ${brlRoteiro(e.valor)} (${e.loja}) — prazo real, não "em breve". Se não souber o prazo exato, prometa retornar em até 24h com a data.`
+    );
+  }
+  if (recusados.length) {
+    linhas.push(
+      "",
+      `${recusados.length > 1 ? `${recusados.length} estornos foram` : "Um estorno foi"} recusado — confirme com quem recusou o motivo real antes de ligar, pra não prometer nada que não pode cumprir.`,
+      "Pergunte ao cliente: o problema já foi resolvido de outra forma, ou ele ainda está sem o produto e sem o dinheiro? Esse é o ponto mais grave da ligação."
+    );
+  }
+  if (concluidos.length) {
+    linhas.push("", `O estorno de ${brlRoteiro(concluidos[0].valor)} já foi concluído — confirme que ele recebeu o valor (não dê por certo), sem tratar como pendente.`);
+  }
+  if (piorNota !== null) {
+    linhas.push("", `Ele deixou nota ${piorNota} numa pesquisa — pergunte diretamente como avalia o atendimento agora, dê espaço pra ele falar, não justifique demais.`);
+  }
+  if (c.causa === "atraso_entrega") {
+    linhas.push("", "Causa registrada: atraso na entrega — se ainda não resolveu, ofereça uma posição clara sobre o prazo real.");
+  } else if (c.causa === "defeito_assistencia") {
+    linhas.push("", "Causa registrada: defeito/assistência — confirme se o chamado de assistência já foi aberto e qual o status.");
+  } else if (c.causa === "atendimento") {
+    linhas.push("", "Causa registrada: atendimento — reconheça a falha específica antes de qualquer outra coisa, sem justificar o setor que errou.");
+  }
+
+  linhas.push("", "Encerre perguntando se ele toparia comprar com a Maia de novo e o que precisaria ser diferente — anote a resposta.");
+  if (c.motivos.length) linhas.push("", `(Por que esse cliente está no topo da fila: ${c.motivos.join(" · ")})`);
+
+  return linhas.join("\n");
 }

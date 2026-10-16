@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
-import { montarFila, type ClienteRecuperacao } from "@/lib/recuperacao";
+import { montarFila, gerarRoteiro, type ClienteRecuperacao } from "@/lib/recuperacao";
 import {
   RECUPERACAO_DONO_ID,
   STATUS_ENCERRADOS,
@@ -169,7 +169,7 @@ export default async function RecuperacaoPage({ searchParams }: { searchParams: 
       ) : (
         <ul className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
           {lista.slice(0, limite).map((c, i) => (
-            <LinhaRecuperacao key={c.chave} c={c} posicao={i + 1} hoje={hoje} niveis={niveis} />
+            <LinhaRecuperacao key={c.chave} c={c} posicao={i + 1} hoje={hoje} niveis={niveis} roteiro={gerarRoteiro(c)} />
           ))}
         </ul>
       )}

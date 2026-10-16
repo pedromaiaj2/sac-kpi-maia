@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, MessageCircle, ClipboardCopy, Check } from "lucide-react";
 import { salvarRecuperacaoAction, historicoRecuperacaoAction, type SalvarRecuperacaoState } from "@/app/assistencia/recuperacao-actions";
 import {
   STATUS_RECUPERACAO,
@@ -40,6 +40,43 @@ function whatsapp(tel: string, nome: string) {
   return `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`;
 }
 
+// Botão "Copiar roteiro" -- pedido do Victor 16/10/2026. `roteiro` já vem
+// pronto do servidor (gerarRoteiro em recuperacao.ts, função pura montada
+// com os dados do cliente) -- esse componente só cuida do clique/feedback,
+// não gera texto nenhum (mesmo motivo de `niveis` vir por prop: lib do
+// servidor não pode entrar no bundle do cliente).
+function CopiarRoteiroButton({ roteiro }: { roteiro: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(roteiro);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1800);
+    } catch {
+      // Clipboard API pode falhar (navegador antigo, iframe sem permissão) --
+      // sem fallback de seleção de texto aqui porque não tem um <textarea>
+      // visível pra selecionar; só silencia, o botão continua clicável.
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copiar}
+      title="Copiar roteiro de ligação pra esse cliente"
+      className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+      style={{
+        border: `1px solid ${copiado ? "var(--status-good)" : "var(--border)"}`,
+        color: copiado ? "var(--status-good)" : "var(--text-primary)",
+      }}
+    >
+      {copiado ? <Check size={14} aria-hidden /> : <ClipboardCopy size={14} aria-hidden />}
+      {copiado ? "Copiado!" : "Roteiro"}
+    </button>
+  );
+}
+
 // Rótulos/cores de nível vêm da página: clientes.ts puxa o cliente do banco
 // (servidor) e não pode entrar no bundle do navegador.
 export function LinhaRecuperacao({
@@ -47,11 +84,13 @@ export function LinhaRecuperacao({
   posicao,
   hoje,
   niveis,
+  roteiro,
 }: {
   c: ClienteRecuperacao;
   posicao: number;
   hoje: string;
   niveis: Record<string, { label: string; cor: string }>;
+  roteiro: string;
 }) {
   const [aberto, setAberto] = useState(false);
   const [state, action, pending] = useActionState<SalvarRecuperacaoState, FormData>(salvarRecuperacaoAction, undefined);
@@ -150,6 +189,7 @@ export function LinhaRecuperacao({
               🎟 Voucher
             </Link>
           ) : null}
+          <CopiarRoteiroButton roteiro={roteiro} />
           <button
             type="button"
             onClick={abrir}
