@@ -433,6 +433,15 @@ async function listClientesPorNivelUncached(): Promise<ClienteNivelInfo[]> {
         admin
           .from("v_clientes_agregado_nivel")
           .select("client_id, nome, cpf_cnpj, compras, gasto_acumulado, primeira_compra, ultima_compra, branches", { count: "exact" })
+          // Achado na revisão de 16/10/2026: sem .order() aqui, paginação em
+          // PARALELO (.range()) sobre uma materialized view de ~98 mil linhas
+          // não tem ordem garantida entre as chamadas -- confirmado na prática
+          // (script de auditoria rodando a MESMA query sem order trouxe só
+          // 66 mil de 97,5 mil clientes, 32% faltando, mesma view). client_id
+          // é só pra fixar uma ordem estável de leitura, sem significado de
+          // negócio -- essa função alimenta /clientes (níveis, propensão a
+          // recompra) e listConversaoRecompra (recompra.ts).
+          .order("client_id")
           .range(from, to) as unknown as PromiseLike<PagedQueryResult<ClienteAgregadoRow>>,
       { pageSize: CLIENTE_AGREGADO_PAGE_SIZE }
     ),

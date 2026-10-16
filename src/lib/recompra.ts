@@ -932,6 +932,13 @@ export async function listConversaoRecompra(): Promise<ConversaoRecompraData> {
           .select("client_id, primeira_compra, loja_primeira_compra, forma_pagamento_primeira_compra, segunda_compra", {
             count: "exact",
           })
+          // Achado na revisão de 16/10/2026: sem .order() aqui, paginação em
+          // PARALELO (.range()) sobre uma materialized view de ~98 mil linhas
+          // não tem ordem garantida entre as chamadas -- confirmado na prática
+          // (script de auditoria rodando a MESMA query sem order trouxe só
+          // 66 mil de 97,5 mil clientes, 32% faltando). client_id é só pra
+          // fixar uma ordem estável de leitura, sem significado de negócio.
+          .order("client_id")
           .range(from, to) as unknown as PromiseLike<PagedQueryResult<PrimeiraSegundaCompraRow>>,
       { pageSize: 1000 }
     ),
