@@ -105,6 +105,10 @@ export async function sincronizarSubconta(key: SubcontaKey): Promise<ResultadoSy
         .select("ghl_conversation_id, primeira_resposta_min", { count: "exact" })
         .eq("subconta", key)
         .gte("aberta_em", new Date(sinceMs).toISOString())
+        // .order() -- sem isso, paginação em paralelo não tem ordem
+        // garantida entre as chamadas (achado 16/10/2026). ghl_conversation_id
+        // é único (onConflict do upsert logo abaixo).
+        .order("ghl_conversation_id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ ghl_conversation_id: string; primeira_resposta_min: number | null }>>
   );
   const estado = new Map(conhecidas.map((r) => [r.ghl_conversation_id, r.primeira_resposta_min]));
@@ -167,6 +171,8 @@ export async function resumoAtendimentos(key: SubcontaKey): Promise<{ porAtenden
         .select("atendente_nome, primeira_resposta_min, atualizado_em", { count: "exact" })
         .eq("subconta", key)
         .gte("aberta_em", sinceIso)
+        // .order() -- mesmo motivo do comentário em sincronizarSubconta acima.
+        .order("ghl_conversation_id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ atendente_nome: string; primeira_resposta_min: number | null; atualizado_em: string }>>
   );
 

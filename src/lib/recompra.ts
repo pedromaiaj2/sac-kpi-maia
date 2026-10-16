@@ -105,6 +105,11 @@ async function fetchCategoriasPorCliente(): Promise<Record<string, Record<string
       admin
         .from("v_recompra_categorias_por_cliente")
         .select("client_id, categoria, ultima_data, valor_total, qtd_compras", { count: "exact" })
+        // .order() -- sem isso, paginação em paralelo não tem ordem
+        // garantida entre as chamadas (achado 16/10/2026). (client_id,
+        // categoria) é o índice único da view (migração 0124).
+        .order("client_id")
+        .order("categoria")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<CategoriaAgregadaRow>>,
     { pageSize: CATEGORIA_AGREGADA_PAGE_SIZE }
   );
@@ -550,6 +555,9 @@ async function buildAtritoPorCliente(): Promise<Map<string, number>> {
         .select("client_protheus_code, causa_raiz", { count: "exact" })
         .not("client_protheus_code", "is", null)
         .in("type", DELIVERY_REQUEST_TYPES as unknown as string[])
+        // .order() -- sem isso, paginação em paralelo não tem ordem
+        // garantida entre as chamadas (achado 16/10/2026).
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<Row>>
   );
 

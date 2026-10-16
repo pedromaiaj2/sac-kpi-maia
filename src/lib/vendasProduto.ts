@@ -253,6 +253,9 @@ export const getVendaCurvaProduto = unstable_cache(
           .eq("product", trimmed)
           .gte("totvs_orders.issue_date", range.from)
           .lte("totvs_orders.issue_date", range.to)
+          // .order() -- sem isso, paginação em paralelo não tem ordem
+          // garantida entre as chamadas (achado 16/10/2026).
+          .order("id")
           .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemComData>>,
       { pageSize: RANKING_PAGE_SIZE }
     );
@@ -385,6 +388,9 @@ export const fetchItensDoPeriodo = memoizeWithTtl(async (range: DateRange): Prom
         .select("issue_date, items:totvs_order_items(product, description, quantity, total)", { count: "exact" })
         .gte("issue_date", range.from)
         .lte("issue_date", range.to)
+        // .order() -- sem isso, paginação em paralelo não tem ordem
+        // garantida entre as chamadas (achado 16/10/2026).
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderWithItemsRow>>,
     { pageSize: RANKING_PAGE_SIZE }
   );
@@ -486,6 +492,9 @@ export async function getVendasCountPorLoja(range: DateRange): Promise<Map<strin
         .eq("type", "Venda")
         .gte("issue_date", range.from)
         .lte("issue_date", range.to)
+        // .order() -- sem isso, paginação em paralelo não tem ordem
+        // garantida entre as chamadas (achado 16/10/2026).
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ branch: string | null }>>,
     { pageSize: RANKING_PAGE_SIZE }
   );
@@ -677,6 +686,9 @@ async function listSaldoEstoqueProdutosEntries(productCodes: string[]): Promise<
               .in("product", productCodes)
               .gte("totvs_orders.issue_date", inicio)
               .lte("totvs_orders.issue_date", fim)
+              // .order() -- sem isso, paginação em paralelo não tem ordem
+              // garantida entre as chamadas (achado 16/10/2026).
+              .order("id")
               .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ product: string | null; quantity: number }>>,
           { pageSize: RANKING_PAGE_SIZE }
         );
@@ -892,6 +904,9 @@ async function listTendenciaProdutosEntries(productCodes: string[]): Promise<[st
         .in("product", productCodes)
         .gte("totvs_orders.issue_date", inicioPrevias)
         .lte("totvs_orders.issue_date", fim)
+        // .order() -- sem isso, paginação em paralelo não tem ordem
+        // garantida entre as chamadas (achado 16/10/2026).
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<TendenciaRow>>,
     { pageSize: RANKING_PAGE_SIZE }
   );

@@ -204,7 +204,9 @@ async function getConferenteNotasTotais(fromIso: string | null, toIso: string): 
         .not("conferente_codigo", "is", null)
         .lte("dt_previsao", toDate);
       if (fromDate) query = query.gte("dt_previsao", fromDate);
-      return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<CargaConferenteRow>>;
+      // .order() -- sem isso, paginação em paralelo não tem ordem garantida
+      // entre as chamadas (achado 16/10/2026).
+      return query.order("id").range(from, to) as unknown as PromiseLike<PagedQueryResult<CargaConferenteRow>>;
     },
     { pageSize: PAGE_SIZE }
   );
@@ -668,7 +670,9 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
         .not("status", "eq", "cancelada")
         .lte("created_at", toIso);
       if (fromIso) query = query.gte("created_at", fromIso);
-      return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<RequestRow>>;
+      // .order() -- sem isso, paginação em paralelo não tem ordem garantida
+      // entre as chamadas (achado 16/10/2026).
+      return query.order("id").range(from, to) as unknown as PromiseLike<PagedQueryResult<RequestRow>>;
     },
     { pageSize: PAGE_SIZE }
   );
@@ -688,6 +692,10 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
         .from("service_request_items")
         .select("request_id, product, part_code, part_name, quantity", { count: "exact" })
         .in("request_id", chunk)
+        // .order() -- mesmo motivo do achado 16/10/2026: fetchAllPagesForIds
+        // usa fetchAllPagesParallel por baixo, mesmo risco de paginação sem
+        // ordem estável.
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemRow>>,
     { pageSize: PAGE_SIZE }
   );
@@ -1036,6 +1044,9 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
             .not("status", "eq", "cancelada")
             .gte("created_at", chamadosFromIso)
             .lte("created_at", chamadosToIso)
+            // .order() -- sem isso, paginação em paralelo não tem ordem
+            // garantida entre as chamadas (achado 16/10/2026).
+            .order("id")
             .range(from, to) as unknown as PromiseLike<PagedQueryResult<ChamadoTodosTiposRow>>,
         { pageSize: PAGE_SIZE }
       ),
@@ -1064,6 +1075,9 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
         .from("service_request_items")
         .select("request_id, product, quantity", { count: "exact" })
         .in("request_id", chunk)
+        // .order() -- mesmo motivo do achado 16/10/2026 (ver comentário
+        // equivalente acima, mesma função/padrão).
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ request_id: string; product: string | null; quantity: number | null }>>,
     { pageSize: PAGE_SIZE }
   );

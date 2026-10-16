@@ -989,6 +989,8 @@ export async function listTicketsForDay(date: string, fromTime: string, toTime: 
         .gte("opened_at", fromIso)
         .lte("opened_at", toIso)
         .order("opened_at", { ascending: true })
+        // Desempate -- opened_at sozinho pode empatar (achado 16/10/2026).
+        .order("conversation_id", { ascending: true })
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<TicketRow>>,
     { pageSize: 1000 }
   );
@@ -1072,6 +1074,12 @@ const getKpiDataCached = memoizeWithTtl(
         .from("v_ticket_enriched")
         .select("*", { count: "exact" })
         .order("opened_at", { ascending: false })
+        // Desempate -- opened_at sozinho pode empatar entre tickets (achado
+        // 16/10/2026: paginação em paralelo sem ordem totalmente estável
+        // pode perder/duplicar linha -- confirmado na prática noutra view).
+        // Varre a tabela INTEIRA (sem filtro de data aqui, ver comentário
+        // acima), então é o call site de maior risco do arquivo.
+        .order("conversation_id", { ascending: false })
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<TicketRow>>,
     { pageSize }
   );
@@ -1097,6 +1105,7 @@ const getKpiDataCached = memoizeWithTtl(
         .from("conversations")
         .select("id, nps_score, nps_answered_at, contact_id", { count: "exact" })
         .not("nps_score", "is", null)
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<NpsScoreRow>>,
     { pageSize }
   );
@@ -1163,6 +1172,7 @@ const getKpiDataCached = memoizeWithTtl(
         .from("conversations")
         .select("id, ai_category, ai_product, ai_store_tag, ai_confidence", { count: "exact" })
         .not("ai_analyzed_at", "is", null)
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<AiClassificationRow>>,
     { pageSize }
   );
@@ -1197,6 +1207,8 @@ const getKpiDataCached = memoizeWithTtl(
         .from("v_escalations")
         .select("*", { count: "exact" })
         .order("asked_at", { ascending: false })
+        // Desempate -- asked_at sozinho pode empatar (achado 16/10/2026).
+        .order("id", { ascending: false })
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<RawEscalationRow>>,
     { pageSize }
   );

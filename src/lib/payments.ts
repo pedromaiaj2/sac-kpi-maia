@@ -288,6 +288,12 @@ export async function listPaymentItems(
       // empilhando como ruído no balde "Sem montador definido".
       .in("request.type", VISITA_REQUEST_TYPES)
       .order("created_at", { ascending: false })
+      // Desempate -- created_at sozinho pode empatar entre itens (achado
+      // 16/10/2026: paginação em paralelo sem ordem totalmente estável
+      // pode perder/duplicar linha, mesma classe do bug de 16/09/2026
+      // documentado acima, só que por empate de ordenação em vez de
+      // ausência de paginação).
+      .order("id", { ascending: false })
       .range(from, to);
     // Visão geral (sem montador escolhido) só mostra quem já tem valor --
     // senão a lista fica poluída com anos de item sem preço nenhum. Ao

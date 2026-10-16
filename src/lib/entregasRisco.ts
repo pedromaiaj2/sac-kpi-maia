@@ -252,7 +252,7 @@ const DELIVERY_PAGE_SIZE = 1000;
 async function fetchAllDeliveryRows(admin: ReturnType<typeof getSupabaseAdmin>): Promise<DeliveryRow[]> {
   return fetchAllPagesParallel<DeliveryRow>(
     (from, to) =>
-      admin.from("totvs_deliveries").select(DELIVERY_COLUMNS, { count: "exact" }).range(from, to) as unknown as PromiseLike<
+      admin.from("totvs_deliveries").select(DELIVERY_COLUMNS, { count: "exact" }).order("id").range(from, to) as unknown as PromiseLike<
         PagedQueryResult<DeliveryRow>
       >,
     { pageSize: DELIVERY_PAGE_SIZE }

@@ -46,7 +46,11 @@ export async function getEmAndamentoList(): Promise<EmAndamentoRow[]> {
         .from("v_conversation_tags")
         .select("conversation_id, tag, event_at", { count: "exact" })
         .eq("dimension", "status")
+        // Desempate por conversation_id -- event_at sozinho pode empatar
+        // entre linhas (achado na revisão de 16/10/2026 sobre paginação em
+        // paralelo sem ordem totalmente estável).
         .order("event_at", { ascending: true })
+        .order("conversation_id", { ascending: true })
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<StatusTagRow>>,
     { pageSize }
   );

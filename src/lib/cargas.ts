@@ -107,6 +107,11 @@ export async function listCargasRecentes(): Promise<CargaGroup[]> {
         .from("totvs_delivery_cargas")
         .select(CARGA_COLUMNS, { count: "exact" })
         .or(`dt_previsao.gte.${cutoff},dt_previsao.is.null`)
+        // .order() -- a ordem do RESULTADO não importa (reordenado em
+        // memória abaixo), mas sem order() a paginação em paralelo
+        // (.range()) não tem ordem garantida entre as chamadas, podendo
+        // perder ou duplicar linha (achado 16/10/2026).
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<CargaRow>>,
     { pageSize: CARGA_PAGE_SIZE }
   );
@@ -216,6 +221,8 @@ export async function listPedidosSemCarga(): Promise<PedidoSemCarga[]> {
         .from("totvs_deliveries")
         .select(PEDIDOS_SEM_CARGA_COLUMNS, { count: "exact" })
         .or(`first_seen_at.gte.${cutoff},risk_trigger_at.gte.${cutoff}`)
+        // .order() -- mesmo motivo do comentário em listCargasRecentes acima.
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<PedidoSemCargaRow>>,
     { pageSize: 1000 }
   );

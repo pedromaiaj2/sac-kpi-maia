@@ -39,6 +39,9 @@ export async function getNpsTrend(weeksBack: number): Promise<NpsWeekPoint[]> {
         .select("nps_score, nps_answered_at", { count: "exact" })
         .not("nps_score", "is", null)
         .gte("nps_answered_at", since.toISOString())
+        // .order() -- sem isso, paginação em paralelo não tem ordem
+        // garantida entre as chamadas (achado 16/10/2026).
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<NpsScoreRow>>,
     { pageSize }
   );

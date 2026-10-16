@@ -295,6 +295,8 @@ export async function listPartOrders(
       .from("part_orders")
       .select(PART_ORDER_COLUMNS, { count: "exact" })
       .order("created_at", { ascending: false })
+      // Desempate -- created_at sozinho pode empatar (achado 16/10/2026).
+      .order("id", { ascending: false })
       .range(from, to);
 
     if (opts.status) {

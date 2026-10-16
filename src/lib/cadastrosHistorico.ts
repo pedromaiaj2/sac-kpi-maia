@@ -292,7 +292,10 @@ export async function getCadastrosResumoPorSolicitante(opts: { dateFrom?: string
     if (opts.dateFrom) q = q.gte("data_abertura", opts.dateFrom);
     if (opts.dateTo && !opts.dateFrom) q = q.or(`data_abertura.lte.${opts.dateTo},data_abertura.is.null`);
     else if (opts.dateTo) q = q.lte("data_abertura", opts.dateTo);
-    return q.range(from, to) as unknown as PromiseLike<PagedQueryResult<{ solicitante: string | null; status: CadastroStatus }>>;
+    // .order() -- sem isso, paginação em paralelo (.range()) não tem ordem
+    // garantida entre as chamadas, podendo perder ou duplicar linha (achado
+    // na revisão de 16/10/2026, confirmado em v_clientes_agregado_nivel).
+    return q.order("id").range(from, to) as unknown as PromiseLike<PagedQueryResult<{ solicitante: string | null; status: CadastroStatus }>>;
   });
 
   const byName = new Map<string, CadastroResumoSolicitante>();

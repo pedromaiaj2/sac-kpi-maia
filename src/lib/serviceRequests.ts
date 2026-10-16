@@ -1524,6 +1524,9 @@ export async function listScheduledRequests(
         .select(SUMMARY_COLUMNS as any, { count: "exact" })
         .in("type", [...VISITA_REQUEST_TYPES])
         .or("scheduled_date.not.is.null,approved_deadline.not.is.null")
+        // .order() -- sem isso, paginação em paralelo não tem ordem
+        // garantida entre as chamadas (achado 16/10/2026).
+        .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<SummaryRow>>
   );
 
@@ -1874,6 +1877,9 @@ export async function getRequestsReport(
       .select("id, ticket_number, store_id, seller_name, type, status, causa_raiz, reason, created_at, order_code, client_name, stores(name)", {
         count: "exact",
       })
+      // .order() -- sem isso, paginação em paralelo não tem ordem garantida
+      // entre as chamadas (achado 16/10/2026).
+      .order("id")
       .range(from, to);
     // Achado na revisão de 15/10/2026: sem "-03:00" explícito, o Postgres
     // interpreta `created_at >= "2026-10-01"` como meia-noite EM UTC (21h
@@ -1983,6 +1989,9 @@ export async function getMontagemReconciliation(opts: {
         { count: "exact" }
       )
       .in("type", ["montagem", "desmontagem"])
+      // .order() -- sem isso, paginação em paralelo não tem ordem garantida
+      // entre as chamadas (achado 16/10/2026).
+      .order("id")
       .range(from, to);
     // Mesmo fuso de getRequestsReport acima (achado na revisão de 15/10/2026).
     if (opts.dateFrom) query = query.gte("created_at", `${opts.dateFrom}T00:00:00-03:00`);
@@ -2094,6 +2103,9 @@ export async function getServiceTypeIndicators(
         count: "exact",
       })
       .in("type", types)
+      // .order() -- sem isso, paginação em paralelo não tem ordem garantida
+      // entre as chamadas (achado 16/10/2026).
+      .order("id")
       .range(from, to);
     // Mesmo fuso de getRequestsReport acima (achado na revisão de 15/10/2026).
     if (opts.dateFrom) query = query.gte("created_at", `${opts.dateFrom}T00:00:00-03:00`);
