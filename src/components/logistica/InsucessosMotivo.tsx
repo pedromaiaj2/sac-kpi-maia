@@ -38,7 +38,7 @@ export function InsucessosMotivo({
       <table className="w-full text-xs border-collapse">
         <thead className="sticky top-0" style={{ background: "var(--surface-2)" }}>
           <tr>
-            {["Data", "Cliente", "CPF/CNPJ", "Produto", "NF / pedido", "Carga", "Motorista"].map((h) => (
+            {["Data", "Cliente", "CPF/CNPJ", "Produto", "Motivo", "Vendedor", "NF / pedido", "Carga", "Motorista"].map((h) => (
               <th key={h} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                 {h}
               </th>
@@ -62,6 +62,16 @@ export function InsucessosMotivo({
               <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">{formatarDocumento(i.cpf)}</td>
               <td className="px-2 py-1.5 min-w-[220px]" style={{ color: "var(--text-primary)" }}>
                 {i.produtos ?? "—"}
+              </td>
+              <td className="px-2 py-1.5 min-w-[160px]" style={{ color: "var(--text-primary)" }}>
+                {i.motivo ?? "—"}
+              </td>
+              <td
+                className="px-2 py-1.5 min-w-[140px] whitespace-nowrap"
+                style={{ color: "var(--text-secondary)" }}
+                title={i.vendedor ? "Aproximado: último pedido de venda desse cliente antes da carga, não um cruzamento exato pela nota." : undefined}
+              >
+                {i.vendedor ?? "—"}
               </td>
               <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">
                 {i.notaFiscal ?? "—"}

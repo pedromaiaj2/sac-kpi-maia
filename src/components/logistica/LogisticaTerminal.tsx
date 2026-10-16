@@ -4,11 +4,13 @@ import { useState } from "react";
 import { CargasMonitor } from "./CargasMonitor";
 import { VolumePorteChart } from "./VolumePorteChart";
 import { CausasVoltaChart } from "./CausasVoltaChart";
-import { TabelaMotoristasOrdenavel } from "./TabelaMotoristasOrdenavel";
+import { TabelaMotoristasOrdenavel, type TipoDetalheMotorista } from "./TabelaMotoristasOrdenavel";
 import { ThHint } from "./ThHint";
 import { MotivosInsucesso } from "./MotivosInsucesso";
 import { AssistenciasMotorista } from "./AssistenciasMotorista";
-import { VISITAS_MINIMAS } from "@/lib/logisticaFormat";
+import { InsucessosMotivo } from "./InsucessosMotivo";
+import { CargasMotorista } from "./CargasMotorista";
+import { VISITAS_MINIMAS, isMotivoLogistica } from "@/lib/logisticaFormat";
 import type {
   AssistenciaEntrega,
   CargaEntregas,
@@ -62,6 +64,7 @@ export function LogisticaTerminal({
   assistencias,
   ocorrencias,
   insucessos,
+  parciais,
   produtosPorte,
   regrasPorte,
 }: {
@@ -77,11 +80,16 @@ export function LogisticaTerminal({
   assistencias: AssistenciaEntrega[];
   ocorrencias: KpisEntregas["ocorrencias"];
   insucessos: InsucessoDetalhe[];
+  parciais: InsucessoDetalhe[];
   produtosPorte: ProdutoPorte[];
   regrasPorte: KpisEntregas["regrasPorte"];
 }) {
   const nomes = Object.fromEntries(motoristas.map((m) => [m.codigo, m.nome ?? m.codigo]));
-  const [assistAberto, setAssistAberto] = useState<MotoristaEntregas | null>(null);
+  // Um estado só pra todo detalhe por motorista na tabela de Índice de
+  // Volta (pedido do Victor 16/10/2026: "todos os números fiquem
+  // clicáveis") -- qual modal renderizar depende do tipo (ver
+  // TabelaMotoristasOrdenavel.tsx, dono dos cliques).
+  const [detalheAberto, setDetalheAberto] = useState<{ motorista: MotoristaEntregas; tipo: TipoDetalheMotorista } | null>(null);
   const [selecionado, setSelecionado] = useState<{ codigo: string; nome: string | null } | null>(null);
 
   function handleSelect(c: CargaEntregas) {
@@ -134,15 +142,71 @@ export function LogisticaTerminal({
           produtos={produtos}
           filtroCodigo={selecionado?.codigo ?? null}
           onLimparFiltro={() => setSelecionado(null)}
-          onAbrirAssistencias={setAssistAberto}
+          onAbrirDetalhe={(motorista, tipo) => setDetalheAberto({ motorista, tipo })}
         />
-        {assistAberto && (
-          <AssistenciasMotorista
-            nome={assistAberto.nome ?? assistAberto.codigo}
-            itens={assistencias.filter((a) => a.motoristaCodigo === assistAberto.codigo)}
-            onFechar={() => setAssistAberto(null)}
-          />
-        )}
+        {detalheAberto && (() => {
+          const { motorista, tipo } = detalheAberto;
+          const nome = motorista.nome ?? motorista.codigo;
+          const fechar = () => setDetalheAberto(null);
+          switch (tipo) {
+            case "cargas":
+              return <CargasMotorista nome={nome} itens={cargas.filter((c) => c.motorista?.codigo === motorista.codigo)} onFechar={fechar} />;
+            case "insucessos":
+              return (
+                <InsucessosMotivo
+                  titulo={`Insucessos · ${nome}`}
+                  itens={insucessos.filter((i) => i.motoristaCodigo === motorista.codigo)}
+                  nomes={nomes}
+                  onFechar={fechar}
+                />
+              );
+            case "parciais":
+              return (
+                <InsucessosMotivo
+                  titulo={`Parciais · ${nome}`}
+                  itens={parciais.filter((i) => i.motoristaCodigo === motorista.codigo)}
+                  nomes={nomes}
+                  onFechar={fechar}
+                />
+              );
+            case "voltaTotal":
+              return (
+                <InsucessosMotivo
+                  titulo={`Volta total · ${nome}`}
+                  itens={[...insucessos, ...parciais].filter((i) => i.motoristaCodigo === motorista.codigo)}
+                  nomes={nomes}
+                  onFechar={fechar}
+                />
+              );
+            case "voltaLogistica":
+              return (
+                <InsucessosMotivo
+                  titulo={`Volta logística · ${nome}`}
+                  itens={insucessos.filter((i) => i.motoristaCodigo === motorista.codigo && isMotivoLogistica(i.codigo))}
+                  nomes={nomes}
+                  onFechar={fechar}
+                />
+              );
+            case "assistencias":
+              return <AssistenciasMotorista nome={nome} itens={assistencias.filter((a) => a.motoristaCodigo === motorista.codigo)} onFechar={fechar} />;
+            case "assistenciasErroMotorista":
+              return (
+                <AssistenciasMotorista
+                  nome={`${nome} · erro do motorista`}
+                  itens={assistencias.filter((a) => a.motoristaCodigo === motorista.codigo && a.causaRaiz === "erro_motorista")}
+                  onFechar={fechar}
+                />
+              );
+            case "assistenciasAvariaTransporte":
+              return (
+                <AssistenciasMotorista
+                  nome={`${nome} · avaria no transporte`}
+                  itens={assistencias.filter((a) => a.motoristaCodigo === motorista.codigo && a.causaRaiz === "avaria_transporte")}
+                  onFechar={fechar}
+                />
+              );
+          }
+        })()}
       </Secao>
     </div>
   );

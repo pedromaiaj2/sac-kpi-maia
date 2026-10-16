@@ -6,6 +6,21 @@ import { ThHint } from "./ThHint";
 import { pct, VISITAS_MINIMAS, toneIndiceVolta, TONE_COLOR } from "@/lib/logisticaFormat";
 import type { MotoristaEntregas } from "@/lib/kpisLogistica";
 
+// Tipo de detalhe que cada número da tabela abre -- pedido do Victor
+// 16/10/2026: "todos os números fiquem clicáveis... pra ver detalhes de
+// cargas, notas... e todas as colunas". Quem decide o que cada tipo abre
+// é o LogisticaTerminal (dono dos dados de cargas/insucessos/parciais/
+// assistências); esta tabela só avisa qual motorista + qual coluna.
+export type TipoDetalheMotorista =
+  | "cargas"
+  | "insucessos"
+  | "parciais"
+  | "voltaTotal"
+  | "voltaLogistica"
+  | "assistencias"
+  | "assistenciasErroMotorista"
+  | "assistenciasAvariaTransporte";
+
 // Versão "order book" da tabela de Índice de Volta -- pedido do Victor
 // 09/10/2026 (evolução do PR #584, estilo home broker): "ordenar
 // instantaneamente por qualquer coluna". Client Component só por causa
@@ -124,6 +139,18 @@ function VoltaBadge({ valor }: { valor: number | null }) {
   );
 }
 
+// Número clicável padrão da tabela -- sublinhado pontilhado + cor de marca,
+// igual ao botão de Assistências que já existia. 0 não é clicável (nada
+// pra ver): aparece neutro, sem sublinhado.
+function NumBtn({ valor, onClick, title }: { valor: number; onClick: () => void; title?: string }) {
+  if (valor <= 0) return <span style={{ color: "var(--text-muted)" }}>{valor}</span>;
+  return (
+    <button type="button" onClick={onClick} className="underline decoration-dotted underline-offset-2 font-bold" style={{ color: "var(--brand-green)" }} title={title}>
+      {valor}
+    </button>
+  );
+}
+
 export function VinculoTag({ vinculo, transportadora }: { vinculo: string | null; transportadora?: string | null }) {
   if (!vinculo) return <span style={{ color: "var(--text-muted)" }}>—</span>;
   const cor = vinculo === "Próprio" ? "var(--brand-green)" : "var(--series-5)";
@@ -144,7 +171,7 @@ export function TabelaMotoristasOrdenavel({
   produtos,
   filtroCodigo,
   onLimparFiltro,
-  onAbrirAssistencias,
+  onAbrirDetalhe,
 }: {
   motoristas: MotoristaEntregas[];
   // Produtos (unidades) nas cargas de cada motorista -- ver produtosPorMotorista.
@@ -154,7 +181,7 @@ export function TabelaMotoristasOrdenavel({
   // LogisticaTerminal.tsx, dono do estado de seleção).
   filtroCodigo: string | null;
   onLimparFiltro: () => void;
-  onAbrirAssistencias: (m: MotoristaEntregas) => void;
+  onAbrirDetalhe: (m: MotoristaEntregas, tipo: TipoDetalheMotorista) => void;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "indiceVolta", dir: "desc" });
 
@@ -236,54 +263,73 @@ export function TabelaMotoristasOrdenavel({
                       {m.codigo}
                     </span>
                   </td>
-                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">{m.cargas}</td>
-                  <td
-                    className="px-1.5 py-1.5 text-right tabular-nums font-semibold"
-                    title={`Notas que ficaram com o cliente (todas ou em parte): Strada ${m.entregasPorVeiculo.Carro} · caminhão ${m.entregasPorVeiculo["Caminhão"]} · sem placa ${m.entregasPorVeiculo["Não identificado"] ?? 0}`}
-                  >
-                    {m.visitas}
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
+                    <NumBtn valor={m.cargas} onClick={() => onAbrirDetalhe(m, "cargas")} title="Clique pra ver as cargas dele no período." />
                   </td>
                   <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
-                    {m.cargas > 0 ? ((produtos[m.codigo] ?? 0) / m.cargas).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "—"}
+                    <NumBtn
+                      valor={m.visitas}
+                      onClick={() => onAbrirDetalhe(m, "cargas")}
+                      title={`Notas que ficaram com o cliente (todas ou em parte): Strada ${m.entregasPorVeiculo.Carro} · caminhão ${m.entregasPorVeiculo["Caminhão"]} · sem placa ${m.entregasPorVeiculo["Não identificado"] ?? 0}. Clique pra ver as cargas dele.`}
+                    />
                   </td>
-                  <td
-                    className="px-2 py-1.5 text-right tabular-nums font-semibold"
-                    title={`Cliente ${m.insucessos.cliente} · logística ${m.insucessos.logistica} · CD ${m.insucessos.cd} · outros ${m.insucessos.outros}`}
-                  >
-                    {m.insucessos.total}
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
+                    {m.cargas > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => onAbrirDetalhe(m, "cargas")}
+                        className="underline decoration-dotted underline-offset-2 font-bold"
+                        style={{ color: "var(--brand-green)" }}
+                        title="Clique pra ver as cargas dele (com os volumes de cada uma)."
+                      >
+                        {((produtos[m.codigo] ?? 0) / m.cargas).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">
+                    <NumBtn
+                      valor={m.insucessos.total}
+                      onClick={() => onAbrirDetalhe(m, "insucessos")}
+                      title={`Cliente ${m.insucessos.cliente} · logística ${m.insucessos.logistica} · CD ${m.insucessos.cd} · outros ${m.insucessos.outros}. Clique pra ver nota a nota.`}
+                    />
                     {m.insucessos.cd > 0 && (
                       <span className="ml-1 font-normal" style={{ color: "var(--text-muted)" }}>
                         ({m.insucessos.cd} CD)
                       </span>
                     )}
                   </td>
-                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">{m.parciais}</td>
+                  <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
+                    <NumBtn valor={m.parciais} onClick={() => onAbrirDetalhe(m, "parciais")} title="Clique pra ver nota a nota." />
+                  </td>
                   <td className="px-1.5 py-1.5 text-right">
-                    <VoltaBadge valor={m.indiceVolta} />
+                    <button type="button" className="inline-flex" onClick={() => onAbrirDetalhe(m, "voltaTotal")} title="Insucessos + parciais. Clique pra ver nota a nota.">
+                      <VoltaBadge valor={m.indiceVolta} />
+                    </button>
                   </td>
                   <td className="px-1.5 py-1.5 text-right">
-                    <VoltaBadge valor={m.indiceVoltaLogistica} />
+                    <button
+                      type="button"
+                      className="inline-flex"
+                      onClick={() => onAbrirDetalhe(m, "voltaLogistica")}
+                      title="Só insucessos de categoria logística (exceto L06, do CD). Clique pra ver nota a nota."
+                    >
+                      <VoltaBadge valor={m.indiceVoltaLogistica} />
+                    </button>
                   </td>
                   <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
-                    {m.assistencias.total > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => onAbrirAssistencias(m)}
-                        className="underline decoration-dotted underline-offset-2 font-bold"
-                        style={{ color: "var(--brand-green)" }}
-                        title={`${m.assistencias.porCarga} pela carga do chamado · ${m.assistencias.porProduto} pelo cliente + produto · ${m.assistencias.porCliente} só pelo cliente (≈). Clique pra ver.`}
-                      >
-                        {m.assistencias.total}
-                      </button>
-                    ) : (
-                      <span style={{ color: "var(--text-muted)" }}>0</span>
-                    )}
+                    <NumBtn
+                      valor={m.assistencias.total}
+                      onClick={() => onAbrirDetalhe(m, "assistencias")}
+                      title={`${m.assistencias.porCarga} pela carga do chamado · ${m.assistencias.porProduto} pelo cliente + produto · ${m.assistencias.porCliente} só pelo cliente (≈). Clique pra ver.`}
+                    />
                   </td>
                   <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
-                    {m.assistencias.porErroMotorista > 0 ? m.assistencias.porErroMotorista : <span style={{ color: "var(--text-muted)" }}>0</span>}
+                    <NumBtn valor={m.assistencias.porErroMotorista} onClick={() => onAbrirDetalhe(m, "assistenciasErroMotorista")} />
                   </td>
                   <td className="px-1.5 py-1.5 text-right tabular-nums font-semibold">
-                    {m.assistencias.porAvariaTransporte > 0 ? m.assistencias.porAvariaTransporte : <span style={{ color: "var(--text-muted)" }}>0</span>}
+                    <NumBtn valor={m.assistencias.porAvariaTransporte} onClick={() => onAbrirDetalhe(m, "assistenciasAvariaTransporte")} />
                   </td>
                 </tr>
               );

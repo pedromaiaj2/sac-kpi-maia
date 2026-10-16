@@ -35,3 +35,11 @@ export const TONE_COLOR: Record<"good" | "warning" | "critical" | "neutral", str
   critical: "var(--status-critical)",
   neutral: "var(--text-primary)",
 };
+
+// Mesmo critério de "Volta logística" da RPC (voltas_logistica, kpis_entregas):
+// código L* exceto L06 (L06 é falha do CD, não do transporte). Usado aqui
+// pra filtrar a lista de insucessos de um motorista na mesma definição --
+// pedido do Victor 16/10/2026: clique em "Volta logística" abre só esses.
+export function isMotivoLogistica(codigo: string | null): boolean {
+  return codigo !== null && codigo.startsWith("L") && codigo !== "L06";
+}

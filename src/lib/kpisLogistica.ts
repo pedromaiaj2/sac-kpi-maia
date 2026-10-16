@@ -120,6 +120,9 @@ export type KpisEntregas = {
   // pedido que voltou sem entregar no período (abre ao clicar no motivo) -- 0164.
   ocorrencias: Record<string, { descricao: string | null; categoria: string | null }>;
   insucessos: InsucessoDetalhe[];
+  // Mesma base, pras notas que ficaram parciais com o cliente (0177) --
+  // abre ao clicar em "Parciais" na tabela de motoristas.
+  parciais: InsucessoDetalhe[];
   // Produtos das cargas do período por classe de porte e as regras de
   // classificação por descrição -- abre ao clicar em P/M/G (0165).
   produtosPorte: ProdutoPorte[];
@@ -151,6 +154,14 @@ export type InsucessoDetalhe = {
   cliente: string | null;
   cpf: string | null;
   produtos: string | null;
+  // Texto da ocorrência lançada naquela carga (0177) -- costuma bater com
+  // a descrição agregada por código que motivosInsucesso já mostra, mas
+  // esse é o texto da nota em si.
+  motivo: string | null;
+  // "~ Nome" (0177): aproximado -- o último pedido de Venda desse cliente
+  // antes da data da carga, não um cruzamento exato por nota fiscal (o
+  // número de NF que a entrega guarda não é o mesmo da NF de venda).
+  vendedor: string | null;
 };
 
 // atribuicao: "carga" (carga informada no chamado), "produto" (entrega ao
