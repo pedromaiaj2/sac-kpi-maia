@@ -2,33 +2,69 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { searchArsenalEntries, listArsenalEntries, isArsenalCategory, ARSENAL_CATEGORIES, type ArsenalEntrySearchResult } from "@/lib/arsenalSac";
+import { listArsenalFlowNodes } from "@/lib/arsenalFlow";
 import { ARSENAL_CATEGORY_LABELS, ARSENAL_CATEGORY_COLORS } from "@/lib/assistenciaLabels";
 import { ArsenalEntryCard } from "@/components/assistencia/ArsenalEntryCard";
 import { ArsenalEntryForm } from "@/components/assistencia/ArsenalEntryForm";
 import { ArsenalCategorySection } from "@/components/assistencia/ArsenalCategorySection";
+import { ArsenalFlowWizard } from "@/components/assistencia/ArsenalFlowWizard";
+import { ArsenalFlowAdmin } from "@/components/assistencia/ArsenalFlowAdmin";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
-function buildHref(params: { q?: string; category?: string }): string {
+function buildHref(params: { q?: string; category?: string; modo?: string }): string {
   const sp = new URLSearchParams();
   if (params.q) sp.set("q", params.q);
   if (params.category) sp.set("category", params.category);
+  if (params.modo) sp.set("modo", params.modo);
   const qs = sp.toString();
   return qs ? `/assistencia/sac/arsenal?${qs}` : "/assistencia/sac/arsenal";
 }
 
 export const dynamic = "force-dynamic";
 
+// Modo "fluxo" (pirâmide guiada, pedido do Victor 16/10/2026: "algo mais
+// direto e dinâmico... clico no que for o problema e vem com a tratativa")
+// é o padrão -- a busca/lista categorizada de sempre vira o modo "busca",
+// pra quem já sabe exatamente o que procura (ex.: telefone de um
+// fornecedor direto, sem passar pelas perguntas).
 export default async function ArsenalSacPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; inactive?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; inactive?: string; modo?: string }>;
 }) {
   const profile = await getProfile();
   if (profile.role !== "sac" && profile.role !== "admin") {
     redirect("/assistencia/inicio");
   }
 
-  const { q, category, inactive } = await searchParams;
+  const { q, category, inactive, modo } = await searchParams;
+  const modoBusca = modo === "busca";
+
+  if (!modoBusca) {
+    const [nodes, fornecedores, contatos] = await Promise.all([
+      listArsenalFlowNodes({ onlyActive: profile.role !== "admin" }),
+      listArsenalEntries({ category: "fornecedores", onlyActive: true }),
+      listArsenalEntries({ category: "contatos_internos", onlyActive: true }),
+    ]);
+    const nodesAtivos = nodes.filter((n) => n.active);
+    return (
+      <div className="max-w-3xl mx-auto w-full p-6 flex flex-col gap-6 min-w-0">
+        <AssistenciaHeader title="Arsenal do SAC" subtitle="Atendimento guiado — clique na situação do cliente" />
+        <Link
+          href={buildHref({ modo: "busca" })}
+          className="text-xs font-medium self-end -mt-3"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Prefere buscar direto na base? →
+        </Link>
+        <ArsenalFlowWizard nodes={nodesAtivos} fornecedores={fornecedores} contatos={contatos} />
+        {profile.role === "admin" ? <ArsenalFlowAdmin nodes={nodes} /> : null}
+        <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 self-center">
+          ← Voltar
+        </Link>
+      </div>
+    );
+  }
   const filterCategory = isArsenalCategory(category) ? category : undefined;
   const trimmedQ = (q ?? "").trim();
   // "mostrar inativas" só existe no modo listagem (sem busca) e só pro
@@ -48,8 +84,12 @@ export default async function ArsenalSacPage({
   return (
     <div className="max-w-6xl mx-auto w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Arsenal do SAC" subtitle="Base de conhecimento — contatos, garantias e CDC" />
+      <Link href="/assistencia/sac/arsenal" className="text-xs font-medium self-end -mt-3" style={{ color: "var(--text-muted)" }}>
+        ← Voltar pro atendimento guiado
+      </Link>
 
       <form action="/assistencia/sac/arsenal" method="GET" className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-2">
+        <input type="hidden" name="modo" value="busca" />
         {filterCategory ? <input type="hidden" name="category" value={filterCategory} /> : null}
         <span className="pl-2 text-lg text-gray-400 dark:text-gray-500" aria-hidden>
           🔍
@@ -72,7 +112,7 @@ export default async function ArsenalSacPage({
 
       <div className="flex items-center gap-2 flex-wrap">
         <Link
-          href={buildHref({ q })}
+          href={buildHref({ q, modo: "busca" })}
           className={`text-xs px-3.5 py-1.5 rounded-full font-medium transition-colors duration-150 ${
             !filterCategory ? "text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
           }`}
@@ -86,7 +126,7 @@ export default async function ArsenalSacPage({
           return (
             <Link
               key={c}
-              href={buildHref({ q, category: active ? undefined : c })}
+              href={buildHref({ q, category: active ? undefined : c, modo: "busca" })}
               className="text-xs px-3.5 py-1.5 rounded-full font-medium whitespace-nowrap transition-colors duration-150"
               style={
                 active
@@ -100,7 +140,7 @@ export default async function ArsenalSacPage({
         })}
         {profile.role === "admin" && !trimmedQ ? (
           <Link
-            href={showInactive ? "/assistencia/sac/arsenal" : "/assistencia/sac/arsenal?inactive=1"}
+            href={showInactive ? "/assistencia/sac/arsenal?modo=busca" : "/assistencia/sac/arsenal?modo=busca&inactive=1"}
             className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 ml-auto"
           >
             {showInactive ? "ocultar inativas" : "mostrar inativas"}
