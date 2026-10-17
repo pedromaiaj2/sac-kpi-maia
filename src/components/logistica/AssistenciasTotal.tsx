@@ -7,7 +7,15 @@ import type { AssistenciaEntrega } from "@/lib/kpisLogistica";
 
 // Card "Assistências" do topo -- pedido do Victor 14/10/2026: o total de
 // chamados ligados a uma nota do período, clicável pra ver cada um.
-export function AssistenciasTotal({ itens, nomesMotoristas }: { itens: AssistenciaEntrega[]; nomesMotoristas: Record<string, string> }) {
+export function AssistenciasTotal({
+  itens,
+  nomesMotoristas,
+  periodo,
+}: {
+  itens: AssistenciaEntrega[];
+  nomesMotoristas: Record<string, string>;
+  periodo: { de: string; ate: string };
+}) {
   const [aberto, setAberto] = useState(false);
   return (
     <>
@@ -20,7 +28,7 @@ export function AssistenciasTotal({ itens, nomesMotoristas }: { itens: Assistenc
       >
         {num(itens.length)}
       </button>
-      {aberto && <AssistenciasMotorista nome="todos os motoristas" itens={itens} nomesMotoristas={nomesMotoristas} onFechar={() => setAberto(false)} />}
+      {aberto && <AssistenciasMotorista nome="todos os motoristas" itens={itens} nomesMotoristas={nomesMotoristas} periodo={periodo} onFechar={() => setAberto(false)} />}
     </>
   );
 }
