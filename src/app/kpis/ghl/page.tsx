@@ -1,4 +1,4 @@
-import { AppHeader } from "@/components/AppHeader";
+import { Info } from "lucide-react";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 import { UnderlineTab } from "@/components/UnderlineTab";
 import { SUBCONTAS, resumoAtendimentos, type SubcontaKey } from "@/lib/ghlSubcontas";
@@ -22,63 +22,76 @@ export default async function KpisGhlPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <div className="max-w-6xl mx-auto px-6 pt-6 flex flex-col gap-4">
-        <AppHeader />
+      <div className="max-w-6xl mx-auto px-6 pt-6 pb-12 flex flex-col gap-5">
         <KpisSectionTabs active="ghl" />
         <div className="flex flex-wrap items-center gap-1.5">
           {SUB_KEYS.map((k) => (
             <UnderlineTab key={k} href={`/kpis/ghl?sub=${k === "lider" ? "lider" : "lojas_maia"}`} label={SUBCONTAS[k].label} active={k === key} color="var(--brand-orange)" pilula />
           ))}
         </div>
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Conversas atribuídas aos atendentes do SAC nos últimos 60 dias. Tempo medido da última mensagem do cliente até a primeira resposta do próprio atendente, em horário comercial. Respostas acima de 3 dias úteis ficam fora da média e aparecem à parte.
-          {atualizadoEm ? ` Última atualização: ${new Date(atualizadoEm).toLocaleString("pt-BR", { timeZone: "America/Fortaleza" })}.` : " Ainda sem dados sincronizados."}
-        </p>
-        <div className="rounded-xl border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
-          <table className="w-full text-sm border-collapse">
+        {/* Aviso em cartão discreto e tabela em cartão com linhas sutis --
+            design system do painel (17/10/2026). */}
+        <div
+          className="flex items-start gap-3 rounded-xl px-4 py-3 text-sm leading-relaxed"
+          style={{ background: "color-mix(in srgb, var(--brand-orange) 9%, var(--surface-1))", color: "var(--text-secondary)" }}
+        >
+          <Info aria-hidden size={16} className="mt-0.5 shrink-0" style={{ color: "var(--brand-orange)" }} />
+          <p>
+            Conversas atribuídas aos atendentes do SAC nos últimos 60 dias. Tempo medido da última mensagem do cliente até a primeira resposta do próprio atendente, em horário comercial. Respostas acima de 3 dias úteis ficam fora da média e aparecem à parte.
+            <span style={{ color: "var(--text-muted)" }}>
+              {atualizadoEm ? ` Última atualização: ${new Date(atualizadoEm).toLocaleString("pt-BR", { timeZone: "America/Fortaleza" })}.` : " Ainda sem dados sincronizados."}
+            </span>
+          </p>
+        </div>
+        <div className="cartao overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
-                <th className="text-left px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
-                  Atendente
-                </th>
-                <th className="text-right px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
-                  Conversas
-                </th>
-                <th className="text-right px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
-                  Com resposta
-                </th>
-                <th className="text-right px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
-                  Tempo médio 1ª resposta
-                </th>
-                <th className="text-right px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
-                  Acima de 3 dias úteis
-                </th>
+              <tr style={{ boxShadow: "inset 0 -1px 0 var(--border)" }}>
+                {["Atendente", "Conversas", "Com resposta", "Tempo médio 1ª resposta", "Acima de 3 dias úteis"].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`${i === 0 ? "text-left" : "text-right"} px-5 py-3.5 text-xs font-semibold uppercase tracking-wide whitespace-nowrap`}
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
               {porAtendente.map((a) => (
-                <tr key={a.nome} className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <td className="px-3 py-2.5 font-medium" style={{ color: "var(--text-primary)" }}>
+                <tr key={a.nome} className="transition-colors hover:bg-[var(--surface-2)]" style={{ borderColor: "var(--border)" }}>
+                  <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--text-primary)" }}>
                     {a.nome}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{a.conversas}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{a.respondidas}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{formatMinutos(a.tempoMedioMin)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{a.acimaDoLimite}</td>
+                  <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                    {a.conversas}
+                  </td>
+                  <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                    {a.respondidas}
+                  </td>
+                  <td className="px-5 py-3.5 text-right tabular-nums font-medium" style={{ color: "var(--text-primary)" }}>
+                    {formatMinutos(a.tempoMedioMin)}
+                  </td>
+                  <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: a.acimaDoLimite > 0 ? "var(--status-warning)" : "var(--text-secondary)" }}>
+                    {a.acimaDoLimite}
+                  </td>
                 </tr>
               ))}
-              <tr style={{ background: "var(--surface-2)" }}>
-                <td className="px-3 py-2.5 font-semibold" style={{ color: "var(--text-primary)" }}>
+            </tbody>
+            <tfoot>
+              <tr style={{ boxShadow: "inset 0 1px 0 var(--border)" }}>
+                <td className="px-5 py-3.5 font-bold" style={{ color: "var(--text-primary)" }}>
                   Total
                 </td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{totalConversas}</td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{totalRespondidas}</td>
-                <td className="px-3 py-2.5 text-right" style={{ color: "var(--text-muted)" }}>
+                <td className="px-5 py-3.5 text-right font-bold tabular-nums">{totalConversas}</td>
+                <td className="px-5 py-3.5 text-right font-bold tabular-nums">{totalRespondidas}</td>
+                <td className="px-5 py-3.5 text-right" style={{ color: "var(--text-muted)" }}>
                   —
                 </td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{porAtendente.reduce((sum, a) => sum + a.acimaDoLimite, 0)}</td>
+                <td className="px-5 py-3.5 text-right font-bold tabular-nums">{porAtendente.reduce((sum, a) => sum + a.acimaDoLimite, 0)}</td>
               </tr>
-            </tbody>
+            </tfoot>
           </table>
         </div>
       </div>

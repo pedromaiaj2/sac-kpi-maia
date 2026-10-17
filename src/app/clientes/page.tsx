@@ -41,7 +41,6 @@ import { listEstornos, type EstornoRow } from "@/lib/estornos";
 import { listAllEstornoRequests, type EstornoRequestStatus } from "@/lib/estornoRequests";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
-import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 import { RecompraContatoCell } from "@/components/RecompraContatoCell";
 import { RecompraNaoContatarManager } from "@/components/RecompraNaoContatarManager";
@@ -136,7 +135,6 @@ export default async function ClientesPage({
 
   return (
     <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
-      <AppHeader />
 
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
@@ -210,13 +208,8 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
           <Link
             key={s}
             href={buildHref({ view: "status", q, status: filterStatus === s ? undefined : s })}
-            className="rounded-xl border p-5 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{
-              background: `color-mix(in srgb, ${CLIENTE_STATUS_COLORS[s]} ${filterStatus === s ? 10 : 5}%, var(--surface-1))`,
-              borderColor: `color-mix(in srgb, ${CLIENTE_STATUS_COLORS[s]} ${filterStatus === s ? 100 : 35}%, var(--border))`,
-              borderTopWidth: 3,
-              borderTopColor: CLIENTE_STATUS_COLORS[s],
-            }}
+            className="rounded-2xl p-5 flex flex-col gap-1 transition-all duration-200 hover:-translate-y-0.5"
+            style={padraoCardStyle(CLIENTE_STATUS_COLORS[s], filterStatus === s)}
           >
             <span className="text-2xl font-bold" style={{ color: CLIENTE_STATUS_COLORS[s] }}>
               {resumo.porStatus.find((p) => p.status === s)?.total ?? 0}
@@ -265,7 +258,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
       </p>
 
       {listResult.items.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-6 text-center">
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum cliente encontrado.
           </p>
@@ -521,7 +514,7 @@ async function NivelView({ q, nivel, inativo, page }: { q?: string; nivel?: stri
       </p>
 
       {pageItems.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-6 text-center">
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum cliente encontrado.
           </p>
@@ -608,13 +601,8 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
           <Link
             key={s}
             href={buildHref({ view: "recompra", q, segmento: filterSegmento === s ? undefined : s })}
-            className="rounded-xl border p-4 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{
-              background: `color-mix(in srgb, ${RECOMPRA_SEGMENTO_COLORS[s]} ${filterSegmento === s ? 10 : 5}%, var(--surface-1))`,
-              borderColor: `color-mix(in srgb, ${RECOMPRA_SEGMENTO_COLORS[s]} ${filterSegmento === s ? 100 : 35}%, var(--border))`,
-              borderTopWidth: 3,
-              borderTopColor: RECOMPRA_SEGMENTO_COLORS[s],
-            }}
+            className="rounded-2xl p-5 flex flex-col gap-1 transition-all duration-200 hover:-translate-y-0.5"
+            style={padraoCardStyle(RECOMPRA_SEGMENTO_COLORS[s], filterSegmento === s)}
           >
             <span className="text-2xl font-bold" style={{ color: RECOMPRA_SEGMENTO_COLORS[s] }}>
               {porSegmento.get(s) ?? 0}
@@ -661,7 +649,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
       </p>
 
       {pageItems.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-6 text-center">
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum cliente encontrado.
           </p>
@@ -880,7 +868,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
       </p>
 
       <div className="grid sm:grid-cols-3 gap-4">
-        <div className="rounded-xl border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-5 flex flex-col gap-1">
           <span className="text-2xl font-bold" style={{ color: "var(--brand-orange)" }}>
             {tempoMedianoDias !== null ? `${tempoMedianoDias.toLocaleString("pt-BR")} dias` : "—"}
           </span>
@@ -894,7 +882,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
             ) : null}
           </span>
         </div>
-        <div className="rounded-xl border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-5 flex flex-col gap-1">
           <span className="text-2xl font-bold" style={{ color: "var(--brand-green)" }}>
             {taxaGeralPct.toFixed(1)}%
           </span>
@@ -902,7 +890,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
             Taxa de recompra geral ({data.totalComSegundaCompra.toLocaleString("pt-BR")} de {data.totalBase.toLocaleString("pt-BR")} clientes)
           </span>
         </div>
-        <div className="rounded-xl border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-5 flex flex-col gap-1">
           <span className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
             {data.coorte6a12Meses.length.toLocaleString("pt-BR")}
           </span>
@@ -913,7 +901,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="rounded-xl border p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-5 flex flex-col gap-3">
           <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
             Taxa de recompra por loja
           </h3>
@@ -925,7 +913,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
             data.porLoja.map((item) => <TaxaBarRow key={item.label} item={item} />)
           )}
         </div>
-        <div className="rounded-xl border p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-5 flex flex-col gap-3">
           <h3 className="text-sm font-medium flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>
             Taxa de recompra por forma de pagamento
             <span
@@ -980,7 +968,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
       </p>
 
       {pageItems.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-6 text-center">
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum cliente encontrado.
           </p>
@@ -1129,12 +1117,12 @@ function confiancaBadge(pct: number): { label: string; color: string } {
 // fortes quando selecionado) -- reaproveitado aqui pros cards de padrão,
 // que agora TAMBÉM são o filtro (pedido do Victor 24/09/2026: clicar no
 // card, não numa pill separada embaixo).
+// Bloco suave do design system (17/10/2026): fundo tingido na cor do grupo,
+// sem borda; o selecionado ganha um anel de 2px na mesma cor.
 function padraoCardStyle(color: string, selected: boolean): React.CSSProperties {
   return {
-    background: `color-mix(in srgb, ${color} ${selected ? 10 : 5}%, var(--surface-1))`,
-    borderColor: `color-mix(in srgb, ${color} ${selected ? 100 : 35}%, var(--border))`,
-    borderTopWidth: 3,
-    borderTopColor: color,
+    background: `color-mix(in srgb, ${color} ${selected ? 16 : 8}%, var(--surface-1))`,
+    boxShadow: selected ? `inset 0 0 0 2px ${color}` : undefined,
   };
 }
 
@@ -1197,7 +1185,7 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
       </p>
 
       {padroes.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-6 text-center">
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum padrão com amostra suficiente ainda.
           </p>
@@ -1210,7 +1198,7 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             href={buildHref({ view: "frequencia", q })}
-            className="rounded-xl border p-4 flex flex-col gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md"
+            className="rounded-2xl p-5 flex flex-col gap-2 transition-all duration-200 hover:-translate-y-0.5"
             style={padraoCardStyle("var(--brand-green)", !filtroPadrao)}
           >
             <div className="flex items-center gap-2">
@@ -1232,7 +1220,7 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
                 <Link
                   key={p.id}
                   href={buildHref({ view: "frequencia", q, padrao: p.id })}
-                  className="rounded-xl border p-4 flex flex-col gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  className="rounded-2xl p-5 flex flex-col gap-2 transition-all duration-200 hover:-translate-y-0.5"
                   style={padraoCardStyle("var(--brand-orange)", selected)}
                 >
                   <div className="flex items-center gap-2">
@@ -1265,7 +1253,7 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
               <Link
                 key={p.id}
                 href={buildHref({ view: "frequencia", q, padrao: p.id })}
-                className="rounded-xl border p-4 flex flex-col gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                className="rounded-2xl p-5 flex flex-col gap-2 transition-all duration-200 hover:-translate-y-0.5"
                 style={padraoCardStyle("var(--brand-orange)", selected)}
               >
                 <div className="flex items-center gap-2">
@@ -1331,7 +1319,7 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
       </p>
 
       {pageItems.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-6 text-center">
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum cliente encontrado.
           </p>
@@ -1673,7 +1661,7 @@ async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: st
       </p>
 
       {pageItems.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-6 text-center">
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum estorno encontrado.
           </p>

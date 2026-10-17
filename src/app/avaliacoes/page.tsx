@@ -4,7 +4,6 @@ import { listStoreGoogleReviews } from "@/lib/googleReviews";
 import { getNpsTrend } from "@/lib/npsTrend";
 import { listNpsDetratores, getNpsResumoPorFaseAdicional } from "@/lib/npsDetratores";
 import { getCompraNpsResumo } from "@/lib/nps2Meses";
-import { AppHeader } from "@/components/AppHeader";
 import { AvaliacoesTabs } from "@/components/AvaliacoesTabs";
 
 export const revalidate = 60;
@@ -43,7 +42,6 @@ export default async function AvaliacoesPage({
 
   return (
     <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
-      <AppHeader />
 
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>

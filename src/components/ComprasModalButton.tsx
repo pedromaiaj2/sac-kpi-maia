@@ -82,7 +82,7 @@ export function ComprasModalButton({ clientId, count }: { clientId: string; coun
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            className="fixed inset-x-4 top-[10vh] z-50 mx-auto max-w-2xl max-h-[75vh] overflow-y-auto rounded-lg border p-4 shadow-lg flex flex-col gap-3"
+            className="fixed inset-x-4 top-[10vh] z-50 mx-auto max-w-2xl max-h-[75vh] overflow-y-auto rounded-2xl border p-4 shadow-2xl flex flex-col gap-3"
             style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
           >
             <div className="flex items-center justify-between gap-4">
