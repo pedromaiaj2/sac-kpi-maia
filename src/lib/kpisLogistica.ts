@@ -112,8 +112,9 @@ export type KpisEntregas = {
   // Insucessos do período pelo código de ocorrência do Protheus (C01
   // cliente ausente, L01 rota estourada...), do mais comum ao menos.
   motivosInsucesso: MotivoInsucesso[];
-  // Chamados de assistência do período ligados a uma entrega (lista que abre
-  // ao clicar no número do motorista) e quantos chamados o período teve.
+  // Chamados ligados a uma entrega do período, pela data da entrega (0179)
+  // -- lista que abre ao clicar no número do motorista -- e quantos chamados
+  // foram abertos no período e quantos desses acharam uma entrega.
   assistencias: AssistenciaEntrega[];
   assistenciasPeriodo: { total: number; vinculadas: number };
   // Descrição/categoria de cada código de ocorrência do Protheus e cada

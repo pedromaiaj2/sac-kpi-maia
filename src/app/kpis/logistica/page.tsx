@@ -21,6 +21,9 @@ import {
   type Variacao,
 } from "@/lib/kpisLogistica";
 import { num, pct, dataBr } from "@/lib/logisticaFormat";
+import { getLastSuccessfulRunAt } from "@/lib/syncRuns";
+import { getRotasDoDia } from "@/lib/rotasDoDia";
+import { RotasDoDia } from "@/components/logistica/RotasDoDia";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +48,19 @@ function menosDias(dia: string, n: number): string {
   const d = new Date(`${dia}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - n);
   return d.toISOString().slice(0, 10);
+}
+
+// Rodada completa a cada 30 min e a rápida das cargas do dia a cada 10:
+// passou de 45 min sem nenhuma das duas, alguma coisa falhou.
+function syncAtrasado(ultimoSync: string | null): boolean {
+  return !ultimoSync || Date.now() - Date.parse(ultimoSync) > 45 * 60_000;
+}
+
+const horaRecife = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }).format(d);
+
+function maisRecente(a: string | null, b: string | null): string | null {
+  if (!a || !b) return a ?? b;
+  return Date.parse(a) > Date.parse(b) ? a : b;
 }
 
 type Params = { periodo?: string; de?: string; ate?: string; tipo?: string; veiculo?: string; vinculo?: string };
@@ -129,6 +145,11 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   // Falha nessa busca extra não derruba a página (.catch(() => null)):
   // sem período anterior, o ticker mostra "sem período anterior" em vez
   // de erro.
+  const ultimoSyncPromise = Promise.all([
+    getLastSuccessfulRunAt("totvs").catch(() => null),
+    getLastSuccessfulRunAt("totvs-cargas").catch(() => null),
+  ]).then(([completo, cargas]) => maisRecente(completo, cargas));
+  const rotasPromise = getRotasDoDia(hojeRecife()).catch(() => null);
   const [kpis, kpisAnteriores] = parsed.ok
     ? await Promise.all([
         getKpisEntregas({ ...parsed.periodo, vinculo }),
@@ -137,6 +158,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         ),
       ])
     : [null, null];
+  const [ultimoSync, rotas] = await Promise.all([ultimoSyncPromise, rotasPromise]);
+  const dadosAtrasados = syncAtrasado(ultimoSync);
   const resumo = kpis ? resumirLogistica(kpis) : null;
   const resumoAnterior = kpisAnteriores ? resumirLogistica(kpisAnteriores) : null;
   const porDia = kpis ? volumesPorDia(kpis) : [];
@@ -231,7 +254,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         },
         {
           key: "assistencias",
-          hint: "Chamados de assistência técnica abertos no período (troca, peça, recolhimento, envio de produto novo) ligados a uma nota que saiu numa carga (carga do chamado, cliente + produto ou, sem o produto, a nota mais recente ao cliente, nos 180 dias antes). Não entram no Índice de Volta. Segue os filtros da tela. Clique no número pra ver cada chamado.",
+          hint: "Chamados de assistência técnica (troca, peça, recolhimento, envio de produto novo) referentes às notas entregues no período, pela data da entrega e não pelo dia em que o chamado foi aberto. Ligação: carga do chamado, cliente + produto ou, sem o produto, a nota mais recente ao cliente, nos 180 dias antes. Não entram no Índice de Volta. Segue os filtros da tela. Clique no número pra ver cada chamado.",
           label: "Assistências",
           largo: true,
           valor: num(kpis.assistencias.length),
@@ -241,7 +264,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
               nomesMotoristas={Object.fromEntries(kpis.motoristas.map((m) => [m.codigo, m.nome ?? m.codigo]))}
             />
           ),
-          complemento: `${num(kpis.assistenciasPeriodo.total - kpis.assistenciasPeriodo.vinculadas)} sem nota ligada (retirada, sem CPF...)`,
+          complemento: `${num(kpis.assistenciasPeriodo.total - kpis.assistenciasPeriodo.vinculadas)} chamados abertos no período sem nota ligada (retirada, sem CPF...)`,
           variacao: variar(kpis.assistencias.length, kpisAnteriores?.assistencias.length ?? null, true),
           formatarDelta: formatarDeltaNum,
         },
@@ -259,6 +282,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         </ThHint>
       </h1>
 
+      {rotas && <RotasDoDia rotas={rotas} agora={horaRecife(new Date())} dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null} />}
+
       <FiltrosLogistica
         preset={sel.preset}
         de={sel.de}
@@ -270,7 +295,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         tipos={TIPOS_CARGA.filter((t) => t !== "Retirada").map((t) => ({ valor: t, rotulo: t }))}
         veiculos={TIPOS_VEICULO.map((v) => ({ valor: v, rotulo: v === "Carro" ? "Carro (Strada)" : v === "Não identificado" ? "Sem placa (não identificado)" : v }))}
         vinculos={VINCULOS.map((v) => ({ valor: v, rotulo: ROTULO_VINCULO[v] }))}
-        atualizadoEm={new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }).format(new Date())}
+        dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null}
+        dadosAtrasados={dadosAtrasados}
       />
 
       {!parsed.ok || !kpis || !resumo ? (

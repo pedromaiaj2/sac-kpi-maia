@@ -346,6 +346,31 @@ a:active {
   transform: scale(0.97);
 }
 
+/* Luz "ao vivo" do mural Rotas de hoje (/kpis/logistica, pedido do Victor
+   17/10/2026): verde aceso nos dois temas -- é uma luz, não um status. */
+.luz-ao-vivo {
+  --luz: #22c55e;
+  background: var(--luz);
+  box-shadow: 0 0 6px 1px var(--luz);
+  animation: luz-ao-vivo 1.8s ease-in-out infinite;
+}
+@keyframes luz-ao-vivo {
+  0%,
+  100% {
+    box-shadow: 0 0 4px 1px color-mix(in srgb, var(--luz) 70%, transparent);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 14px 5px color-mix(in srgb, var(--luz) 55%, transparent);
+    opacity: 0.75;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .luz-ao-vivo {
+    animation: none;
+  }
+}
+
 @keyframes nav-progress-slide {
   0% {
     margin-left: -40%;

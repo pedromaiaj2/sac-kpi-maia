@@ -35,6 +35,7 @@ import { CronogramaAtendenteAdmin } from "@/components/assistencia/CronogramaAte
 
 const SYNC_JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS (clientes, pedidos, entregas)",
+  "totvs-cargas": "TOTVS — cargas do dia (rodada rápida a cada 10 min)",
   ghl: "GoHighLevel (conversas)",
   backup: "Backup diário do Supabase",
   "ai-classify": "Classificação por IA (categoria/produto/loja do SAC)",

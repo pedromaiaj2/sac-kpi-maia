@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
@@ -37,7 +37,8 @@ export function FiltrosLogistica({
   tipos,
   veiculos,
   vinculos,
-  atualizadoEm,
+  dadosDe,
+  dadosAtrasados,
 }: {
   preset: string;
   de: string;
@@ -49,9 +50,21 @@ export function FiltrosLogistica({
   tipos: Opcao[];
   veiculos: Opcao[];
   vinculos: Opcao[];
-  atualizadoEm: string;
+  // Hora (Recife) da última sincronização com o Protheus que deu certo --
+  // é a idade dos dados, não a hora em que a página abriu.
+  dadosDe: string | null;
+  dadosAtrasados: boolean;
 }) {
   const router = useRouter();
+  // Tela de acompanhamento ao vivo (pedido do Victor 17/10/2026): recarrega
+  // sozinha a cada 2 min enquanto está visível -- as cargas do dia chegam do
+  // Protheus a cada 10 min (rodada rápida do sync).
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 2 * 60_000);
+    return () => clearInterval(id);
+  }, [router]);
   const [datas, setDatas] = useState({ de, ate });
   const custom = preset === "custom";
 
@@ -157,16 +170,19 @@ export function FiltrosLogistica({
           ))}
         </select>
       </Grupo>
-      {/* Página é force-dynamic: o horário é o do render de verdade.
-          "Atualizar" recarrega a mesma URL (dados ao vivo em TV/reunião). */}
       <button
         type="button"
         onClick={() => router.refresh()}
         className="ml-auto flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5"
-        style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+        style={{
+          color: dadosAtrasados ? "var(--text-primary)" : "var(--text-secondary)",
+          border: `1px solid ${dadosAtrasados ? "var(--status-warning)" : "var(--border)"}`,
+          background: dadosAtrasados ? "color-mix(in srgb, var(--status-warning) 18%, var(--surface-1))" : undefined,
+        }}
+        title="As cargas do dia vêm do Protheus a cada 10 min e o resto a cada 30. A tela recarrega sozinha a cada 2 min; clique pra recarregar agora."
       >
         <RefreshCw aria-hidden size={13} />
-        Atualizado às {atualizadoEm}
+        {dadosDe ? `Dados do Protheus das ${dadosDe}${dadosAtrasados ? " (atrasado)" : ""}` : "Sem sincronização recente"}
       </button>
     </div>
   );
