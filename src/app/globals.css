@@ -384,6 +384,14 @@ a:active {
   background: var(--canvas);
   color: var(--text-primary);
 }
+/* Lista que abre do <select>: o Chrome no Windows desenhava as opções com
+   texto escuro sobre fundo escuro (Victor 17/10/2026: "cor preta e sem
+   mostrar a palavra"). */
+.painel-escuro option,
+.painel-escuro optgroup {
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+}
 
 /* Luz "ao vivo" do mural Rotas de hoje (/kpis/logistica, pedido do Victor
    17/10/2026): verde aceso nos dois temas -- é uma luz, não um status. */
