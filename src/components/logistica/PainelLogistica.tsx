@@ -184,6 +184,7 @@ export function PainelLogistica({
           valor: num(kpis.assistencias.length),
           valorNode: (
             <AssistenciasTotal
+              periodo={kpis.periodo}
               itens={kpis.assistencias}
               nomesMotoristas={Object.fromEntries(kpis.motoristas.map((m) => [m.codigo, m.nome ?? m.codigo]))}
             />
@@ -258,6 +259,7 @@ export function PainelLogistica({
             parciais={kpis.parciais}
             produtosPorte={kpis.produtosPorte}
             regrasPorte={kpis.regrasPorte}
+            periodo={kpis.periodo}
           />
         </>
       )}

@@ -41,10 +41,14 @@ export function AssistenciasMotorista({
   itens,
   onFechar,
   nomesMotoristas,
+  periodo,
 }: {
   nome: string;
   itens: AssistenciaEntrega[];
   onFechar: () => void;
+  // período da tela -- a lista é das ENTREGAS desse período (data da
+  // entrega ligada ao chamado, não a da abertura; Victor 17/10/2026)
+  periodo: { de: string; ate: string };
   // com isto, mostra a coluna Motorista (lista de todos, card do topo)
   nomesMotoristas?: Record<string, string>;
 }) {
@@ -53,7 +57,9 @@ export function AssistenciasMotorista({
   return (
     <ModalLogistica
       titulo={`Assistências · ${nome}`}
-      subtitulo={`${itens.length} chamado${itens.length === 1 ? "" : "s"} das entregas do período: ${porAtribuicao("carga")} pela carga do chamado, ${porAtribuicao(
+      subtitulo={`${itens.length} chamado${itens.length === 1 ? "" : "s"} de clientes que receberam ${
+        periodo.de === periodo.ate ? `em ${dataBr(periodo.de)}` : `entre ${dataBr(periodo.de)} e ${dataBr(periodo.ate)}`
+      } (vale a data da entrega, não a da abertura do chamado) · ${porAtribuicao("carga")} pela carga do chamado, ${porAtribuicao(
         "produto",
       )} pelo cliente + produto, ${porAtribuicao("cliente")} só pelo cliente (≈).`}
       onFechar={onFechar}
@@ -61,7 +67,7 @@ export function AssistenciasMotorista({
       <table className="w-full text-xs border-collapse">
         <thead className="sticky top-0" style={{ background: "var(--surface-2)" }}>
           <tr>
-            {["Chamado", "Aberto em", "Tipo", "Produto", "Causa", ...(nomesMotoristas ? ["Motorista"] : []), "Saiu na carga", "Ligado por"].map((h) => (
+            {["Chamado", "Entregue em", "Aberto em", "Tipo", "Produto", "Causa", ...(nomesMotoristas ? ["Motorista"] : []), "Ligado por"].map((h) => (
               <th key={h} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                 {h}
               </th>
@@ -76,6 +82,12 @@ export function AssistenciasMotorista({
                 <td className="px-2 py-1.5 font-semibold tabular-nums whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
                   {a.ticket ? `#${a.ticket}` : "—"}
                 </td>
+                <td className="px-2 py-1.5 tabular-nums whitespace-nowrap font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {dataBr(a.diaEntrega)}
+                  <span className="block font-normal" style={{ color: "var(--text-muted)" }}>
+                    carga #{a.carga}
+                  </span>
+                </td>
                 <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">{dataBr(a.dia)}</td>
                 <td className="px-2 py-1.5 whitespace-nowrap">{tipoLabel(a)}</td>
                 <td className="px-2 py-1.5 min-w-[180px]" style={{ color: "var(--text-primary)" }}>
@@ -83,12 +95,6 @@ export function AssistenciasMotorista({
                 </td>
                 <td className="px-2 py-1.5 min-w-[120px]">{a.causaRaiz ? (CAUSA_RAIZ_LABELS[a.causaRaiz] ?? a.causaRaiz) : "—"}</td>
                 {nomesMotoristas && <td className="px-2 py-1.5 min-w-[140px]">{nomesMotoristas[a.motoristaCodigo] ?? a.motoristaCodigo}</td>}
-                <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">
-                  #{a.carga}
-                  <span className="block" style={{ color: "var(--text-muted)" }}>
-                    {dataBr(a.diaEntrega)}
-                  </span>
-                </td>
                 <td className="px-2 py-1.5 whitespace-nowrap" title={at.hint}>
                   <span
                     className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"

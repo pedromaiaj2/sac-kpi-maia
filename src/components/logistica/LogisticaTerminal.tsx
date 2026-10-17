@@ -67,6 +67,7 @@ export function LogisticaTerminal({
   parciais,
   produtosPorte,
   regrasPorte,
+  periodo,
 }: {
   cargas: CargaEntregas[];
   motoristas: MotoristaEntregas[];
@@ -83,6 +84,8 @@ export function LogisticaTerminal({
   parciais: InsucessoDetalhe[];
   produtosPorte: ProdutoPorte[];
   regrasPorte: KpisEntregas["regrasPorte"];
+  // período da tela (lista de assistências: entregas desse período)
+  periodo: { de: string; ate: string };
 }) {
   const nomes = Object.fromEntries(motoristas.map((m) => [m.codigo, m.nome ?? m.codigo]));
   // Um estado só pra todo detalhe por motorista na tabela de Índice de
@@ -188,12 +191,13 @@ export function LogisticaTerminal({
                 />
               );
             case "assistencias":
-              return <AssistenciasMotorista nome={nome} itens={assistencias.filter((a) => a.motoristaCodigo === motorista.codigo)} onFechar={fechar} />;
+              return <AssistenciasMotorista nome={nome} itens={assistencias.filter((a) => a.motoristaCodigo === motorista.codigo)} periodo={periodo} onFechar={fechar} />;
             case "assistenciasErroMotorista":
               return (
                 <AssistenciasMotorista
                   nome={`${nome} · erro do motorista`}
                   itens={assistencias.filter((a) => a.motoristaCodigo === motorista.codigo && a.causaRaiz === "erro_motorista")}
+                  periodo={periodo}
                   onFechar={fechar}
                 />
               );
@@ -202,6 +206,7 @@ export function LogisticaTerminal({
                 <AssistenciasMotorista
                   nome={`${nome} · avaria no transporte`}
                   itens={assistencias.filter((a) => a.motoristaCodigo === motorista.codigo && a.causaRaiz === "avaria_transporte")}
+                  periodo={periodo}
                   onFechar={fechar}
                 />
               );
