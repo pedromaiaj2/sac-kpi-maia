@@ -1,6 +1,5 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { CausasVolta } from "@/lib/kpisLogistica";
 
 // Detalhamento das causas do Índice de Volta -- pedido do Victor
@@ -19,7 +18,9 @@ import type { CausasVolta } from "@/lib/kpisLogistica";
 // outros, parciais) são causas externas ou
 // mistas -- tons neutros da paleta categórica, mesmo critério de
 // CausaRaizDonutChart.tsx (causa externa/decisão do cliente = tom neutro,
-// só erro interno controlável vira vermelho).
+// só erro interno controlável vira vermelho). Painel escuro 17/10/2026:
+// barras horizontais finas (mesmo padrão de Motivos dos insucessos), com o
+// número e o % escritos ao lado -- a cor nunca é a única pista.
 const CAUSAS: { key: keyof CausasVolta; label: string; color: string; hint: string }[] = [
   {
     key: "insucessoLogistica",
@@ -30,7 +31,7 @@ const CAUSAS: { key: keyof CausasVolta; label: string; color: string; hint: stri
   {
     key: "insucessoCliente",
     label: "Insucesso — cliente",
-    color: "var(--series-7)",
+    color: "var(--series-3)",
     hint: "Nota que voltou por recusa, ausência ou indisponibilidade do cliente.",
   },
   {
@@ -39,7 +40,7 @@ const CAUSAS: { key: keyof CausasVolta; label: string; color: string; hint: stri
     color: "var(--series-5)",
     hint: "Falha do CD antes de a nota sair (L06, pedido não carregado etc.) -- fica fora de Volta Logística de propósito.",
   },
-  { key: "parciais", label: "Parcial", color: "var(--series-3)", hint: "Nota em que só parte dos produtos ficou com o cliente." },
+  { key: "parciais", label: "Parcial", color: "var(--series-7)", hint: "Nota em que só parte dos produtos ficou com o cliente." },
   {
     key: "insucessoOutros",
     label: "Insucesso — outros",
@@ -52,31 +53,14 @@ function fmt(n: number) {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 }
 
-function CausaTooltip({ active, payload, total }: { active?: boolean; payload?: ReadonlyArray<{ payload?: unknown }>; total: number }) {
-  const d = payload?.[0]?.payload as ChartRow | undefined;
-  if (!active || !d) return null;
-  return (
-    <div
-      className="rounded-lg border px-3 py-2 text-xs flex flex-col gap-1 max-w-[260px]"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-primary)" }}
-    >
-      <span className="font-semibold">{d.label}</span>
-      <span>
-        {fmt(d.value)} ocorrência{d.value === 1 ? "" : "s"} · {total > 0 ? `${((d.value / total) * 100).toFixed(1)}%` : "0%"} do total de voltas
-      </span>
-      <span style={{ color: "var(--text-secondary)" }}>{d.hint}</span>
-    </div>
-  );
-}
-
-type ChartRow = { key: string; label: string; value: number; color: string; hint: string };
+type Linha = { key: string; label: string; value: number; color: string; hint: string };
 
 export function CausasVoltaChart({ causas }: { causas: CausasVolta }) {
   const total = Object.values(causas).reduce((s, v) => s + v, 0);
-  const data: ChartRow[] = CAUSAS.map((c) => ({ key: c.key, label: c.label, value: causas[c.key], color: c.color, hint: c.hint })).sort(
+  const data: Linha[] = CAUSAS.map((c) => ({ key: c.key, label: c.label, value: causas[c.key], color: c.color, hint: c.hint })).sort(
     (a, b) => b.value - a.value
   );
-  const height = Math.max(160, data.length * 36 + 24);
+  const maior = data[0]?.value || 1;
 
   if (total === 0) {
     return (
@@ -87,30 +71,26 @@ export function CausasVoltaChart({ causas }: { causas: CausasVolta }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
-        <CartesianGrid horizontal={false} stroke="var(--gridline)" />
-        <XAxis type="number" allowDecimals={false} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
-        <YAxis
-          type="category"
-          dataKey="label"
-          width={170}
-          stroke="var(--axis)"
-          tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
-        />
-        <Tooltip content={(p) => <CausaTooltip active={p.active} payload={p.payload} total={total} />} cursor={{ fill: "var(--gridline)" }} />
-        <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={22} isAnimationActive={false}>
-          {data.map((d) => (
-            <Cell key={d.key} fill={d.color} />
-          ))}
-          <LabelList
-            dataKey="value"
-            position="right"
-            formatter={(label: unknown) => fmt(Number(label ?? 0))}
-            style={{ fill: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}
-          />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <ul className="flex flex-col gap-4">
+      {data.map((d) => (
+        <li key={d.key} className="flex flex-col gap-1.5" title={d.hint}>
+          <span className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="inline-flex items-center gap-2 min-w-0" style={{ color: "var(--text-primary)" }}>
+              <span aria-hidden className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
+              <span className="truncate">{d.label}</span>
+            </span>
+            <span className="shrink-0 tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
+              {fmt(d.value)}
+              <span className="ml-1.5 text-xs font-normal" style={{ color: "var(--text-muted)" }}>
+                {((d.value / total) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
+              </span>
+            </span>
+          </span>
+          <span className="h-2 rounded-full" style={{ background: "var(--surface-2)" }}>
+            <span className="block h-full rounded-full" style={{ width: `${d.value > 0 ? Math.max(2, (d.value / maior) * 100) : 0}%`, background: d.color }} />
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -6,22 +6,39 @@ import { RefreshCw } from "lucide-react";
 
 // Barra de filtros da aba Logística -- pedido do Victor 13/10/2026 ("mova
 // todos os filtros para uma barra de ferramentas dedicada, alinhada
-// horizontalmente no topo"). Selects compactos em vez das fileiras de
-// pílulas: cabe numa linha só no desktop e quebra em blocos no celular.
-// Cada troca navega pra mesma página com o parâmetro novo (a página é
-// Server Component e lê tudo da URL).
+// horizontalmente no topo"). Painel escuro 17/10/2026: período em pílulas
+// (estilo seletor de player) e os demais filtros como pílulas com o rótulo
+// dentro. Cada troca navega pra mesma página com o parâmetro novo (a página
+// é Server Component e lê tudo da URL).
 type Opcao = { valor: string; rotulo: string };
 
-const campo = "rounded-lg px-2.5 py-1.5 text-sm";
-const campoStyle = { border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" };
+const pilula = "rounded-full text-sm px-3.5 py-1.5";
+const pilulaStyle = { background: "var(--surface-1)", color: "var(--text-primary)" };
 
-function Grupo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+function SelectPilula({
+  rotulo,
+  valor,
+  opcoes,
+  onChange,
+}: {
+  rotulo: string;
+  valor: string;
+  opcoes: Opcao[];
+  onChange: (v: string | undefined) => void;
+}) {
   return (
-    <label className="flex flex-col gap-1 min-w-0">
-      <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+    <label className={`${pilula} inline-flex items-center gap-2`} style={pilulaStyle}>
+      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
         {rotulo}
       </span>
-      {children}
+      <select className="bg-transparent font-medium outline-none cursor-pointer" value={valor} onChange={(e) => onChange(e.target.value || undefined)}>
+        <option value="">Todos</option>
+        {opcoes.map((o) => (
+          <option key={o.valor} value={o.valor}>
+            {o.rotulo}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -92,98 +109,77 @@ export function FiltrosLogistica({
   const datasMudaram = datas.de !== de || datas.ate !== ate;
 
   return (
-    <div
-      className="rounded-xl p-4 flex flex-wrap items-end gap-x-5 gap-y-3 shadow-sm"
-      style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}
-    >
-      <Grupo rotulo="Período">
-        <select className={campo} style={campoStyle} value={preset} onChange={(e) => trocarPeriodo(e.target.value)}>
-          {presets.map((p) => (
-            <option key={p.valor} value={p.valor}>
-              {p.rotulo}
-            </option>
-          ))}
-          <option value="custom">Datas livres</option>
-        </select>
-      </Grupo>
-      <Grupo rotulo="De / até">
-        <span className="flex items-center gap-1.5">
-          <input
-            type="date"
-            className={campo}
-            style={campoStyle}
-            value={datas.de}
-            max={datas.ate}
-            onChange={(e) => setDatas((d) => ({ ...d, de: e.target.value }))}
-          />
-          <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-            até
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex flex-wrap rounded-full p-1 gap-0.5" role="group" aria-label="Período" style={{ background: "var(--surface-1)" }}>
+          {[...presets, { valor: "custom", rotulo: "Datas livres" }].map((p) => {
+            const ativo = preset === p.valor;
+            return (
+              <button
+                key={p.valor}
+                type="button"
+                aria-pressed={ativo}
+                onClick={() => trocarPeriodo(p.valor)}
+                className="rounded-full text-sm px-3.5 py-1.5 font-medium transition-colors"
+                style={{ background: ativo ? "var(--text-primary)" : "transparent", color: ativo ? "var(--canvas)" : "var(--text-secondary)" }}
+              >
+                {p.rotulo}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => router.refresh()}
+          className="ml-auto inline-flex items-center gap-1.5 text-xs rounded-full px-3.5 py-2"
+          style={{
+            color: dadosAtrasados ? "var(--text-primary)" : "var(--text-secondary)",
+            background: dadosAtrasados ? "color-mix(in srgb, var(--status-warning) 22%, var(--surface-1))" : "var(--surface-1)",
+          }}
+          title="As cargas do dia vêm do Protheus a cada 10 min e o resto a cada 30. A tela recarrega sozinha a cada 2 min; clique pra recarregar agora."
+        >
+          <RefreshCw aria-hidden size={13} />
+          {dadosDe ? `Dados do Protheus das ${dadosDe}${dadosAtrasados ? " (atrasado)" : ""}` : "Sem sincronização recente"}
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {custom && (
+          <span className={`${pilula} inline-flex items-center gap-2`} style={pilulaStyle}>
+            <input
+              type="date"
+              aria-label="De"
+              className="bg-transparent outline-none"
+              value={datas.de}
+              max={datas.ate}
+              onChange={(e) => setDatas((d) => ({ ...d, de: e.target.value }))}
+            />
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              até
+            </span>
+            <input
+              type="date"
+              aria-label="Até"
+              className="bg-transparent outline-none"
+              value={datas.ate}
+              min={datas.de}
+              onChange={(e) => setDatas((d) => ({ ...d, ate: e.target.value }))}
+            />
+            {datasMudaram && datas.de && datas.ate && (
+              <button
+                type="button"
+                onClick={() => ir({ periodo: undefined, de: datas.de, ate: datas.ate })}
+                className="text-xs font-semibold rounded-full px-3 py-1"
+                style={{ background: "var(--brand-green)", color: "#fff" }}
+              >
+                Aplicar
+              </button>
+            )}
           </span>
-          <input
-            type="date"
-            className={campo}
-            style={campoStyle}
-            value={datas.ate}
-            min={datas.de}
-            onChange={(e) => setDatas((d) => ({ ...d, ate: e.target.value }))}
-          />
-          {datasMudaram && datas.de && datas.ate && (
-            <button
-              type="button"
-              onClick={() => ir({ periodo: undefined, de: datas.de, ate: datas.ate })}
-              className="text-sm font-semibold rounded-lg px-3 py-1.5"
-              style={{ background: "var(--brand-green)", color: "#fff" }}
-            >
-              Aplicar
-            </button>
-          )}
-        </span>
-      </Grupo>
-      <span aria-hidden className="hidden lg:block self-stretch w-px" style={{ background: "var(--border)" }} />
-      <Grupo rotulo="Tipo de carga">
-        <select className={campo} style={campoStyle} value={tipo ?? ""} onChange={(e) => ir({ tipo: e.target.value || undefined })}>
-          <option value="">Todos</option>
-          {tipos.map((t) => (
-            <option key={t.valor} value={t.valor}>
-              {t.rotulo}
-            </option>
-          ))}
-        </select>
-      </Grupo>
-      <Grupo rotulo="Veículo">
-        <select className={campo} style={campoStyle} value={veiculo ?? ""} onChange={(e) => ir({ veiculo: e.target.value || undefined })}>
-          <option value="">Todos</option>
-          {veiculos.map((v) => (
-            <option key={v.valor} value={v.valor}>
-              {v.rotulo}
-            </option>
-          ))}
-        </select>
-      </Grupo>
-      <Grupo rotulo="Motoristas">
-        <select className={campo} style={campoStyle} value={vinculo ?? ""} onChange={(e) => ir({ vinculo: e.target.value || undefined })}>
-          <option value="">Todos</option>
-          {vinculos.map((v) => (
-            <option key={v.valor} value={v.valor}>
-              {v.rotulo}
-            </option>
-          ))}
-        </select>
-      </Grupo>
-      <button
-        type="button"
-        onClick={() => router.refresh()}
-        className="ml-auto flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5"
-        style={{
-          color: dadosAtrasados ? "var(--text-primary)" : "var(--text-secondary)",
-          border: `1px solid ${dadosAtrasados ? "var(--status-warning)" : "var(--border)"}`,
-          background: dadosAtrasados ? "color-mix(in srgb, var(--status-warning) 18%, var(--surface-1))" : undefined,
-        }}
-        title="As cargas do dia vêm do Protheus a cada 10 min e o resto a cada 30. A tela recarrega sozinha a cada 2 min; clique pra recarregar agora."
-      >
-        <RefreshCw aria-hidden size={13} />
-        {dadosDe ? `Dados do Protheus das ${dadosDe}${dadosAtrasados ? " (atrasado)" : ""}` : "Sem sincronização recente"}
-      </button>
+        )}
+        <SelectPilula rotulo="Tipo de carga" valor={tipo ?? ""} opcoes={tipos} onChange={(v) => ir({ tipo: v })} />
+        <SelectPilula rotulo="Veículo" valor={veiculo ?? ""} opcoes={veiculos} onChange={(v) => ir({ veiculo: v })} />
+        <SelectPilula rotulo="Motoristas" valor={vinculo ?? ""} opcoes={vinculos} onChange={(v) => ir({ vinculo: v })} />
+      </div>
     </div>
   );
 }

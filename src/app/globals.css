@@ -346,6 +346,45 @@ a:active {
   transform: scale(0.97);
 }
 
+/* Painel escuro da Logística (/kpis/logistica) -- pedido do Victor
+   17/10/2026: tela de monitoramento em tempo real, sempre escura (TV/sala do
+   CD), independente do tema do resto do app. Redefine os mesmos tokens que
+   os componentes já usam, então tudo dentro do painel (modais inclusive)
+   herda. Categóricas validadas no fundo #1E1E22 (validate_palette, dark):
+   azul / âmbar escuro / verde-azulado / violeta / vermelho. O âmbar vivo
+   (#F59E0B) é só de alerta (status), nunca série. */
+.painel-escuro {
+  color-scheme: dark;
+  --canvas: #121214;
+  --surface-1: #1e1e22;
+  --surface-2: #2a2a30;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --gridline: #27272a;
+  --axis: #3f3f46;
+  --border: #27272a;
+  --brand-green: #10b981;
+  --brand-orange: #f59e0b;
+  --status-good: #10b981;
+  --status-warning: #f59e0b;
+  --status-serious: #f97316;
+  --status-critical: #ef4444;
+  --series-3: #c97a05;
+  --series-5: #3b82f6;
+  --series-7: #0f9488;
+  --viz-1: #3b82f6;
+  --viz-2: #c97a05;
+  --viz-3: #0f9488;
+  --viz-4: #8b5cf6;
+  --viz-5: #ef4444;
+  --porte-p: #c97a05;
+  --porte-m: #3b82f6;
+  --porte-g: #0f9488;
+  background: var(--canvas);
+  color: var(--text-primary);
+}
+
 /* Luz "ao vivo" do mural Rotas de hoje (/kpis/logistica, pedido do Victor
    17/10/2026): verde aceso nos dois temas -- é uma luz, não um status. */
 .luz-ao-vivo {

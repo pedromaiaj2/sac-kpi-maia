@@ -27,14 +27,14 @@ export function ModalLogistica({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3" role="dialog" aria-modal="true" aria-label={titulo}>
-      <button type="button" aria-label="Fechar" className="absolute inset-0 cursor-default" style={{ background: "rgb(0 0 0 / 0.45)" }} onClick={onFechar} />
+      <button type="button" aria-label="Fechar" className="absolute inset-0 cursor-default" style={{ background: "rgb(0 0 0 / 0.6)" }} onClick={onFechar} />
       <div
-        className="relative w-full max-w-5xl max-h-[85vh] flex flex-col rounded-xl overflow-hidden shadow-xl"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+        className="relative w-full max-w-5xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl shadow-black/50"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
       >
-        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <div>
-            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+            <h3 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
               {titulo}
             </h3>
             {subtitulo && (
