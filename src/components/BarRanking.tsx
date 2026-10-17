@@ -46,8 +46,7 @@ export function BarRanking({
   const total = data.reduce((sum, d) => sum + d.count, 0);
   return (
     <div
-      className="rounded-lg border p-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      className="cartao p-5"
     >
       <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
         {title}

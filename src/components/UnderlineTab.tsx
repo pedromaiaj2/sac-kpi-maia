@@ -63,28 +63,44 @@ export function UnderlineTab({
   active,
   color = "var(--brand-green)",
   count,
+  pilula = false,
 }: {
   href: string;
   label: string;
   active: boolean;
   color?: string;
   count?: number;
+  // Pílula do design system das telas do SAC (17/10/2026): ativa preenchida
+  // na cor da seção, as outras só texto com fundo leve no hover. Sem isso,
+  // a aba sublinhada de sempre (telas da assistência não mudam).
+  pilula?: boolean;
 }) {
   return (
     <Link
       href={href}
-      className="text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0 transition-colors duration-200 flex items-center gap-1.5"
-      style={{
-        color: active ? color : "var(--text-secondary)",
-        background: active ? "var(--surface-1)" : "transparent",
-        borderColor: active ? "var(--border)" : "transparent",
-      }}
+      aria-current={active ? "page" : undefined}
+      className={
+        pilula
+          ? `text-sm font-medium tracking-wide px-4 py-1.5 rounded-full transition-colors duration-200 flex items-center gap-1.5 ${active ? "" : "hover:bg-[var(--surface-2)]"}`
+          : "text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0 transition-colors duration-200 flex items-center gap-1.5"
+      }
+      style={
+        pilula
+          ? { color: active ? "#fff" : "var(--text-secondary)", background: active ? color : undefined }
+          : {
+              color: active ? color : "var(--text-secondary)",
+              background: active ? "var(--surface-1)" : "transparent",
+              borderColor: active ? "var(--border)" : "transparent",
+            }
+      }
     >
       {label}
       {count ? (
         <span
           className="text-[10px] font-bold rounded-full min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center"
-          style={{ background: `color-mix(in srgb, ${color} 20%, transparent)`, color }}
+          style={
+            pilula && active ? { background: "rgb(255 255 255 / 0.25)", color: "#fff" } : { background: `color-mix(in srgb, ${color} 20%, transparent)`, color }
+          }
         >
           {count > 99 ? "99+" : count}
         </span>

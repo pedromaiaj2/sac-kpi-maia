@@ -14,8 +14,8 @@ export function PreviousWeekCard({ data }: { data: PreviousWeekSummary }) {
   const [open, setOpen] = useState(false);
   return (
     <div
-      className="rounded-lg border p-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderLeft: "3px solid var(--brand-orange)" }}
+      className="cartao p-5"
+      style={{ borderLeft: "3px solid var(--brand-orange)" }}
     >
       <h3 className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>
         Semana anterior ({formatDate(data.from)} a {formatDate(data.to)})

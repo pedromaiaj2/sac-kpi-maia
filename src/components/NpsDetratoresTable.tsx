@@ -137,7 +137,7 @@ export function NpsDetratoresTable({ items }: { items: NpsDetrator[] }) {
   }
 
   return (
-    <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}>
+    <div className="cartao overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="border-b" style={{ borderColor: "var(--border)" }}>

@@ -25,9 +25,9 @@ export type KpisSectionKey = (typeof TABS)[number]["key"];
 // dos kpis pode deixar a cor laranja mesmo, nao verde").
 export function KpisSectionTabs({ active }: { active: KpisSectionKey }) {
   return (
-    <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+    <div className="flex flex-wrap items-center gap-1.5">
       {TABS.map((tab) => (
-        <UnderlineTab key={tab.key} href={tab.href} label={tab.label} active={tab.key === active} color="var(--brand-orange)" />
+        <UnderlineTab key={tab.key} href={tab.href} label={tab.label} active={tab.key === active} color="var(--brand-orange)" pilula />
       ))}
     </div>
   );

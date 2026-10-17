@@ -33,7 +33,7 @@ export function MonthlyEvolutionTable({
           {subtitle}
         </p>
       </div>
-      <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-x-auto">
+      <div className="cartao overflow-x-auto">
         <table className="w-full border-collapse text-sm" style={{ minWidth: "480px" }}>
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">

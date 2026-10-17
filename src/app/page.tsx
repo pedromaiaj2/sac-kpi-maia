@@ -37,36 +37,37 @@ export default async function Home() {
     <div className="max-w-4xl mx-auto p-6 flex flex-col gap-10">
       <AppHeader />
 
-      <div className="flex flex-col items-center gap-2 text-center pt-4">
-        <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>
+      <div className="flex flex-col items-center gap-2 text-center pt-6">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
           Bem-vindo ao Painel de Controle
         </h1>
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        <p className="text-sm tracking-wide" style={{ color: "var(--text-secondary)" }}>
           Selecione uma área para gerenciar
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
+      {/* Cards flutuantes (design system 17/10/2026): sem borda, ícone
+          grande no centro, sobem levemente no hover. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 w-full">
         {AREAS.map((area) => {
           const Icon = area.icon;
           return (
             <Link
               key={area.href}
               href={area.href}
-              className="group rounded-xl bg-white dark:bg-gray-800 border p-6 flex flex-col gap-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
-              style={{ borderColor: "var(--border)" }}
+              className="group cartao p-7 flex flex-col items-center text-center gap-4 transition-transform duration-200 hover:-translate-y-1"
             >
               <span
-                className="rounded-full p-3 w-fit transition-colors duration-200"
-                style={{ background: `color-mix(in srgb, ${area.color} 15%, transparent)`, color: area.color }}
+                className="rounded-2xl p-4 transition-transform duration-200 group-hover:scale-105"
+                style={{ background: `color-mix(in srgb, ${area.color} 14%, transparent)`, color: area.color }}
               >
-                <Icon size={24} />
+                <Icon size={30} strokeWidth={1.75} />
               </span>
-              <div className="flex flex-col gap-1">
-                <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+              <div className="flex flex-col gap-1.5">
+                <h2 className="text-lg font-bold tracking-wide" style={{ color: "var(--text-primary)" }}>
                   {area.title}
                 </h2>
-                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                   {area.description}
                 </p>
               </div>

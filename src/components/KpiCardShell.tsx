@@ -16,7 +16,7 @@ export function KpiCardShell({
   onClick,
 }: {
   children: ReactNode;
-  // Cor da borda superior (3px) -- sutil, mesma lógica de status do
+  // Cor do traço de status no topo -- sutil, mesma lógica de status do
   // MetricCard: verde/vermelho quando o card tem meta, ou omitido
   // (sem borda colorida) pra cards sem meta definida (neutro).
   accentColor?: string;
@@ -36,11 +36,14 @@ export function KpiCardShell({
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={onClick ? handleKeyDown : undefined}
-      className={`rounded-xl bg-white dark:bg-gray-800 shadow-sm p-5 flex flex-col gap-3 min-w-0 h-full ${
-        onClick ? "cursor-pointer hover:shadow-md transition-shadow duration-150" : ""
+      className={`cartao p-5 flex flex-col gap-3 min-w-0 h-full ${
+        onClick ? "cursor-pointer transition-transform duration-200 hover:-translate-y-0.5" : ""
       }`}
-      style={{ borderTop: accentColor ? `3px solid ${accentColor}` : undefined }}
     >
+      {/* Cor de status num traço curto no topo (design system 17/10/2026),
+          no lugar da borda superior de 3px; sem status, o espaço fica
+          reservado pra os rótulos da fileira alinharem. */}
+      <span aria-hidden className="block h-1 w-10 rounded-full" style={{ background: accentColor ?? "transparent" }} />
       {children}
     </div>
   );

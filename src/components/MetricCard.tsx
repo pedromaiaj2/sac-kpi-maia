@@ -50,7 +50,7 @@ export function MetricCard({
 
   return (
     <KpiCardShell accentColor={pct !== null ? pctColor : undefined}>
-      <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+      <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
         {title}
       </span>
 

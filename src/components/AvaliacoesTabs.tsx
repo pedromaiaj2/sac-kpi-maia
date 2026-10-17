@@ -60,7 +60,7 @@ export function AvaliacoesTabs({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+      <div className="flex flex-wrap gap-1.5">
         {TABS.map((tab) => {
           const active = tab.id === activeTab;
           return (
@@ -68,12 +68,9 @@ export function AvaliacoesTabs({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className="text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0"
-              style={{
-                color: active ? "var(--brand-green)" : "var(--text-secondary)",
-                background: active ? "var(--surface-1)" : "transparent",
-                borderColor: active ? "var(--border)" : "transparent",
-              }}
+              aria-pressed={active}
+              className={`text-sm font-medium tracking-wide px-4 py-1.5 rounded-full transition-colors duration-200 ${active ? "" : "hover:bg-[var(--surface-2)]"}`}
+              style={{ color: active ? "#fff" : "var(--text-secondary)", background: active ? "var(--brand-green)" : undefined }}
             >
               {tab.label}
             </button>

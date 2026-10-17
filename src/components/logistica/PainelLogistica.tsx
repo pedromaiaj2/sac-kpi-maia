@@ -1,4 +1,5 @@
 import { SidebarPainel } from "./SidebarPainel";
+import { PainelTema } from "./PainelTema";
 import { ThHint } from "./ThHint";
 import { LogisticaTerminal } from "./LogisticaTerminal";
 import { IndiceTicker, type TickerItem } from "./IndiceTicker";
@@ -199,7 +200,7 @@ export function PainelLogistica({
   return (
     // Painel escuro (pedido do Victor 17/10/2026): menu lateral, Rotas de
     // hoje no topo e os indicadores do período abaixo, com os filtros.
-    <div className="painel-escuro flex-1 md:flex">
+    <PainelTema>
       <SidebarPainel />
       <main className="flex-1 min-w-0 w-full max-w-[1440px] mx-auto px-4 sm:px-8 pt-6 pb-16 flex flex-col gap-8">
         {rotas && <RotasDoDia rotas={rotas} agora={horaRecife(new Date())} dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null} />}
@@ -265,6 +266,6 @@ export function PainelLogistica({
           </>
         )}
       </main>
-    </div>
+    </PainelTema>
   );
 }

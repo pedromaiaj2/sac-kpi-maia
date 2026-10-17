@@ -27,8 +27,7 @@ export const NPS_SCORE_LABELS: Record<number, string> = {
 export function NpsCard({ data, detractors }: { data: NpsSummary; detractors: NpsDetractor[] }) {
   return (
     <div
-      className="rounded-lg border p-4 flex flex-col gap-3"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
+      className="cartao p-5 flex flex-col gap-3"
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>

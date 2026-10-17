@@ -12,8 +12,8 @@ export function InsightCard({ insight }: { insight: KpiInsight }) {
   const style = STATUS_STYLE[insight.status];
   return (
     <div
-      className="rounded-lg border p-4 flex flex-col gap-2"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderLeft: `3px solid ${style.color}` }}
+      className="cartao p-5 flex flex-col gap-2"
+      style={{ borderLeft: `3px solid ${style.color}` }}
     >
       <div className="flex items-center gap-2">
         <span

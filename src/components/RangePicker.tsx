@@ -8,13 +8,17 @@ const PRESETS: { key: DateRange["preset"]; label: string }[] = [
   { key: "all", label: "Tudo" },
 ];
 
+// Pílulas do design system (17/10/2026): trilho único com a ativa
+// preenchida em verde; datas livres e "Aplicar" no mesmo formato.
 function pillStyle(active: boolean) {
   return {
-    color: active ? "var(--surface-1)" : "var(--text-secondary)",
+    color: active ? "#fff" : "var(--text-secondary)",
     background: active ? "var(--brand-green)" : "transparent",
-    border: `1px solid ${active ? "var(--brand-green)" : "var(--border)"}`,
   };
 }
+
+const campoData = "rounded-full px-3 py-1.5 text-xs outline-none";
+const campoDataStyle = { background: "var(--surface-1)", color: "var(--text-primary)", boxShadow: "inset 0 0 0 1px var(--border)" };
 
 // Mesmo fuso de dateRange.ts (America/Fortaleza, UTC-3) -- desde a correção
 // de 15/10/2026, `range.to` de um período customizado é 23:59:59.999 LOCAL
@@ -31,36 +35,41 @@ function toLocalDateInputValue(date: Date): string {
 export function RangePicker({ range, basePath = "/kpis" }: { range: DateRange; basePath?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {PRESETS.map((p) => (
-        <Link
-          key={p.key}
-          href={`${basePath}?range=${p.key}`}
-          className="text-sm px-3 py-1 rounded-full"
-          style={pillStyle(range.preset === p.key)}
-        >
-          {p.label}
-        </Link>
-      ))}
+      <div className="inline-flex flex-wrap items-center gap-0.5 rounded-full p-1" style={{ background: "var(--surface-2)" }}>
+        {PRESETS.map((p) => (
+          <Link
+            key={p.key}
+            href={`${basePath}?range=${p.key}`}
+            aria-current={range.preset === p.key ? "true" : undefined}
+            className={`text-sm font-medium tracking-wide px-3.5 py-1.5 rounded-full transition-colors duration-200 ${range.preset === p.key ? "" : "hover:bg-[var(--surface-1)]"}`}
+            style={pillStyle(range.preset === p.key)}
+          >
+            {p.label}
+          </Link>
+        ))}
+      </div>
       <form method="get" className="flex items-center gap-1.5 text-sm" style={{ color: "var(--text-secondary)" }}>
         <input
           type="date"
           name="from"
           defaultValue={range.preset === "custom" && range.from ? toLocalDateInputValue(range.from) : undefined}
-          className="rounded px-2 py-1 text-xs"
-          style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
+          aria-label="De"
+          className={campoData}
+          style={campoDataStyle}
         />
-        <span>até</span>
+        <span className="text-xs">até</span>
         <input
           type="date"
           name="to"
           defaultValue={range.preset === "custom" ? toLocalDateInputValue(range.to) : undefined}
-          className="rounded px-2 py-1 text-xs"
-          style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
+          aria-label="Até"
+          className={campoData}
+          style={campoDataStyle}
         />
         <button
           type="submit"
-          className="text-xs px-2 py-1 rounded"
-          style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+          className="text-xs font-semibold tracking-wide px-3.5 py-1.5 rounded-full transition-opacity hover:opacity-90"
+          style={{ background: "var(--brand-orange)", color: "#fff" }}
         >
           Aplicar
         </button>

@@ -131,7 +131,7 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-lg overflow-x-auto" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <div className="cartao overflow-x-auto">
         <table className="w-full text-sm border-collapse min-w-[640px]">
           <thead>
             <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
@@ -151,7 +151,7 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
         </table>
       </div>
 
-      <div className="rounded-lg overflow-x-auto" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <div className="cartao overflow-x-auto">
         <div className="px-3 pt-3 flex items-start justify-between gap-3 flex-wrap">
           <div className="flex flex-col gap-0.5">
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
@@ -163,13 +163,13 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
                 : `Quem mais melhorou a nota no(a) ${EVOLUTION_PERIOD_OPTIONS.find((o) => o.id === evolutionPeriod)!.label.toLowerCase()}.`}
             </p>
           </div>
-          <div className="flex gap-1 rounded-lg p-0.5" style={{ background: "var(--surface-2)" }}>
+          <div className="flex gap-1 rounded-full p-1" style={{ background: "var(--surface-2)" }}>
             {EVOLUTION_PERIOD_OPTIONS.map((opt) => (
               <button
                 key={opt.id}
                 type="button"
                 onClick={() => setEvolutionPeriod(opt.id)}
-                className="text-xs font-medium px-2.5 py-1.5 rounded-md"
+                className="text-xs font-medium px-3 py-1.5 rounded-full"
                 style={{
                   background: evolutionPeriod === opt.id ? "var(--brand-green)" : "transparent",
                   color: evolutionPeriod === opt.id ? "var(--brand-green-ink)" : "var(--text-secondary)",
@@ -248,7 +248,7 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
         )}
       </div>
 
-      <div className="rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <div className="cartao p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
           <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Evolução da nota
@@ -256,7 +256,7 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
           <select
             value={selectedStoreId}
             onChange={(e) => setSelectedStoreId(e.target.value)}
-            className="rounded border px-2 py-1 text-sm"
+            className="rounded-full border px-3 py-1.5 text-sm"
             style={{ borderColor: "var(--border)" }}
           >
             {stores.map((s) => (
@@ -274,9 +274,9 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={chartData} margin={{ left: 0, right: 16, top: 8, bottom: 4 }}>
-              <CartesianGrid vertical={false} stroke="var(--gridline)" />
-              <XAxis dataKey="date" tickFormatter={formatDate} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
-              <YAxis domain={[0, 5]} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+              <CartesianGrid vertical={false} stroke="var(--gridline)" strokeDasharray="3 6" />
+              <XAxis dataKey="date" tickFormatter={formatDate} axisLine={false} tickLine={false} tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+              <YAxis domain={[0, 5]} axisLine={false} tickLine={false} tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
               <Tooltip
                 labelFormatter={formatDate}
                 contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-primary)", fontSize: 12 }}
@@ -369,7 +369,7 @@ function GoogleReviewRow({ store, rank, onSaved }: { store: StoreGoogleReviews; 
             disabled={pending}
             placeholder="Link do Google…"
             autoFocus
-            className="mt-1 block w-full rounded border px-2 py-1 text-xs"
+            className="mt-1 block w-full rounded-lg border px-2.5 py-1.5 text-xs"
             style={{ borderColor: "var(--border)" }}
           />
         ) : (
@@ -408,7 +408,7 @@ function GoogleReviewRow({ store, rank, onSaved }: { store: StoreGoogleReviews; 
             value={ratingInput}
             onChange={(e) => setRatingInput(e.target.value)}
             placeholder="Nota"
-            className="w-16 rounded border px-2 py-1 text-xs"
+            className="w-16 rounded-lg border px-2.5 py-1.5 text-xs"
             style={{ borderColor: "var(--border)" }}
             disabled={pending}
           />
@@ -416,7 +416,7 @@ function GoogleReviewRow({ store, rank, onSaved }: { store: StoreGoogleReviews; 
             value={countInput}
             onChange={(e) => setCountInput(e.target.value)}
             placeholder="Nº avaliações"
-            className="w-24 rounded border px-2 py-1 text-xs"
+            className="w-24 rounded-lg border px-2.5 py-1.5 text-xs"
             style={{ borderColor: "var(--border)" }}
             disabled={pending}
           />

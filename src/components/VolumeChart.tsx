@@ -12,10 +12,9 @@ function formatDate(date: unknown) {
 export function VolumeChart({ data, title = "Volume de chamados por dia" }: { data: DayCount[]; title?: string }) {
   return (
     <div
-      className="rounded-lg border p-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      className="cartao p-5"
     >
-      <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+      <h3 className="text-base font-semibold tracking-wide mb-4" style={{ color: "var(--text-primary)" }}>
         {title}
       </h3>
       {data.length === 0 ? (
@@ -27,24 +26,28 @@ export function VolumeChart({ data, title = "Volume de chamados por dia" }: { da
           <AreaChart data={data} margin={{ left: 0, right: 16, top: 8, bottom: 4 }}>
             <defs>
               <linearGradient id="volumeFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--series-1)" stopOpacity={0.35} />
+                <stop offset="0%" stopColor="var(--series-1)" stopOpacity={0.22} />
                 <stop offset="100%" stopColor="var(--series-1)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid vertical={false} stroke="var(--gridline)" />
+            {/* Design system 17/10/2026: só a grade horizontal, tracejada e
+                clara, sem as linhas dos eixos. */}
+            <CartesianGrid vertical={false} stroke="var(--gridline)" strokeDasharray="3 6" />
             <XAxis
               dataKey="date"
               tickFormatter={formatDate}
-              stroke="var(--axis)"
+              axisLine={false}
+              tickLine={false}
+              tickMargin={8}
               tick={{ fill: "var(--text-muted)", fontSize: 12 }}
             />
-            <YAxis allowDecimals={false} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+            <YAxis allowDecimals={false} axisLine={false} tickLine={false} width={36} tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
             <Tooltip
               labelFormatter={formatDate}
               contentStyle={{
                 background: "var(--surface-1)",
                 border: "1px solid var(--border)",
-                borderRadius: 8,
+                borderRadius: 12,
                 color: "var(--text-primary)",
                 fontSize: 12,
               }}
@@ -53,8 +56,9 @@ export function VolumeChart({ data, title = "Volume de chamados por dia" }: { da
               type="monotone"
               dataKey="count"
               stroke="var(--series-1)"
-              strokeWidth={2}
+              strokeWidth={1.75}
               fill="url(#volumeFill)"
+              activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface-1)" }}
             />
           </AreaChart>
         </ResponsiveContainer>

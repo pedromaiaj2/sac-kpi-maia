@@ -70,8 +70,7 @@ export default async function ChamadosDoDiaPage({
       <form
         action="/kpis/chamados-do-dia"
         method="GET"
-        className="rounded-lg p-3 flex items-center gap-3 flex-wrap"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+        className="cartao px-4 py-3 flex items-center gap-3 flex-wrap"
       >
         <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
           Data
@@ -106,7 +105,7 @@ export default async function ChamadosDoDiaPage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+        <div className="cartao overflow-hidden">
           <div className="flex flex-col divide-y" style={{ background: "var(--surface-1)", borderColor: "var(--gridline)" }}>
             {tickets.map((t) => (
               <div key={t.conversationId} className="flex flex-col gap-1.5 p-4">
