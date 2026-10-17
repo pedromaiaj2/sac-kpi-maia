@@ -1052,7 +1052,7 @@ export function SacCreateRequestForm({
 
       </FormSection>
 
-      {/* Checklist antes de finalizar (0178) -- pedido do Victor 17/10/2026,
+      {/* Checklist antes de finalizar (0181) -- pedido do Victor 17/10/2026,
           só pros 3 tipos de CHECKLIST_REQUIRED_TYPES (troca_produto/
           entrega_produto/envio_peca). Não bloqueia o "Criar" -- incompleto
           vira rascunho, sem entrar na rota (ver ChecklistEntregaFields.tsx). */}

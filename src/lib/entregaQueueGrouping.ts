@@ -220,7 +220,7 @@ export type QueueGroup = {
   // Pra tag Hoje/Futura/Atrasada/Sem rota no cabeçalho -- ver DATE_BUCKET_TAG.
   dateBucket?: DateBucketKey;
   isSemRota?: boolean;
-  // Checklist pendente (0178, CHECKLIST_REQUIRED_TYPES em
+  // Checklist pendente (0181, CHECKLIST_REQUIRED_TYPES em
   // assistenciaLabels.ts) -- "fica ao lado das rotas... em vermelho",
   // pedido do Victor 17/10/2026: grupo próprio, separado de isSemRota (o
   // chamado pode já ter rota escolhida, só não foi liberado ainda).
@@ -263,7 +263,7 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
     key: Rota | "sem_rota" | "retira_loja" | "retira_cd" | "rascunho";
     rotaLabel: string;
   })[] = [
-    // Checklist pendente (0178) -- antes de qualquer rota de verdade: o
+    // Checklist pendente (0181) -- antes de qualquer rota de verdade: o
     // chamado pode até já ter rota/motorista escolhido no formulário, mas
     // não é "de verdade" até o checklist ser concluído (ver
     // CHECKLIST_REQUIRED_TYPES, assistenciaLabels.ts). Vermelho (mesmo tom
@@ -300,7 +300,7 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
     for (const rotaInfo of rotaOrder) {
       const items = dateGroup.items.filter((r) => {
         // Checklist pendente vence qualquer rota/retirada escolhida -- vai
-        // pro balde "rascunho" (0178), não pro balde da rota de verdade.
+        // pro balde "rascunho" (0181), não pro balde da rota de verdade.
         if (!r.checklistCompleto) return rotaInfo.key === "rascunho";
         if (rotaInfo.key === "rascunho") return false;
         return (r.retiradaEm ? `retira_${r.retiradaEm}` : (r.rota ?? "sem_rota")) === rotaInfo.key;

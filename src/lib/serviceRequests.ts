@@ -284,7 +284,7 @@ export type ServiceRequestSummary = {
   // vez que o motorista marca remarcar outra vez (ver driverReportIssue).
   remarcarContactedAt: string | null;
   remarcarContactedBy: string | null;
-  // Checklist antes de finalizar (0178) -- só vale pra CHECKLIST_REQUIRED_TYPES
+  // Checklist antes de finalizar (0181) -- só vale pra CHECKLIST_REQUIRED_TYPES
   // (envio_peca/troca_produto/entrega_produto, ver assistenciaLabels.ts); nos
   // outros tipos checklistCompleto é sempre true (default do banco, nunca
   // escrito pelas actions de criação/edição pra esses tipos). Enquanto
@@ -1440,7 +1440,7 @@ export async function listRequestsForDriver(
   opts: { onlyCompleted?: boolean; viewAll?: boolean } = {}
 ): Promise<DriverRequestView[]> {
   const admin = getSupabaseAdmin();
-  // "Só entra de verdade na rota depois que preencher o checklist" (0178)
+  // "Só entra de verdade na rota depois que preencher o checklist" (0181)
   // -- motorista (e supervisor em viewAll) nunca vê um chamado ainda em
   // rascunho (envio_peca/troca_produto/entrega_produto sem checklist
   // completo), mesmo que já tenha rota/motorista escolhido no formulário.
@@ -1483,7 +1483,7 @@ export async function getDriverRequestDetail(
   opts: { viewAll?: boolean } = {}
 ): Promise<DriverRequestView | null> {
   const admin = getSupabaseAdmin();
-  // Mesmo filtro de listRequestsForDriver acima (0178) -- um chamado ainda
+  // Mesmo filtro de listRequestsForDriver acima (0181) -- um chamado ainda
   // em rascunho não deve abrir nem pelo link direto.
   let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).eq("id", requestId).eq("checklist_completo", true);
   if (!opts.viewAll) {

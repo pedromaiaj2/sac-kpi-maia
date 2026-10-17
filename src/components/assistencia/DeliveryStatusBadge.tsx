@@ -40,7 +40,7 @@ export function DeliveryStatusBadge({
   status: string;
   scheduledDate: string | null;
   rota: string | null;
-  // Checklist antes de finalizar (0178, CHECKLIST_REQUIRED_TYPES em
+  // Checklist antes de finalizar (0181, CHECKLIST_REQUIRED_TYPES em
   // assistenciaLabels.ts) -- pedido do Victor 17/10/2026: enquanto não
   // completo, mostra "Rascunho" em vez de Programado/Não programado,
   // mesmo que já tenha data/rota escolhida (não é "de verdade" ainda).

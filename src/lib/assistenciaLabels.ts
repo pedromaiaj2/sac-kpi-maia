@@ -643,7 +643,7 @@ export const CAUSA_RAIZ_ERRO_INTERNO: string[] = [
 // Checklist antes de finalizar -- pedido do Victor 17/10/2026: "preciso de
 // um checklist antes que o atendente finalize a solicitação... Ele deverá
 // poder salvar como rascunho, mas só entra de verdade na rota, depois que
-// preencher o checklist". Só esses 3 tipos (migração 0178,
+// preencher o checklist". Só esses 3 tipos (migração 0181,
 // checklist_completo em service_requests) -- os outros tipos de entrega
 // (recolhimento, recolhimento_produto, envio_recolhimento_peca) ficam de
 // fora por agora, o Victor só pediu esses 3.

@@ -970,7 +970,7 @@ export function NovaEntregaAssistenciaForm({
         ) : null}
       </FormSection>
 
-      {/* Checklist antes de finalizar (0178) -- só "envio_peca" (os outros 2
+      {/* Checklist antes de finalizar (0181) -- só "envio_peca" (os outros 2
           tipos do checklist, troca_produto/entrega_produto, só nascem no
           SAC). Não bloqueia o "Criar" -- incompleto vira rascunho, sem
           entrar na rota (ver ChecklistEntregaFields.tsx). */}

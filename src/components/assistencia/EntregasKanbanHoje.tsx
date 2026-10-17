@@ -48,7 +48,7 @@ type KanbanColumn = {
   driverName: string | null;
   // Rota "crua" por trás do card -- só serve pra achar a rota padrão do dia
   // (ver defaultRota em EntregasKanbanHoje) e pré-selecionar o card certo;
-  // não aparece em nenhum texto (isso já é rotaLabel). "rascunho" (0178) é
+  // não aparece em nenhum texto (isso já é rotaLabel). "rascunho" (0181) é
   // checklist pendente -- nunca a rota padrão do dia.
   rotaKey?: Rota | "sem_rota" | "retira_loja" | "retira_cd" | "rascunho";
 };
