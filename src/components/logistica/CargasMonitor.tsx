@@ -67,7 +67,7 @@ export function CargasMonitor({
     );
   }
   return (
-    <div className="flex flex-col divide-y max-h-[420px] overflow-y-auto rounded-lg border" style={{ borderColor: "var(--border)" }}>
+    <div className="flex flex-col divide-y max-h-[420px] overflow-y-auto rounded-xl" style={{ borderColor: "var(--border)" }}>
       {cargas.map((c) => {
         const status = statusCarga(c, ocorrencias);
         const unidades = c.volumes.P + c.volumes.M + c.volumes.G + c.volumes.naoClassificado;

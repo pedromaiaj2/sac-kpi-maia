@@ -31,8 +31,8 @@ import type {
 // fica mais sempre visível.
 function Secao({ titulo, hint, className = "", children }: { titulo: string; hint?: string; className?: string; children: React.ReactNode }) {
   return (
-    <section className={`rounded-xl p-4 sm:p-5 flex flex-col gap-3 min-w-0 shadow-sm ${className}`} style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
-      <h2 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+    <section className={`rounded-2xl p-5 sm:p-6 flex flex-col gap-4 min-w-0 shadow-lg shadow-black/20 ${className}`} style={{ background: "var(--surface-1)" }}>
+      <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
         {hint ? <ThHint hint={hint}>{titulo}</ThHint> : titulo}
       </h2>
       {children}

@@ -46,27 +46,27 @@ type TickerItem = {
 
 export function IndiceTicker({ items, labelComparacao }: { items: TickerItem[]; labelComparacao: string }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       {items.map((item, i) => {
         const cor = corVariacao(item.variacao.melhorou);
         return (
           <div
             key={item.key}
-            className={`rounded-lg px-2.5 py-2 flex flex-col gap-0.5 min-w-0 ${item.destaque || item.largo ? "lg:col-span-2" : ""}`}
-            style={{ background: "var(--surface-1)", border: item.destaque ? "2px solid var(--brand-green)" : "1px solid var(--border)" }}
+            className={`rounded-2xl p-4 flex flex-col gap-1.5 min-w-0 shadow-lg shadow-black/20 ${item.destaque || item.largo ? "lg:col-span-2" : ""}`}
+            style={{ background: "var(--surface-1)" }}
           >
             {/* na grade de 6 (1º e último cards ocupando 2), os índices 3, 4, 8 e
                 9 ficam encostados na direita: a caixa do "i" abre pra esquerda */}
             <ThHint hint={item.hint} lado={[3, 4, 8, 9].includes(i) ? "direita" : "esquerda"}>
-              <span className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: "var(--text-muted)" }}>
+              <span className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
                 {item.label}
               </span>
             </ThHint>
-            <span className={`${item.destaque ? "text-2xl" : "text-lg"} font-bold leading-tight tabular-nums`} style={{ color: "var(--text-primary)" }}>
+            <span className={`${item.destaque ? "text-3xl" : "text-2xl"} font-bold tracking-tight leading-tight tabular-nums`} style={{ color: "var(--text-primary)" }}>
               {item.valorNode ?? item.valor}
             </span>
             {item.complemento && (
-              <span className="text-xs font-semibold tabular-nums leading-tight" style={{ color: "var(--text-secondary)" }}>
+              <span className="text-xs tabular-nums leading-tight" style={{ color: "var(--text-secondary)" }}>
                 {item.complemento}
               </span>
             )}

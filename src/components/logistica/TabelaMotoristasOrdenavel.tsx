@@ -109,8 +109,8 @@ function valorOrdenavel(m: MotoristaEntregas, key: SortKey, produtos: Record<str
 
 // Cabeçalho fixo (sticky) -- pedido do Victor 13/10/2026: continua visível
 // ao rolar a tabela. O fundo precisa estar no próprio <th>.
-const th = "sticky top-0 z-10 px-1.5 py-2 font-semibold whitespace-nowrap";
-const thStyle = { color: "var(--text-secondary)", background: "var(--surface-2)" };
+const th = "sticky top-0 z-10 px-1.5 py-2.5 font-medium whitespace-nowrap";
+const thStyle = { color: "var(--text-muted)", background: "var(--surface-1)", boxShadow: "inset 0 -1px 0 var(--border)" };
 
 const ROTULO_TOM: Record<"good" | "warning" | "critical" | "neutral", string> = {
   good: "dentro da meta (até 5%)",
@@ -230,18 +230,17 @@ export function TabelaMotoristasOrdenavel({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="inline-flex rounded-lg p-0.5" role="group" aria-label="Motoristas" style={{ background: "var(--surface-2)" }}>
+        <div className="inline-flex rounded-full p-1" role="group" aria-label="Motoristas" style={{ background: "var(--surface-2)" }}>
           {FILTROS_VINCULO.map((f) => (
             <button
               key={f.valor}
               type="button"
               onClick={() => setVinculo(f.valor)}
               aria-pressed={vinculo === f.valor}
-              className="text-xs font-semibold px-3 py-1 rounded-md"
+              className="text-xs font-semibold px-3.5 py-1.5 rounded-full"
               style={{
-                background: vinculo === f.valor ? "var(--surface-1)" : "transparent",
-                color: vinculo === f.valor ? "var(--text-primary)" : "var(--text-secondary)",
-                boxShadow: vinculo === f.valor ? "0 1px 2px rgb(0 0 0 / 0.12)" : undefined,
+                background: vinculo === f.valor ? "var(--text-primary)" : "transparent",
+                color: vinculo === f.valor ? "var(--canvas)" : "var(--text-secondary)",
               }}
             >
               {f.rotulo}
@@ -263,7 +262,7 @@ export function TabelaMotoristasOrdenavel({
           </button>
         </div>
       ) : null}
-      <div className="rounded-lg border overflow-auto max-h-[70vh]" style={{ borderColor: "var(--border)" }}>
+      <div className="rounded-xl overflow-auto max-h-[70vh]">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr>

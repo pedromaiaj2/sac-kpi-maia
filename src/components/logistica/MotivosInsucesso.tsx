@@ -16,7 +16,7 @@ import type { InsucessoDetalhe, MotivoInsucesso } from "@/lib/kpisLogistica";
 function corCategoria(m: MotivoInsucesso): string {
   if (m.codigo === "L06") return "var(--series-5)";
   if (m.codigo?.startsWith("L")) return "var(--status-critical)";
-  if (m.codigo?.startsWith("C")) return "var(--series-7)";
+  if (m.codigo?.startsWith("C")) return "var(--series-3)";
   return "var(--text-muted)";
 }
 
@@ -175,7 +175,7 @@ export function MotivosInsucesso({
   return (
     <div className="flex flex-col gap-4">
       <div
-        className="inline-flex self-start rounded-lg p-0.5"
+        className="inline-flex self-start rounded-full p-1"
         role="group"
         aria-label="Forma de visualizar"
         style={{ background: "var(--surface-2)" }}
@@ -186,11 +186,10 @@ export function MotivosInsucesso({
             type="button"
             onClick={() => setModo(m)}
             aria-pressed={modo === m}
-            className="text-xs font-semibold px-3 py-1 rounded-md"
+            className="text-xs font-semibold px-3.5 py-1.5 rounded-full"
             style={{
-              background: modo === m ? "var(--surface-1)" : "transparent",
-              color: modo === m ? "var(--text-primary)" : "var(--text-secondary)",
-              boxShadow: modo === m ? "0 1px 2px rgb(0 0 0 / 0.12)" : undefined,
+              background: modo === m ? "var(--text-primary)" : "transparent",
+              color: modo === m ? "var(--canvas)" : "var(--text-secondary)",
             }}
           >
             {m === "barras" ? "Barras" : "Rosca"}
