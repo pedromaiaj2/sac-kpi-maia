@@ -22,6 +22,8 @@ import {
   CAUSA_RAIZ_ALL_VALUES,
   PAYMENTS_CONTROLLER_NAME,
   PICKUP_DESTINATION_OPTIONS,
+  CHECKLIST_REQUIRED_TYPES,
+  PRODUCT_CHECKLIST_LOCATION_OPTIONS,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { notifyTelegramNewRequest, notifyTelegramStatusChange, notifyTelegramAssemblerAssigned } from "@/lib/telegram";
@@ -98,6 +100,45 @@ function readAddressNumberFields(
     if (isApartment && !complement) return { number, isApartment, complement, error: "Informe o número do apartamento." };
   }
   return { number, isApartment, complement };
+}
+
+// Checklist antes de finalizar (0178) -- pedido do Victor 17/10/2026:
+// "preciso de um checklist antes que o atendente finalize a solicitação...
+// Ele deverá poder salvar como rascunho, mas só entra de verdade na rota,
+// depois que preencher o checklist". Só vale pra CHECKLIST_REQUIRED_TYPES
+// (envio_peca/troca_produto/entrega_produto); nos outros tipos nem lê os
+// campos, fica tudo no padrão "completo" (não existe checklist pra eles).
+// "Salvar como rascunho" não é um botão/modo separado -- é só o checklist
+// ficando incompleto: o atendente pode deixar os campos em branco e salvar
+// do mesmo jeito (sem erro), só não entra na rota (ver checklist_completo,
+// pinSemRotaFirst/groupByRota em entregaQueueGrouping.ts e
+// listRequestsForDriver/getDriverRequestDetail em serviceRequests.ts).
+// Usada tanto na criação (createSacRequest/createQuickRequest) quanto na
+// edição (updateRequestDetails) -- mesma regra, um lugar só.
+function readChecklistFields(
+  formData: FormData,
+  type: string
+):
+  | {
+      checklistEstoque: boolean;
+      checklistSeparado: boolean;
+      checklistPlaca: boolean;
+      checklistLocalizacao: string | null;
+      checklistCompleto: boolean;
+    }
+  | { error: string } {
+  if (!(CHECKLIST_REQUIRED_TYPES as readonly string[]).includes(type)) {
+    return { checklistEstoque: false, checklistSeparado: false, checklistPlaca: false, checklistLocalizacao: null, checklistCompleto: true };
+  }
+  const checklistEstoque = formData.get("checklist_estoque") === "on";
+  const checklistSeparado = formData.get("checklist_separado") === "on";
+  const checklistPlaca = formData.get("checklist_placa") === "on";
+  const checklistLocalizacao = emptyToNull(formData.get("checklist_localizacao"));
+  if (checklistLocalizacao && !(PRODUCT_CHECKLIST_LOCATION_OPTIONS as readonly string[]).includes(checklistLocalizacao)) {
+    return { error: "Localização do produto inválida." };
+  }
+  const checklistCompleto = checklistEstoque && checklistSeparado && checklistPlaca && !!checklistLocalizacao;
+  return { checklistEstoque, checklistSeparado, checklistPlaca, checklistLocalizacao, checklistCompleto };
 }
 
 export type FormState = { error?: string } | undefined;
@@ -2205,6 +2246,17 @@ export async function updateRequestDetails(
     }
   }
 
+  // Checklist antes de finalizar (0178) -- recalcula a cada edição a partir
+  // do TIPO NOVO (igual pickupDestination acima): trocar o tipo pra fora de
+  // CHECKLIST_REQUIRED_TYPES volta checklist_completo pra true (deixa de
+  // ser rascunho, não se aplica mais). É aqui que um rascunho vira "de
+  // verdade": o atendente volta nesta tela de editar, marca os 3 itens +
+  // escolhe a localização, salva -- checklist_completo vira true e o
+  // chamado sai do balde "Rascunho" (groupByRota) e passa a aparecer pro
+  // motorista (listRequestsForDriver).
+  const checklist = readChecklistFields(formData, type);
+  if ("error" in checklist) return checklist;
+
   const { error } = await admin
     .from("service_requests")
     .update({
@@ -2233,6 +2285,11 @@ export async function updateRequestDetails(
       notes: emptyToNull(formData.get("notes")),
       seller_name: emptyToNull(formData.get("seller_name")),
       invoice_number: emptyToNull(formData.get("invoice_number")),
+      checklist_estoque: checklist.checklistEstoque,
+      checklist_separado: checklist.checklistSeparado,
+      checklist_placa: checklist.checklistPlaca,
+      checklist_localizacao: checklist.checklistLocalizacao,
+      checklist_completo: checklist.checklistCompleto,
     })
     .eq("id", requestId);
 
@@ -2331,6 +2388,13 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const isDelivery = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
   const authorizedBy = String(formData.get("authorized_by") ?? "").trim();
   if (isDelivery && !authorizedBy) return { error: "Informe quem autorizou." };
+
+  // Checklist antes de finalizar (0178) -- só "envio_peca" chega aqui (os
+  // outros 2 tipos do checklist só nascem via createSacRequest). Não
+  // bloqueia a criação se vier incompleto -- vira rascunho (ver
+  // readChecklistFields acima).
+  const checklist = readChecklistFields(formData, type);
+  if ("error" in checklist) return checklist;
 
   let causaRaiz: string | null = null;
   let causaCarga: string | null = null;
@@ -2577,6 +2641,11 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       // pra "aprovar" — sem isso, o padrão do banco (pendente) fazia a tela
       // sempre mostrar "prazo pendente de aprovação" sem sentido.
       deadline_status: "aprovado",
+      checklist_estoque: checklist.checklistEstoque,
+      checklist_separado: checklist.checklistSeparado,
+      checklist_placa: checklist.checklistPlaca,
+      checklist_localizacao: checklist.checklistLocalizacao,
+      checklist_completo: checklist.checklistCompleto,
     })
     .select("id, ticket_number")
     .single();
@@ -2754,6 +2823,13 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   // isDeliveryTypeCreate já foi calculado mais acima (ver nota fiscal).
   const authorizedBy = String(formData.get("authorized_by") ?? "").trim();
   if (isDeliveryTypeCreate && !authorizedBy) return { error: "Informe quem autorizou." };
+
+  // Checklist antes de finalizar (0178) -- vale pra troca_produto/
+  // entrega_produto/envio_peca (os 3 tipos que chegam aqui com checklist).
+  // Não bloqueia a criação se vier incompleto -- vira rascunho (ver
+  // readChecklistFields).
+  const checklist = readChecklistFields(formData, type);
+  if ("error" in checklist) return checklist;
 
   const driverNameInput = emptyToNull(formData.get("driver_name"));
 
@@ -3019,6 +3095,11 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       pickup_destination: pickupDestination,
       // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
       deadline_status: "aprovado",
+      checklist_estoque: checklist.checklistEstoque,
+      checklist_separado: checklist.checklistSeparado,
+      checklist_placa: checklist.checklistPlaca,
+      checklist_localizacao: checklist.checklistLocalizacao,
+      checklist_completo: checklist.checklistCompleto,
     })
     .select("id, ticket_number")
     .single();

@@ -94,7 +94,7 @@ function EntregaFlatRow({ r, selected, onToggleSelected }: { r: ServiceRequestSu
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+          <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} checklistCompleto={r.checklistCompleto} />
           {r.status === "remarcar" ? <RemarcarContactBadge contactedAt={r.remarcarContactedAt} /> : null}
           {r.urgent ? (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap text-white" style={{ background: "var(--status-critical)" }}>

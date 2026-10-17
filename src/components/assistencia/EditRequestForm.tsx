@@ -10,8 +10,10 @@ import {
   CAUSA_RAIZ_LABELS,
   PICKUP_DESTINATION_OPTIONS,
   PICKUP_DESTINATION_LABELS,
+  CHECKLIST_REQUIRED_TYPES,
 } from "@/lib/assistenciaLabels";
 import { ConferenteField } from "./ConferenteField";
+import { ChecklistEntregaFields } from "./ChecklistEntregaFields";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -78,8 +80,21 @@ export function EditRequestForm({
       ? [request.causaRaiz, ...CAUSA_RAIZ_OPTIONS]
       : CAUSA_RAIZ_OPTIONS;
 
+  const showChecklist = (CHECKLIST_REQUIRED_TYPES as readonly string[]).includes(type);
+
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+      {/* Checklist antes de finalizar (0178) -- pedido do Victor
+          17/10/2026: "na própria tela de editar o chamado" é onde o
+          atendente volta pra completar um rascunho. Aviso só quando já
+          incompleto HOJE (não some ao trocar o type na tela -- o banner é
+          sobre o estado salvo, o formulário abaixo já reage ao type novo). */}
+      {showChecklist && !request.checklistCompleto ? (
+        <p className="text-sm font-semibold rounded-lg px-3 py-2" style={{ background: "color-mix(in srgb, var(--status-critical) 18%, var(--surface-1))", color: "var(--status-critical)" }}>
+          📝 Rascunho -- checklist pendente (seção &quot;Checklist antes de finalizar&quot; logo abaixo). Só entra na rota depois de completo.
+        </p>
+      ) : null}
+
       {typeOptions.length > 1 ? (
         <Field label="Tipo *">
           <select
@@ -391,6 +406,22 @@ export function EditRequestForm({
             </span>
           ) : null}
         </Field>
+      ) : null}
+
+      {showChecklist ? (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Checklist antes de finalizar
+          </span>
+          <ChecklistEntregaFields
+            initial={{
+              estoque: request.checklistEstoque,
+              separado: request.checklistSeparado,
+              placa: request.checklistPlaca,
+              localizacao: request.checklistLocalizacao,
+            }}
+          />
+        </div>
       ) : null}
 
       {state?.error ? (

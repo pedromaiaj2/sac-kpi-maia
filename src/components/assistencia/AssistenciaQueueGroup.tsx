@@ -216,7 +216,7 @@ function EntregaCardRow({
           {r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
         </span>
         <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-          <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+          <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} checklistCompleto={r.checklistCompleto} />
           {r.status === "remarcar" ? <RemarcarContactBadge contactedAt={r.remarcarContactedAt} /> : null}
         </div>
       </td>

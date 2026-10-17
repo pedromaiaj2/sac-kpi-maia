@@ -35,11 +35,26 @@ export function DeliveryStatusBadge({
   status,
   scheduledDate,
   rota,
+  checklistCompleto = true,
 }: {
   status: string;
   scheduledDate: string | null;
   rota: string | null;
+  // Checklist antes de finalizar (0178, CHECKLIST_REQUIRED_TYPES em
+  // assistenciaLabels.ts) -- pedido do Victor 17/10/2026: enquanto não
+  // completo, mostra "Rascunho" em vez de Programado/Não programado,
+  // mesmo que já tenha data/rota escolhida (não é "de verdade" ainda).
+  // Default true pra quem não passa (telas do motorista, que já nunca
+  // recebem um rascunho -- ver listRequestsForDriver, serviceRequests.ts).
+  checklistCompleto?: boolean;
 }) {
+  if (!checklistCompleto && status !== "concluida" && status !== "cancelada") {
+    return (
+      <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ color: "#fff", background: "var(--status-critical)" }}>
+        📝 Rascunho
+      </span>
+    );
+  }
   if (status === "concluida") {
     return (
       <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ color: "#fff", background: "var(--status-good)" }}>

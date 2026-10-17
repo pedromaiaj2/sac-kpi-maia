@@ -154,15 +154,19 @@ export function filterPendingContato(requests: ServiceRequestSummary[]): Service
   return requests.filter((r) => r.status === "remarcar" && !r.remarcarContactedAt);
 }
 
-// Tira os grupos "sem rota" do meio do feed ordenado por data e coloca
-// primeiro -- mesmo pedido do Victor acima. groupByRota já calcula
-// `isSemRota` por grupo (ver abaixo); aqui só reordena o array que ele
-// devolve, sem recalcular nada. Aplicado nas duas telas que usam
+// Tira os grupos "sem rota"/"rascunho" do meio do feed ordenado por data e
+// coloca primeiro -- mesmo pedido do Victor acima. groupByRota já calcula
+// `isSemRota`/`isRascunho` por grupo (ver abaixo); aqui só reordena o array
+// que ele devolve, sem recalcular nada. Aplicado nas duas telas que usam
 // groupByRota (fila/page.tsx aba Entregas e sac/notificacoes/page.tsx).
+// Rascunho primeiro que sem rota -- checklist pendente é a pendência mais
+// "presa" das duas (sem rota só falta escolher; rascunho já tem rota
+// escolhida mas não libera sozinho).
 export function pinSemRotaFirst(groups: QueueGroup[]): QueueGroup[] {
-  const semRota = groups.filter((g) => g.isSemRota);
-  const rest = groups.filter((g) => !g.isSemRota);
-  return [...semRota, ...rest];
+  const rascunho = groups.filter((g) => g.isRascunho);
+  const semRota = groups.filter((g) => g.isSemRota && !g.isRascunho);
+  const rest = groups.filter((g) => !g.isSemRota && !g.isRascunho);
+  return [...rascunho, ...semRota, ...rest];
 }
 
 // Dentro de cada grupo, mesma prioridade de sempre: ordem manual
@@ -216,13 +220,18 @@ export type QueueGroup = {
   // Pra tag Hoje/Futura/Atrasada/Sem rota no cabeçalho -- ver DATE_BUCKET_TAG.
   dateBucket?: DateBucketKey;
   isSemRota?: boolean;
+  // Checklist pendente (0178, CHECKLIST_REQUIRED_TYPES em
+  // assistenciaLabels.ts) -- "fica ao lado das rotas... em vermelho",
+  // pedido do Victor 17/10/2026: grupo próprio, separado de isSemRota (o
+  // chamado pode já ter rota escolhida, só não foi liberado ainda).
+  isRascunho?: boolean;
   // Rota "crua" (sem a data junto) -- pedido do Victor 25/08/2026: o
   // Kanban de "Hoje" (EntregasKanbanHoje.tsx) precisa de coluna por rota
   // com cabeçalho só "Rota Praia" (sem "· 25 de agosto..." repetido em
   // toda coluna do mesmo dia) e precisa da chave crua pra buscar o nome
   // do motorista (driverNameForRota, rotas.ts). Só existe em groupByRota
   // -- groupByDate (Visitas) não agrupa por rota, não preenche.
-  rotaKey?: Rota | "sem_rota" | "retira_loja" | "retira_cd";
+  rotaKey?: Rota | "sem_rota" | "retira_loja" | "retira_cd" | "rascunho";
   rotaLabel?: string;
   // Data "crua" (YYYY-MM-DD) por trás do dateBucket -- null quando o grupo
   // é o pseudo-dia "sem data definida" (nenhum item com scheduledDate nem
@@ -250,7 +259,23 @@ export const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string 
 // por data (hoje, amanhã, depois, atrasado, sem_data) e só dentro de cada
 // data é que separa por rota.
 export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
-  const rotaOrder: (Omit<QueueGroup, "items" | "label" | "key" | "rotaKey" | "rotaLabel"> & { key: Rota | "sem_rota" | "retira_loja" | "retira_cd"; rotaLabel: string })[] = [
+  const rotaOrder: (Omit<QueueGroup, "items" | "label" | "key" | "rotaKey" | "rotaLabel"> & {
+    key: Rota | "sem_rota" | "retira_loja" | "retira_cd" | "rascunho";
+    rotaLabel: string;
+  })[] = [
+    // Checklist pendente (0178) -- antes de qualquer rota de verdade: o
+    // chamado pode até já ter rota/motorista escolhido no formulário, mas
+    // não é "de verdade" até o checklist ser concluído (ver
+    // CHECKLIST_REQUIRED_TYPES, assistenciaLabels.ts). Vermelho (mesmo tom
+    // de "Não concluída"/críticos do painel), pra destacar que precisa de
+    // ação antes de liberar.
+    {
+      key: "rascunho",
+      rotaLabel: "📝 Rascunho (checklist pendente)",
+      headerBg: "var(--status-critical)",
+      headerText: "#fff",
+      borderColor: "var(--status-critical)",
+    },
     ...ROTAS.map((r) => ({
       key: r,
       // "Rota extra" já é o nome inteiro (ver JP_EXTRA_ROTA em rotas.ts)
@@ -273,7 +298,13 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
   const groups: QueueGroup[] = [];
   for (const dateGroup of groupByScheduledDate(requests)) {
     for (const rotaInfo of rotaOrder) {
-      const items = dateGroup.items.filter((r) => (r.retiradaEm ? `retira_${r.retiradaEm}` : (r.rota ?? "sem_rota")) === rotaInfo.key);
+      const items = dateGroup.items.filter((r) => {
+        // Checklist pendente vence qualquer rota/retirada escolhida -- vai
+        // pro balde "rascunho" (0178), não pro balde da rota de verdade.
+        if (!r.checklistCompleto) return rotaInfo.key === "rascunho";
+        if (rotaInfo.key === "rascunho") return false;
+        return (r.retiradaEm ? `retira_${r.retiradaEm}` : (r.rota ?? "sem_rota")) === rotaInfo.key;
+      });
       if (items.length === 0) continue;
       const rawDateKey = dateGroup.dateKey === NO_SCHEDULED_DATE_KEY ? null : dateGroup.dateKey;
       groups.push({
@@ -285,6 +316,7 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
         items,
         dateBucket: bucketByScheduledDate(rawDateKey),
         isSemRota: rotaInfo.key === "sem_rota",
+        isRascunho: rotaInfo.key === "rascunho",
         rotaKey: rotaInfo.key,
         rotaLabel: rotaInfo.rotaLabel,
         dateKey: rawDateKey,

@@ -284,6 +284,18 @@ export type ServiceRequestSummary = {
   // vez que o motorista marca remarcar outra vez (ver driverReportIssue).
   remarcarContactedAt: string | null;
   remarcarContactedBy: string | null;
+  // Checklist antes de finalizar (0178) -- só vale pra CHECKLIST_REQUIRED_TYPES
+  // (envio_peca/troca_produto/entrega_produto, ver assistenciaLabels.ts); nos
+  // outros tipos checklistCompleto é sempre true (default do banco, nunca
+  // escrito pelas actions de criação/edição pra esses tipos). Enquanto
+  // false, o chamado fica no balde "Rascunho" das telas de notificação
+  // (groupByRota, entregaQueueGrouping.ts) e NÃO aparece na fila do
+  // motorista (listRequestsForDriver/getDriverRequestDetail abaixo).
+  checklistEstoque: boolean;
+  checklistSeparado: boolean;
+  checklistPlaca: boolean;
+  checklistLocalizacao: string | null;
+  checklistCompleto: boolean;
 };
 
 type SummaryRow = {
@@ -329,6 +341,11 @@ type SummaryRow = {
   causa_raiz_detalhe: string | null;
   remarcar_contact_attempted_at: string | null;
   remarcar_contact_attempted_by: string | null;
+  checklist_estoque: boolean;
+  checklist_separado: boolean;
+  checklist_placa: boolean;
+  checklist_localizacao: string | null;
+  checklist_completo: boolean;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -340,7 +357,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, retirada_em, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, retirada_em, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, checklist_estoque, checklist_separado, checklist_placa, checklist_localizacao, checklist_completo, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -404,6 +421,11 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     causaRaizDetalhe: row.causa_raiz_detalhe,
     remarcarContactedAt: row.remarcar_contact_attempted_at,
     remarcarContactedBy: row.remarcar_contact_attempted_by,
+    checklistEstoque: row.checklist_estoque,
+    checklistSeparado: row.checklist_separado,
+    checklistPlaca: row.checklist_placa,
+    checklistLocalizacao: row.checklist_localizacao,
+    checklistCompleto: row.checklist_completo,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -715,7 +737,7 @@ const DETAIL_COLUMNS =
   // ao dar suporte pra editar causa raiz depois de criado (ver
   // EditRequestForm.tsx): sem essa coluna, o texto de "Outro" digitado na
   // criação nunca aparecia de volta no formulário de correção.
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, pickup_destination, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, pickup_destination, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, checklist_estoque, checklist_separado, checklist_placa, checklist_localizacao, checklist_completo, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 export async function getRequestDetail(
   id: string
@@ -1418,7 +1440,11 @@ export async function listRequestsForDriver(
   opts: { onlyCompleted?: boolean; viewAll?: boolean } = {}
 ): Promise<DriverRequestView[]> {
   const admin = getSupabaseAdmin();
-  let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).limit(DRIVER_VIEW_LIMIT);
+  // "Só entra de verdade na rota depois que preencher o checklist" (0178)
+  // -- motorista (e supervisor em viewAll) nunca vê um chamado ainda em
+  // rascunho (envio_peca/troca_produto/entrega_produto sem checklist
+  // completo), mesmo que já tenha rota/motorista escolhido no formulário.
+  let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).eq("checklist_completo", true).limit(DRIVER_VIEW_LIMIT);
   if (opts.viewAll) {
     // Sem o filtro por driver_name, precisa restringir por tipo na mão --
     // era o driver_name (só preenchido em tipo de entrega) que limitava
@@ -1457,7 +1483,9 @@ export async function getDriverRequestDetail(
   opts: { viewAll?: boolean } = {}
 ): Promise<DriverRequestView | null> {
   const admin = getSupabaseAdmin();
-  let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).eq("id", requestId);
+  // Mesmo filtro de listRequestsForDriver acima (0178) -- um chamado ainda
+  // em rascunho não deve abrir nem pelo link direto.
+  let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).eq("id", requestId).eq("checklist_completo", true);
   if (!opts.viewAll) {
     query = query.eq("driver_name", driverName);
   }

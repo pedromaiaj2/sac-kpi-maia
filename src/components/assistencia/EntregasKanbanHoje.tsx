@@ -48,8 +48,9 @@ type KanbanColumn = {
   driverName: string | null;
   // Rota "crua" por trás do card -- só serve pra achar a rota padrão do dia
   // (ver defaultRota em EntregasKanbanHoje) e pré-selecionar o card certo;
-  // não aparece em nenhum texto (isso já é rotaLabel).
-  rotaKey?: Rota | "sem_rota" | "retira_loja" | "retira_cd";
+  // não aparece em nenhum texto (isso já é rotaLabel). "rascunho" (0178) é
+  // checklist pendente -- nunca a rota padrão do dia.
+  rotaKey?: Rota | "sem_rota" | "retira_loja" | "retira_cd" | "rascunho";
 };
 
 // "Rota extra" genérica (ver JP_EXTRA_ROTA, rotas.ts) pode ter mais de um
@@ -349,7 +350,7 @@ function TodayRow({ row, selected, onToggleSelected }: { row: FlatRow; selected:
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+          <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} checklistCompleto={r.checklistCompleto} />
           {r.status === "remarcar" ? <RemarcarContactBadge contactedAt={r.remarcarContactedAt} /> : null}
           {/* Horário agendado -- também tinha sumido na reformulação,
               restaurado (o card antigo mostrava "🕐 HH:MM"). */}

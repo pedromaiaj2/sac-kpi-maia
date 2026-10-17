@@ -19,12 +19,14 @@ import {
   SHIFT_LABELS,
   PICKUP_DESTINATION_OPTIONS,
   PICKUP_DESTINATION_LABELS,
+  CHECKLIST_REQUIRED_TYPES,
 } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, SHIFTS, type Store } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
 import { ConferenteField } from "./ConferenteField";
+import { ChecklistEntregaFields } from "./ChecklistEntregaFields";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -1049,6 +1051,16 @@ export function SacCreateRequestForm({
         ) : null}
 
       </FormSection>
+
+      {/* Checklist antes de finalizar (0178) -- pedido do Victor 17/10/2026,
+          só pros 3 tipos de CHECKLIST_REQUIRED_TYPES (troca_produto/
+          entrega_produto/envio_peca). Não bloqueia o "Criar" -- incompleto
+          vira rascunho, sem entrar na rota (ver ChecklistEntregaFields.tsx). */}
+      {(CHECKLIST_REQUIRED_TYPES as readonly string[]).includes(type) ? (
+        <FormSection title="Checklist antes de finalizar" number={5}>
+          <ChecklistEntregaFields />
+        </FormSection>
+      ) : null}
 
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

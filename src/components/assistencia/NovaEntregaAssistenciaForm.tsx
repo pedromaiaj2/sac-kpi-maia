@@ -12,7 +12,7 @@ import {
   type FormState,
 } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS, CHECKLIST_REQUIRED_TYPES } from "@/lib/assistenciaLabels";
 import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
@@ -20,6 +20,7 @@ import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
 import { useFormPrefill } from "./useFormPrefill";
 import { ConferenteField } from "./ConferenteField";
+import { ChecklistEntregaFields } from "./ChecklistEntregaFields";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -968,6 +969,16 @@ export function NovaEntregaAssistenciaForm({
           </p>
         ) : null}
       </FormSection>
+
+      {/* Checklist antes de finalizar (0178) -- só "envio_peca" (os outros 2
+          tipos do checklist, troca_produto/entrega_produto, só nascem no
+          SAC). Não bloqueia o "Criar" -- incompleto vira rascunho, sem
+          entrar na rota (ver ChecklistEntregaFields.tsx). */}
+      {(CHECKLIST_REQUIRED_TYPES as readonly string[]).includes(type) ? (
+        <FormSection title="Checklist antes de finalizar" number={6}>
+          <ChecklistEntregaFields />
+        </FormSection>
+      ) : null}
 
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

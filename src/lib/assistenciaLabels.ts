@@ -640,6 +640,24 @@ export const CAUSA_RAIZ_ERRO_INTERNO: string[] = [
   "sujeira_conferencia",
 ];
 
+// Checklist antes de finalizar -- pedido do Victor 17/10/2026: "preciso de
+// um checklist antes que o atendente finalize a solicitação... Ele deverá
+// poder salvar como rascunho, mas só entra de verdade na rota, depois que
+// preencher o checklist". Só esses 3 tipos (migração 0178,
+// checklist_completo em service_requests) -- os outros tipos de entrega
+// (recolhimento, recolhimento_produto, envio_recolhimento_peca) ficam de
+// fora por agora, o Victor só pediu esses 3.
+export const CHECKLIST_REQUIRED_TYPES = ["envio_peca", "troca_produto", "entrega_produto"] as const;
+
+// Onde o produto está -- última pergunta do checklist acima.
+export const PRODUCT_CHECKLIST_LOCATION_OPTIONS = ["assistencia", "estoque", "area_reserva"] as const;
+export type ProductChecklistLocation = (typeof PRODUCT_CHECKLIST_LOCATION_OPTIONS)[number];
+export const PRODUCT_CHECKLIST_LOCATION_LABELS: Record<ProductChecklistLocation, string> = {
+  assistencia: "Assistência",
+  estoque: "Estoque",
+  area_reserva: "Área de reserva",
+};
+
 export const SAC_CATEGORIES = [
   "atraso_entrega",
   "entrega_parcial",

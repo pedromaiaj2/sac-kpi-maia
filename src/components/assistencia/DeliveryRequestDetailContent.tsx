@@ -178,7 +178,7 @@ export function DeliveryRequestDetailContent({
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2.5 flex-wrap">
           <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">Chamado #{request.ticketNumber}</h1>
-          <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} />
+          <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} checklistCompleto={request.checklistCompleto} />
           {request.status === "remarcar" ? <RemarcarContactBadge contactedAt={request.remarcarContactedAt} /> : null}
           <NeutralBadge>{REQUEST_TYPE_LABELS[request.type] ?? request.type}</NeutralBadge>
           <NeutralBadge icon="🏬">{request.storeName}</NeutralBadge>
