@@ -15,7 +15,7 @@ function formatDate(value: unknown) {
 // Avaliações: "linha do tempo de evolução dessas notas".
 export function NpsTrendChart({ data }: { data: NpsWeekPoint[] }) {
   return (
-    <div className="rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-orange)" }}>
+    <div className="cartao p-5">
       <h3 className="text-sm font-bold mb-1" style={{ color: "var(--text-primary)" }}>
         Evolução do NPS (por semana)
       </h3>
@@ -30,9 +30,9 @@ export function NpsTrendChart({ data }: { data: NpsWeekPoint[] }) {
       ) : (
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={data} margin={{ left: 0, right: 16, top: 8, bottom: 4 }}>
-            <CartesianGrid vertical={false} stroke="var(--gridline)" />
-            <XAxis dataKey="weekStart" tickFormatter={formatDate} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
-            <YAxis stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+            <CartesianGrid vertical={false} stroke="var(--gridline)" strokeDasharray="3 6" />
+            <XAxis dataKey="weekStart" tickFormatter={formatDate} axisLine={false} tickLine={false} tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
             <Tooltip
               labelFormatter={formatDate}
               contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-primary)", fontSize: 12 }}

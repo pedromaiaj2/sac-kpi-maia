@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Home, Users, Star, MessageSquare, Wrench, MessagesSquare, Truck, LogOut } from "lucide-react";
 import { signOutDashboard } from "@/app/login/actions";
+import { BotaoTemaPainel } from "./PainelTema";
 
 // Menu lateral do painel escuro da Logística (pedido do Victor 17/10/2026):
 // os mesmos destinos do AppHeader + sub-abas de KPIs, só que em ícones
@@ -24,10 +25,16 @@ function Item({ href, rotulo, Icone }: (typeof ITENS)[number]) {
     <Link
       href={href}
       aria-current={ativo ? "page" : undefined}
-      className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 min-w-[64px] text-[11px] transition-colors hover:bg-[var(--surface-2)]"
-      style={{ color: ativo ? "var(--text-primary)" : "var(--text-muted)", background: ativo ? "var(--surface-2)" : undefined }}
+      className={`group flex flex-col items-center gap-1 rounded-xl px-2 py-2 min-w-[64px] text-[11px] transition-all duration-200 ${
+        ativo ? "bg-[var(--surface-2)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[color-mix(in_srgb,var(--text-primary)_7%,transparent)] hover:text-[var(--text-primary)]"
+      }`}
     >
-      <Icone aria-hidden size={20} strokeWidth={1.75} style={{ color: ativo ? "var(--brand-green)" : undefined }} />
+      <Icone
+        aria-hidden
+        size={20}
+        strokeWidth={1.75}
+        className={`transition-transform duration-200 ${ativo ? "text-[var(--brand-green)]" : "group-hover:scale-110"}`}
+      />
       <span className={ativo ? "font-semibold" : undefined}>{rotulo}</span>
     </Link>
   );
@@ -46,11 +53,13 @@ export function SidebarPainel() {
             <Item key={i.href} {...i} />
           ))}
         </nav>
-        <form action={signOutDashboard} className="mt-auto">
+        <div className="mt-auto">
+          <BotaoTemaPainel />
+        </div>
+        <form action={signOutDashboard}>
           <button
             type="submit"
-            className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 min-w-[64px] text-[11px] hover:bg-[var(--surface-2)]"
-            style={{ color: "var(--text-muted)" }}
+            className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 min-w-[64px] text-[11px] text-[var(--text-muted)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--text-primary)_7%,transparent)] hover:text-[var(--status-critical)]"
           >
             <LogOut aria-hidden size={20} strokeWidth={1.75} />
             Sair
@@ -66,8 +75,12 @@ export function SidebarPainel() {
         {ITENS.map((i) => (
           <Item key={i.href} {...i} />
         ))}
+        <BotaoTemaPainel />
         <form action={signOutDashboard}>
-          <button type="submit" className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 min-w-[64px] text-[11px]" style={{ color: "var(--text-muted)" }}>
+          <button
+            type="submit"
+            className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 min-w-[64px] text-[11px] text-[var(--text-muted)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--text-primary)_7%,transparent)] hover:text-[var(--status-critical)]"
+          >
             <LogOut aria-hidden size={20} strokeWidth={1.75} />
             Sair
           </button>

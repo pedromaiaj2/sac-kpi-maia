@@ -8,6 +8,7 @@ export function StatTile({
   badge,
   onClick,
   note,
+  suave = false,
 }: {
   label: string;
   value: string | number;
@@ -32,6 +33,11 @@ export function StatTile({
   // do card de Total de chamados (ver getVendasCountPorLoja,
   // vendasProduto.ts) -- contexto de referência, não um alerta.
   note?: string;
+  // Casca do design system das telas do SAC (17/10/2026): cartão sem borda,
+  // cantos de 16px, rótulo pequeno espaçado e a cor de destaque num traço
+  // curto no topo. Sem isso, o visual de sempre (as telas da assistência
+  // não mudam).
+  suave?: boolean;
 }) {
   // "lg" é pensado pra números curtos ("130") -- valor longo (ex.: "R$
   // 105.768,50") estourava a largura do card, cortado pela borda (achado
@@ -40,7 +46,7 @@ export function StatTile({
   // pra número curto continuar legível à distância.
   const valueStr = String(value);
   const lgSizeClass = valueStr.length > 8 ? "text-2xl sm:text-3xl font-bold" : "text-4xl sm:text-5xl font-bold";
-  const sizeClass = size === "lg" ? lgSizeClass : "text-3xl font-semibold";
+  const sizeClass = size === "lg" ? lgSizeClass : suave ? "text-3xl font-bold tracking-tight" : "text-3xl font-semibold";
 
   return (
     <div
@@ -57,14 +63,23 @@ export function StatTile({
             }
           : undefined
       }
-      className={`rounded-lg border p-4 flex flex-col gap-1 min-w-0 ${onClick ? "cursor-pointer hover:shadow-md transition-shadow duration-150" : ""}`}
-      style={{
-        background: "var(--surface-1)",
-        borderColor: "var(--border)",
-        borderTop: `3px solid ${accent}`,
-      }}
+      className={
+        suave
+          ? `cartao p-5 flex flex-col gap-1.5 min-w-0 ${onClick ? "cursor-pointer transition-transform duration-200 hover:-translate-y-0.5" : ""}`
+          : `rounded-lg border p-4 flex flex-col gap-1 min-w-0 ${onClick ? "cursor-pointer hover:shadow-md transition-shadow duration-150" : ""}`
+      }
+      style={
+        suave
+          ? undefined
+          : {
+              background: "var(--surface-1)",
+              borderColor: "var(--border)",
+              borderTop: `3px solid ${accent}`,
+            }
+      }
     >
-      <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+      {suave ? <span aria-hidden className="block h-1 w-10 rounded-full mb-1" style={{ background: accent }} /> : null}
+      <span className={suave ? "text-xs font-semibold uppercase tracking-wide" : "text-sm"} style={{ color: "var(--text-secondary)" }}>
         {label}
         {onClick ? (
           <span className="ml-1" style={{ color: "var(--text-muted)" }} aria-hidden="true">

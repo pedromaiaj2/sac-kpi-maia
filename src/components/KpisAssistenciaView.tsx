@@ -108,7 +108,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
             linha) -- usa KpiCardShell/StatusPill em vez do StatTile
             genérico, mesma casca visual do MetricCard ao lado. */}
         <KpiCardShell accentColor="var(--status-critical)" onClick={() => setShowPrejuizoDetalhe(true)}>
-          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Prejuízo total estimado em estoque
             {/* Tooltip nativo (title) -- pedido do Victor 21/09/2026: texto
                 explicando a regra de negócio do valor total (custo exato +
@@ -133,7 +133,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           />
         </KpiCardShell>
         <KpiCardShell>
-          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Produtos distintos com chamado
           </span>
           <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
@@ -141,7 +141,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           </span>
         </KpiCardShell>
         <KpiCardShell>
-          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Lojas com chamado no período
           </span>
           <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
@@ -162,7 +162,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           accentColor={economiaPotencial > 0 ? "var(--status-critical)" : "var(--status-good)"}
           onClick={() => setShowDiagnosticoEstrategico(true)}
         >
-          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Prejuízo acima da meta
             <span
               className="ml-1"
@@ -201,7 +201,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
 
       <VendaVsAssistenciaTable data={data.byStoreVendaVsAssistencia} />
 
-      <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+      <div className="cartao p-5">
         <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>
           Quem errou
         </h3>

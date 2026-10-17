@@ -149,7 +149,7 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
           metaIdealPct={SAC_TAXA_META_IDEAL_PCT}
         />
         <KpiCardShell>
-          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Resposta no 1º contato
           </span>
           <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
@@ -160,7 +160,7 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
         <KpiCardShell
           accentColor={data.pctWithin5Min !== null && data.pctWithin5Min < 50 ? "var(--status-warning)" : undefined}
         >
-          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Respondidos em até 5min
           </span>
           <span
@@ -171,7 +171,7 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
           </span>
         </KpiCardShell>
         <KpiCardShell accentColor={indexColor(data.npsSummary.npsIndex)}>
-          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Satisfação (NPS, meta {NPS_INDEX_TARGET})
           </span>
           <span className="text-5xl font-bold leading-none" style={{ color: indexColor(data.npsSummary.npsIndex) }}>
@@ -179,7 +179,7 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
           </span>
         </KpiCardShell>
         <KpiCardShell accentColor={data.highUrgencyOpenCount > 0 ? "var(--status-critical)" : undefined}>
-          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Urgência alta em aberto
           </span>
           <span
@@ -197,7 +197,7 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
           fora de tela) pra não pagar o custo de renderizar tudo de uma vez;
           como todos os dados já vieram prontos em `data`, trocar de aba é
           só troca de estado local, sem nova requisição. */}
-      <div className="flex flex-wrap gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+      <div className="flex flex-wrap gap-1.5">
         {TABS.map((tab) => {
           const active = tab.id === activeTab;
           return (
@@ -205,12 +205,9 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className="text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0"
-              style={{
-                color: active ? "var(--brand-green)" : "var(--text-secondary)",
-                background: active ? "var(--surface-1)" : "transparent",
-                borderColor: active ? "var(--border)" : "transparent",
-              }}
+              aria-pressed={active}
+              className={`text-sm font-medium tracking-wide px-4 py-1.5 rounded-full transition-colors duration-200 ${active ? "" : "hover:bg-[var(--surface-2)]"}`}
+              style={{ color: active ? "#fff" : "var(--text-secondary)", background: active ? "var(--brand-green)" : undefined }}
             >
               {tab.label}
             </button>
@@ -251,10 +248,11 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
         <div className="flex flex-col gap-6">
           <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatTile
+              suave
               label={`Dentro do SLA (${data.slaMinutesThreshold}min)`}
               value={data.pctWithinSla !== null ? `${data.pctWithinSla}%` : "—"}
             />
-            <StatTile label="Taxa de reincidência" value={data.recurrencePct !== null ? `${data.recurrencePct}%` : "—"} />
+            <StatTile suave label="Taxa de reincidência" value={data.recurrencePct !== null ? `${data.recurrencePct}%` : "—"} />
           </section>
           <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
             1ª resposta/SLA já considera horário comercial (seg-sex 8h-18h, sáb 8h-17h) para{" "}
@@ -280,16 +278,18 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
         <div className="flex flex-col gap-6">
           <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatTile
+              suave
               label="Tempo médio de resolução"
               value={data.avgResolutionHours ?? "—"}
               suffix={data.avgResolutionHours !== null ? "h" : undefined}
             />
             <StatTile
+              suave
               label="Espera média por info. externa (IA)"
               value={data.escalations.avgWaitMinutes !== null ? Math.round((data.escalations.avgWaitMinutes / 60) * 10) / 10 : "—"}
               suffix={data.escalations.avgWaitMinutes !== null ? "h" : undefined}
             />
-            <StatTile label="Ciclos de consulta ainda em aberto (IA)" value={data.escalations.pendingCount} />
+            <StatTile suave label="Ciclos de consulta ainda em aberto (IA)" value={data.escalations.pendingCount} />
           </section>
           <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
             Tempo de resolução calculado apenas para os {data.resolvedByTagCount} chamados com a tag

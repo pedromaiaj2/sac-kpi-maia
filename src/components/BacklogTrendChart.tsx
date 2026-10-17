@@ -19,8 +19,7 @@ export function BacklogTrendChart({ data }: { data: DayCount[] }) {
 
   return (
     <div
-      className="rounded-lg p-4"
-      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-orange)" }}
+      className="cartao p-5"
     >
       <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
@@ -48,14 +47,14 @@ export function BacklogTrendChart({ data }: { data: DayCount[] }) {
       ) : (
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={data} margin={{ left: 0, right: 16, top: 8, bottom: 4 }}>
-            <CartesianGrid vertical={false} stroke="var(--gridline)" />
+            <CartesianGrid vertical={false} stroke="var(--gridline)" strokeDasharray="3 6" />
             <XAxis
               dataKey="date"
               tickFormatter={formatDate}
-              stroke="var(--axis)"
+              axisLine={false} tickLine={false}
               tick={{ fill: "var(--text-muted)", fontSize: 12 }}
             />
-            <YAxis allowDecimals={false} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+            <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
             <Tooltip
               labelFormatter={formatDate}
               contentStyle={{

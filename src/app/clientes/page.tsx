@@ -147,19 +147,20 @@ export default async function ClientesPage({
         </p>
       </div>
 
-      <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
-        <UnderlineTab href={buildHref({ view: "status" })} label="Status (Protheus)" active={view === "status"} color="var(--brand-orange)" />
-        <UnderlineTab href={buildHref({ view: "nivel" })} label="Nível de relacionamento" active={view === "nivel"} color="var(--brand-orange)" />
-        <UnderlineTab href={buildHref({ view: "recompra" })} label="Propensão a recompra" active={view === "recompra"} color="var(--brand-orange)" />
-        <UnderlineTab href={buildHref({ view: "conversao" })} label="Conversão 1ª → 2ª Compra" active={view === "conversao"} color="var(--brand-orange)" />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <UnderlineTab href={buildHref({ view: "status" })} label="Status (Protheus)" active={view === "status"} color="var(--brand-orange)" pilula />
+        <UnderlineTab href={buildHref({ view: "nivel" })} label="Nível de relacionamento" active={view === "nivel"} color="var(--brand-orange)" pilula />
+        <UnderlineTab href={buildHref({ view: "recompra" })} label="Propensão a recompra" active={view === "recompra"} color="var(--brand-orange)" pilula />
+        <UnderlineTab href={buildHref({ view: "conversao" })} label="Conversão 1ª → 2ª Compra" active={view === "conversao"} color="var(--brand-orange)" pilula />
         <UnderlineTab
           href={buildHref({ view: "frequencia" })}
           label="Frequência & Potencial de Recompra"
           active={view === "frequencia"}
           color="var(--brand-orange)"
+          pilula
         />
-        <UnderlineTab href={buildHref({ view: "estornos" })} label="Estornos" active={view === "estornos"} color="var(--brand-orange)" />
-        <UnderlineTab href={buildHref({ view: "vouchers" })} label="Vouchers" active={view === "vouchers"} color="var(--brand-orange)" />
+        <UnderlineTab href={buildHref({ view: "estornos" })} label="Estornos" active={view === "estornos"} color="var(--brand-orange)" pilula />
+        <UnderlineTab href={buildHref({ view: "vouchers" })} label="Vouchers" active={view === "vouchers"} color="var(--brand-orange)" pilula />
       </div>
 
       {view === "status" ? (
@@ -275,7 +276,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
         // da tabela e o overflow-x-auto nunca chega a rolar de verdade
         // (mesma causa raiz do bug corrigido em ClientesNivelTable.tsx
         // 15/09/2026).
-        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+        <div className="cartao min-w-0 overflow-hidden">
           <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -284,17 +285,17 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     lógica dessa" (tela de Entregas, EntregasFlatList.tsx). */}
                 <tr
                   className="text-[11px] uppercase tracking-wider"
-                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                  style={{ color: "var(--text-muted)", boxShadow: "inset 0 -1px 0 var(--border)" }}
                 >
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Status</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Dias sem comprar</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Telefone</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cidade</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Canal de aquisição</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Nome</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Status</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Última compra</th>
+                  <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">Dias sem comprar</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Telefone</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Cidade</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Loja</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Canal de aquisição</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Compras</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -305,7 +306,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     name={c.name}
                     accentColor={CLIENTE_STATUS_COLORS[c.status]}
                   >
-                    <td className="px-4 py-2 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
                         style={{
@@ -316,22 +317,22 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                         {CLIENTE_STATUS_LABELS[c.status]}
                       </span>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {formatDateOnly(c.lastPurchaseDate)}
                     </td>
                     <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.daysWithoutBuying ?? "—"}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.phone1 ?? "—"}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.city ? `${c.city}${c.state ? `/${c.state}` : ""}` : "—"}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.stores.length > 0 ? c.stores.join(", ") : "—"}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <CanalAquisicaoSelect clientId={c.protheusCode} canal={canalPorCliente.get(c.protheusCode) ?? null} />
                     </td>
                   </ClienteHistoricoRow>
@@ -441,18 +442,15 @@ async function NivelView({ q, nivel, inativo, page }: { q?: string; nivel?: stri
           <Link
             key={n}
             href={buildHref({ view: "nivel", q, nivel: filterNivel === n ? undefined : n, inativo: filterInativo ? "1" : undefined })}
-            className="rounded-xl border p-4 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
+            aria-current={filterNivel === n ? "true" : undefined}
+            className="rounded-2xl p-5 flex flex-col gap-1.5 transition-all duration-200 hover:-translate-y-0.5"
             style={{
-              background: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[n]} ${filterNivel === n ? 10 : 5}%, var(--surface-1))`,
-              borderColor: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[n]} ${filterNivel === n ? 100 : 35}%, var(--border))`,
-              borderTopWidth: 3,
-              borderTopColor: CLIENTE_NIVEL_COLORS[n],
+              background: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[n]} ${filterNivel === n ? 16 : 8}%, var(--surface-1))`,
+              boxShadow: filterNivel === n ? `inset 0 0 0 2px ${CLIENTE_NIVEL_COLORS[n]}` : undefined,
             }}
           >
-            <span className="text-2xl font-bold" style={{ color: CLIENTE_NIVEL_COLORS[n] }}>
-              {porNivel.get(n) ?? 0}
-            </span>
-            <span className="text-sm font-medium flex items-center gap-1" style={{ color: "var(--text-primary)" }}>
+            <span className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
+              <span aria-hidden className="inline-block w-2 h-2 rounded-full" style={{ background: CLIENTE_NIVEL_COLORS[n] }} />
               {CLIENTE_NIVEL_LABELS[n]}
               <span
                 title={CLIENTE_NIVEL_CRITERIA[n]}
@@ -462,6 +460,9 @@ async function NivelView({ q, nivel, inativo, page }: { q?: string; nivel?: stri
               >
                 i
               </span>
+            </span>
+            <span className="text-3xl font-bold tracking-tight tabular-nums" style={{ color: CLIENTE_NIVEL_COLORS[n] }}>
+              {(porNivel.get(n) ?? 0).toLocaleString("pt-BR")}
             </span>
             {/* Nível é histórico acumulado e nunca esfria sozinho -- esse
                 sub-contador é o que avisa quando o número acima está inflado
@@ -671,7 +672,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
         // da tabela e o overflow-x-auto nunca chega a rolar de verdade
         // (mesma causa raiz do bug corrigido em ClientesNivelTable.tsx
         // 15/09/2026).
-        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+        <div className="cartao min-w-0 overflow-hidden">
           <DualScrollTable>
             <table className="w-full text-sm">
               <thead>
@@ -680,21 +681,21 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     lógica dessa" (tela de Entregas, EntregasFlatList.tsx). */}
                 <tr
                   className="text-[11px] uppercase tracking-wider"
-                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                  style={{ color: "var(--text-muted)", boxShadow: "inset 0 -1px 0 var(--border)" }}
                 >
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Segmento</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Categoria em janela</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Sugestão (cross-sell)</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Atrito</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Gasto acumulado</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Nome</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Segmento</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Categoria em janela</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Sugestão (cross-sell)</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Nível</th>
+                  <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">Atrito</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Última compra</th>
+                  <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">Gasto acumulado</th>
                   {/* CLV preditivo (Fase 4) ajustado pelo índice de atrito
                       desta mesma linha -- metade do CLV bruto quando
                       "Atrito" (coluna acima) é alto, ver comentário completo
                       em recompra.ts. */}
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">
+                  <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">
                     <span className="inline-flex items-center gap-1">
                       CLV ajustado
                       <span
@@ -707,8 +708,8 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                       </span>
                     </span>
                   </th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Contato</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
+                  <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">Contato</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Compras</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -720,7 +721,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     comprasCount={c.compras}
                     accentColor={RECOMPRA_SEGMENTO_COLORS[c.segmento]}
                   >
-                    <td className="px-4 py-2 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
                         style={{
@@ -731,7 +732,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                         {RECOMPRA_SEGMENTO_LABELS[c.segmento]}
                       </span>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {/* "📦 entrega confirmada" saiu 12/09/2026 -- a
                           cross-referência com totvs_delivery_cargas que
                           calculava isso era a maior parte do custo da
@@ -744,10 +745,10 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                         "—"
                       )}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: c.sugestaoCrossSell ? "var(--text-primary)" : "var(--text-muted)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: c.sugestaoCrossSell ? "var(--text-primary)" : "var(--text-muted)" }}>
                       {c.sugestaoCrossSell ?? "—"}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {CLIENTE_NIVEL_LABELS[c.nivel]}
                     </td>
                     <td className="text-right px-4 py-2 whitespace-nowrap">
@@ -763,7 +764,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                         {c.atritoAlto ? "alto" : "baixo"}
                       </span>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {formatDateOnly(c.ultimaCompra)}
                     </td>
                     <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--brand-green)" }}>
@@ -772,7 +773,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.clvAjustado !== null ? formatBRL(c.clvAjustado) : "—"}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <RecompraContatoCell clientId={c.clientId} segmento={c.segmento} contato={c.ultimoContato} />
                     </td>
                   </ClienteHistoricoRow>
@@ -985,20 +986,20 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
           </p>
         </div>
       ) : (
-        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-orange)" }}>
+        <div className="cartao min-w-0 overflow-hidden">
           <DualScrollTable>
             <table className="w-full text-sm">
               <thead>
                 <tr
                   className="text-[11px] uppercase tracking-wider"
-                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-orange) 10%, var(--surface-1))" }}
+                  style={{ color: "var(--text-muted)", boxShadow: "inset 0 -1px 0 var(--border)" }}
                 >
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">1ª compra</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Forma de pagamento</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Converteu?</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Ação</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Cliente</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">1ª compra</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Loja</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Forma de pagamento</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Converteu?</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -1015,16 +1016,16 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
                     }
                     accentColor={c.converteu ? "var(--status-good)" : "var(--status-warning)"}
                   >
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {formatDateOnly(c.primeiraCompra)}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.lojaPrimeiraCompra ?? "—"}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.formasPagamentoPrimeiraCompra.length > 0 ? c.formasPagamentoPrimeiraCompra.join(" · ") : "—"}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {c.converteu ? (
                         <div>
                           <span
@@ -1051,7 +1052,7 @@ async function ConversaoView({ q, conv, page }: { q?: string; conv?: string; pag
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {c.converteu ? (
                         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                           —
@@ -1336,20 +1337,20 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
           </p>
         </div>
       ) : (
-        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+        <div className="cartao min-w-0 overflow-hidden">
           <DualScrollTable>
             <table className="w-full text-sm">
               <thead>
                 <tr
                   className="text-[11px] uppercase tracking-wider"
-                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                  style={{ color: "var(--text-muted)", boxShadow: "inset 0 -1px 0 var(--border)" }}
                 >
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Próxima compra provável</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Confiança</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Ação</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Cliente</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Última compra</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Próxima compra provável</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Confiança</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Ação</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Compras</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -1369,16 +1370,16 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
                       }
                       accentColor={badge.color}
                     >
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div style={{ color: "var(--text-primary)" }}>{l.padraoLabel}</div>
                         <div className="text-xs" style={{ color: "var(--text-muted)" }}>
                           Há {l.diasGatilho.toLocaleString("pt-BR")} dias
                         </div>
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
                         {l.proximaCompraProvavel}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span
                           className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
                           style={{ color: badge.color, background: `color-mix(in srgb, ${badge.color} 15%, transparent)` }}
@@ -1386,7 +1387,7 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
                           {badge.label} · {l.confiancaPct}%
                         </span>
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <AcionarClienteButton nome={l.nome} phone={l.phone} mensagem={mensagemOferta(l.nome, padraoDoLead)} />
                       </td>
                     </ClienteHistoricoRow>
@@ -1678,25 +1679,25 @@ async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: st
           </p>
         </div>
       ) : (
-        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+        <div className="cartao min-w-0 overflow-hidden">
           <DualScrollTable>
             <table className="w-full text-sm">
               <thead>
                 <tr
                   className="text-[11px] uppercase tracking-wider"
-                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                  style={{ color: "var(--text-muted)", boxShadow: "inset 0 -1px 0 var(--border)" }}
                 >
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Solicitação</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Valor</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Venda</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Pagamento</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Motivo</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Produto</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Autorizado por</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Status</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Ação</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Solicitação</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Cliente</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Loja</th>
+                  <th className="text-right font-semibold px-4 py-3 whitespace-nowrap">Valor</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Venda</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Pagamento</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Motivo</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Produto</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Autorizado por</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Status</th>
+                  <th className="text-left font-semibold px-4 py-3 whitespace-nowrap">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -1705,11 +1706,11 @@ async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: st
                   const pagamento = e.formaPagamento ? classificarPagamento(e.formaPagamento) : null;
                   const urgenciaLinha = classificarUrgencia(e);
                   return (
-                    <tr key={e.id} className="even:bg-[var(--surface-2)]">
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <tr key={e.id} className="transition-colors hover:bg-[var(--surface-2)]">
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                         {formatDateOnly(e.dataSolicitacao)}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
                         <span className="font-medium">{nome}</span>
                         {flag ? (
                           <span
@@ -1730,16 +1731,16 @@ async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: st
                           </span>
                         ) : null}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                         {e.loja}
                       </td>
                       <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--status-critical)" }}>
                         {formatBRL(e.valorReembolso)}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                         {formatDateOnly(e.dataVenda)}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         {pagamento ? (
                           <span
                             title={e.formaPagamento ?? undefined}
@@ -1752,7 +1753,7 @@ async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: st
                           <span style={{ color: "var(--text-secondary)" }}>—</span>
                         )}
                       </td>
-                      <td className="px-4 py-2 max-w-[280px]">
+                      <td className="px-4 py-3 max-w-[280px]">
                         <span
                           className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap mb-1"
                           style={{ color: URGENCIA_COLORS[urgenciaLinha], background: `color-mix(in srgb, ${URGENCIA_COLORS[urgenciaLinha]} 15%, transparent)` }}
@@ -1763,16 +1764,16 @@ async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: st
                           {e.motivo ?? "—"}
                         </span>
                       </td>
-                      <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
+                      <td className="px-4 py-3 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
                         {e.produto ?? "—"}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                         {e.autorizadoPor ?? "—"}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                         {e.status ?? "—"}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         {e.phone ? (
                           <a
                             href={whatsappHref(e.phone, `Olá${nome ? `, ${nome}` : ""}! Estamos acompanhando sua solicitação de estorno na Lojas Maia.`)}

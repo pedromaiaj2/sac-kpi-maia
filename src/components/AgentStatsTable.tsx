@@ -23,8 +23,7 @@ export function AgentStatsTable({
 
   return (
     <div
-      className="rounded-lg border p-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      className="cartao p-5"
     >
       <h3 className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>
         Desempenho por agente do SAC

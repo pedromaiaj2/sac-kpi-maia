@@ -81,19 +81,22 @@ function FaseCard({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg border p-4 flex flex-col gap-1 text-left hover:shadow-md transition-shadow duration-150"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      className="cartao p-5 flex flex-col items-center gap-2 text-center transition-transform duration-200 hover:-translate-y-0.5"
     >
-      <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+      {/* Design system 17/10/2026: a nota do NPS no centro, grande. */}
+      <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
         {label}
       </span>
-      <span className="text-2xl font-semibold" style={{ color: metaColor(npsIndex, meta) }}>
+      <span className="text-5xl font-bold tracking-tight tabular-nums leading-none py-2" style={{ color: metaColor(npsIndex, meta) }}>
         {npsIndex ?? "—"}
       </span>
       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
         {responseCount > 0 ? `${responseCount} resposta${responseCount > 1 ? "s" : ""}` : "sem respostas ainda"}
       </span>
-      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+      <span
+        className="text-[11px] rounded-full px-2.5 py-0.5"
+        style={{ color: "var(--text-secondary)", background: "var(--surface-2)" }}
+      >
         {metaLabel(meta)}
       </span>
     </button>
@@ -115,10 +118,10 @@ export function AvaliacoesResumo({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+        <h2 className="text-base font-semibold tracking-wide mb-4" style={{ color: "var(--text-primary)" }}>
           NPS por fase
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <FaseCard
             label="Atendimento (SAC)"
             npsIndex={npsSummary.npsIndex}

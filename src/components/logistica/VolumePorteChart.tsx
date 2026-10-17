@@ -65,7 +65,7 @@ export function VolumePorteChart({
   const [aberto, setAberto] = useState<ProdutoPorte["porte"] | null>(null);
   const unidades = (key: (typeof SERIES)[number]["key"]) => data.reduce((t, d) => t + d[key], 0);
   return (
-    <div>
+    <div className="pb-4">
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
         {SERIES.map((s) => (
           <button
@@ -91,7 +91,7 @@ export function VolumePorteChart({
         </p>
       ) : (
         <ResponsiveContainer width="100%" height={360}>
-          <BarChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 4 }} barCategoryGap="30%">
+          <BarChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 12 }} barCategoryGap="30%">
             <CartesianGrid vertical={false} stroke="var(--gridline)" />
             <XAxis dataKey="dia" tickFormatter={formatDia} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
             <YAxis allowDecimals={false} stroke="var(--axis)" tick={{ fill: "var(--text-muted)", fontSize: 12 }} width={44} />

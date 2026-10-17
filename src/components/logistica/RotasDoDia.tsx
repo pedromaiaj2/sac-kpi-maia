@@ -131,7 +131,7 @@ function CartaoCarga({ c, grupo, agora, onAbrir }: { c: CargaRota; grupo: GrupoR
             <p className="text-base font-semibold truncate" style={{ color: "var(--text-primary)" }}>
               {c.motorista?.nome ?? "Sem motorista"}
             </p>
-            <p className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
+            <p className="text-xs truncate opacity-80" style={{ color: "var(--text-secondary)" }}>
               {c.tipoVeiculo === "Carro" ? "Strada" : c.tipoVeiculo === "Caminhão" ? "Caminhão" : "Sem placa"}
               {c.veiculo ? ` ${c.veiculo}` : ""} · #{c.carga}
               {c.vinculo === "Terceirizado" && c.transportadora ? ` · ${c.transportadora}` : ""}

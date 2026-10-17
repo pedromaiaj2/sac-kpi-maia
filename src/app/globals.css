@@ -384,6 +384,41 @@ a:active {
   background: var(--canvas);
   color: var(--text-primary);
 }
+/* Versão clara do mesmo painel (botão sol/lua no menu lateral): os valores
+   do tema claro do app, fixados aqui pra valer mesmo com o resto do app no
+   modo noturno. */
+.painel-claro {
+  color-scheme: light;
+  --canvas: #f7f8f6;
+  --surface-1: #ffffff;
+  --surface-2: #f0f0ec;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #6e6c66;
+  --gridline: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --brand-green: #1b5e3c;
+  --brand-orange: #f2871a;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --series-3: #eda100;
+  --series-5: #2a78d6;
+  --series-7: #1baf7a;
+  --viz-1: #2a78d6;
+  --viz-2: #ea7a0f;
+  --viz-3: #16794a;
+  --viz-4: #8b5cf6;
+  --viz-5: #d03b3b;
+  --porte-p: #ea7a0f;
+  --porte-m: #3b82f6;
+  --porte-g: #16794a;
+  background: var(--canvas);
+  color: var(--text-primary);
+}
+
 /* Lista que abre do <select>: o Chrome no Windows desenhava as opções com
    texto escuro sobre fundo escuro (Victor 17/10/2026: "cor preta e sem
    mostrar a palavra"). */
@@ -391,6 +426,22 @@ a:active {
 .painel-escuro optgroup {
   background-color: var(--surface-1);
   color: var(--text-primary);
+}
+
+/* Cartão do design system (pedido do Victor 17/10/2026, mesmo acabamento
+   da Logística nas telas claras): cantos de 16px, sem borda, sombra suave
+   em duas camadas. Fundo claro continua -- só muda a casca. */
+.cartao {
+  border-radius: 1rem;
+  background: var(--surface-1);
+  box-shadow:
+    0 1px 2px rgb(16 24 40 / 0.04),
+    0 8px 24px -8px rgb(16 24 40 / 0.1);
+}
+html.dark .cartao {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.3),
+    0 8px 24px -8px rgb(0 0 0 / 0.5);
 }
 
 /* Luz "ao vivo" do mural Rotas de hoje (/kpis/logistica, pedido do Victor

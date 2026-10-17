@@ -25,9 +25,9 @@ export default async function KpisGhlPage({ searchParams }: { searchParams: Prom
       <div className="max-w-6xl mx-auto px-6 pt-6 flex flex-col gap-4">
         <AppHeader />
         <KpisSectionTabs active="ghl" />
-        <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        <div className="flex flex-wrap items-center gap-1.5">
           {SUB_KEYS.map((k) => (
-            <UnderlineTab key={k} href={`/kpis/ghl?sub=${k === "lider" ? "lider" : "lojas_maia"}`} label={SUBCONTAS[k].label} active={k === key} color="var(--brand-orange)" />
+            <UnderlineTab key={k} href={`/kpis/ghl?sub=${k === "lider" ? "lider" : "lojas_maia"}`} label={SUBCONTAS[k].label} active={k === key} color="var(--brand-orange)" pilula />
           ))}
         </div>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>

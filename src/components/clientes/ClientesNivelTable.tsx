@@ -238,7 +238,9 @@ export function ClientesNivelTable({
         const color = CLIENTE_NIVEL_COLORS[c.nivel];
         return (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>{CLIENTE_NIVEL_LABELS[c.nivel]}</Badge>
+            <Badge className="rounded-full px-2.5" style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
+              {CLIENTE_NIVEL_LABELS[c.nivel]}
+            </Badge>
             {c.inativoRecente ? (
               <Badge variant="destructive" title="Sem comprar há 180 dias ou mais -- nível é histórico acumulado, não reflete isso sozinho">
                 ⚠ inativo
@@ -390,7 +392,7 @@ export function ClientesNivelTable({
     // ação e as últimas colunas ficam cortadas em vez de roláveis.
     <div
       ref={wrapperRef}
-      className="relative min-w-0 rounded-lg overflow-hidden border-2 border-[var(--brand-green)] [&_[data-slot=table-container]]:min-w-0 [&_[data-slot=table-container]]:[scrollbar-color:var(--brand-green)_transparent] [&_[data-slot=table-container]]:[scrollbar-width:thin] [&_[data-slot=table-container]]:[&::-webkit-scrollbar]:h-2.5 [&_[data-slot=table-container]]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot=table-container]]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot=table-container]]:[&::-webkit-scrollbar-thumb]:bg-[var(--brand-green)]"
+      className="cartao relative min-w-0 overflow-hidden [&_[data-slot=table-container]]:min-w-0 [&_[data-slot=table-container]]:[scrollbar-color:var(--brand-green)_transparent] [&_[data-slot=table-container]]:[scrollbar-width:thin] [&_[data-slot=table-container]]:[&::-webkit-scrollbar]:h-2.5 [&_[data-slot=table-container]]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot=table-container]]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot=table-container]]:[&::-webkit-scrollbar-thumb]:bg-[var(--brand-green)]"
     >
       <div
         ref={topRef}
@@ -402,7 +404,7 @@ export function ClientesNivelTable({
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="bg-[color-mix(in_srgb,var(--brand-green)_10%,var(--surface-1))]">
+            <TableRow key={headerGroup.id} className="hover:bg-transparent">
               {headerGroup.headers.map((header) => (
                 // Cabeçalho compacto/uppercase -- pedido do Victor 16/09/2026:
                 // "fiquem com a tabela muito parecida com a lógica dessa"
@@ -419,7 +421,7 @@ export function ClientesNivelTable({
           {table.getRowModel().rows.map((row) => (
             <TableRow key={row.id} className="hover:bg-[var(--surface-2)]">
               {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id} className="whitespace-nowrap">
+                <TableCell key={cell.id} className="whitespace-nowrap py-3">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </TableCell>
               ))}
