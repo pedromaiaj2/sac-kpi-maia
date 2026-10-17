@@ -101,8 +101,20 @@ const STALE_PRIORITY_TIME_BUDGET_MS = 60_000;
 // inteira e descobre pedido novo que tenha entrado nela depois da 1ª vez,
 // sem depender do cursor global. Carga aberta em produção (03/09/2026):
 // ~91 distintas -- cabe reconsultar todas em poucas execuções.
-const OPEN_CARGA_PRIORITY_LIMIT = 15;
-const OPEN_CARGA_TIME_BUDGET_MS = 45_000;
+//
+// Correção 17/10/2026 (Victor: a tela de logística "bem desatualizada" no fim
+// da tarde): a fila pegava as 15 cargas com a linha mais antiga, e a mais
+// antiga era sempre uma linha que a API não devolve mais (pedido que saiu da
+// carga em agosto, "Em Separação" pra sempre). Como ela nunca era regravada,
+// o updated_at não andava e as mesmas 15 cargas velhas ocupavam a fila em
+// toda rodada -- as cargas Em Rota do dia só atualizavam pela paginação
+// geral, horas depois. Agora: só cargas com previsão na janela
+// (OPEN_CARGA_JANELA_*), a do dia primeiro, e a linha que a API não lista
+// mais na carga é apagada (ver limparLinhasForaDaCarga).
+const OPEN_CARGA_PRIORITY_LIMIT = 30;
+const OPEN_CARGA_TIME_BUDGET_MS = 150_000;
+const OPEN_CARGA_JANELA_ATRAS_DIAS = 7;
+const OPEN_CARGA_JANELA_FRENTE_DIAS = 3;
 
 // URL e paginação (page/size minúsculo) confirmados contra a API real em
 // 2026-07-30 -- api-totvs.yaml também errava os nomes de alguns campos do
@@ -1248,7 +1260,18 @@ async function syncStaleDeliveries(supabase: SupabaseAdmin): Promise<SyncResult>
 
 type OpenCargaCandidate = { carga: string };
 
-async function syncOpenCargas(supabase: SupabaseAdmin): Promise<SyncResult> {
+type JanelaCargas = { atrasDias: number; frenteDias: number; limite: number; orcamentoMs: number };
+const JANELA_SYNC_COMPLETO: JanelaCargas = {
+  atrasDias: OPEN_CARGA_JANELA_ATRAS_DIAS,
+  frenteDias: OPEN_CARGA_JANELA_FRENTE_DIAS,
+  limite: OPEN_CARGA_PRIORITY_LIMIT,
+  orcamentoMs: OPEN_CARGA_TIME_BUDGET_MS,
+};
+// Rodada rápida das rotas do dia (ver runTotvsSyncCargasDoDia): ontem
+// (rota que ainda não fechou), hoje e amanhã (carga sendo montada).
+const JANELA_CARGAS_DO_DIA: JanelaCargas = { atrasDias: 1, frenteDias: 1, limite: 30, orcamentoMs: 150_000 };
+
+async function syncOpenCargas(supabase: SupabaseAdmin, janela: JanelaCargas = JANELA_SYNC_COMPLETO): Promise<SyncResult> {
   const started = Date.now();
   const errors: string[] = [];
   let checked = 0;
@@ -1258,12 +1281,17 @@ async function syncOpenCargas(supabase: SupabaseAdmin): Promise<SyncResult> {
   // agrupa por carga e usa o updated_at mais antigo do grupo como proxy de
   // "há quanto tempo não reconsultamos essa carga inteira", pra rodar as
   // mais desatualizadas primeiro em vez de sempre bater nas mesmas.
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Recife" }).format(new Date());
+  const dia = (n: number) => isoDate(new Date(Date.parse(`${hoje}T12:00:00Z`) + n * DAY_MS));
   const { data: rows, error: fetchError } = await supabase
     .from("totvs_delivery_cargas")
     .select("carga, updated_at")
     .neq("status_carga_codigo", "6")
+    .gte("dt_previsao", dia(-janela.atrasDias))
+    .lte("dt_previsao", dia(janela.frenteDias))
+    .order("dt_previsao", { ascending: false })
     .order("updated_at", { ascending: true })
-    .limit(OPEN_CARGA_PRIORITY_LIMIT * 8);
+    .limit(janela.limite * 30);
   if (fetchError) {
     errors.push(`open cargas: ${fetchError.message}`);
     return { checked, upserted, errors };
@@ -1275,11 +1303,11 @@ async function syncOpenCargas(supabase: SupabaseAdmin): Promise<SyncResult> {
     if (seen.has(r.carga)) continue;
     seen.add(r.carga);
     cargas.push({ carga: r.carga });
-    if (cargas.length >= OPEN_CARGA_PRIORITY_LIMIT) break;
+    if (cargas.length >= janela.limite) break;
   }
 
   for (const { carga } of cargas) {
-    if (Date.now() - started > OPEN_CARGA_TIME_BUDGET_MS) break;
+    if (Date.now() - started > janela.orcamentoMs) break;
     checked++;
     let json: TotvsDeliveryListResponse;
     try {
@@ -1290,12 +1318,28 @@ async function syncOpenCargas(supabase: SupabaseAdmin): Promise<SyncResult> {
       errors.push(`open carga ${carga}: ${(err as Error).message}`);
       continue;
     }
+    // 1 min de folga: a linha fantasma tem pelo menos 30 min (a última rodada).
+    const inicio = new Date(Date.now() - 60_000).toISOString();
+    const errosAntes = errors.length;
     for (const d of json.data ?? []) {
       if (await upsertDelivery(supabase, d, errors)) upserted++;
+    }
+    if (errors.length === errosAntes && (json.data ?? []).length > 0 && (json.totalPages ?? 1) <= 1) {
+      await limparLinhasForaDaCarga(supabase, carga, inicio, errors);
     }
   }
 
   return { checked, upserted, errors };
+}
+
+// A consulta load=<carga> traz todos os pedidos da carga, e cada um foi
+// regravado acima (o gatilho set_updated_at avança o updated_at mesmo sem
+// mudança). Linha da carga que não foi regravada é de pedido que o Protheus
+// não lista mais nela: sai daqui. Só roda com a resposta completa (1 página,
+// não vazia) e sem erro de gravação na carga.
+async function limparLinhasForaDaCarga(supabase: SupabaseAdmin, carga: string, inicio: string, errors: string[]) {
+  const { error } = await supabase.from("totvs_delivery_cargas").delete().eq("carga", carga).lt("updated_at", inicio);
+  if (error) errors.push(`open carga ${carga} limpar linhas: ${error.message}`);
 }
 
 async function syncDeliveries(supabase: SupabaseAdmin): Promise<SyncResult> {
@@ -1365,6 +1409,21 @@ export async function runTotvsSync(supabase: SupabaseAdmin, origem: string): Pro
     throw new Error("TOTVS_API_BASE_URL/TOTVS_API_KEY ausentes");
   }
   return comTravaTotvs(supabase, origem, () => runTotvsSyncNaTrava(supabase));
+}
+
+// Rodada rápida (pedido do Victor 17/10/2026, mural "Rotas de hoje" da
+// logística): só reconsulta as cargas de ontem/hoje/amanhã pelo código, a
+// cada 10 min, entre as rodadas completas. Mesma trava do sync completo:
+// se ele estiver rodando, esta pula -- nunca abre uma 2ª conexão em paralelo.
+export async function runTotvsSyncCargasDoDia(supabase: SupabaseAdmin, origem: string): Promise<SyncResult | TravaOcupada> {
+  if (!BASE_URL || !process.env.TOTVS_API_KEY) {
+    throw new Error("TOTVS_API_BASE_URL/TOTVS_API_KEY ausentes");
+  }
+  return comTravaTotvs(supabase, origem, async () => {
+    const r = await syncOpenCargas(supabase, JANELA_CARGAS_DO_DIA);
+    await recordSyncRun("totvs-cargas", r.errors.length === 0, { checked: r.checked, upserted: r.upserted }, r.errors);
+    return r;
+  });
 }
 
 async function runTotvsSyncNaTrava(supabase: SupabaseAdmin): Promise<TotvsSyncSummary> {

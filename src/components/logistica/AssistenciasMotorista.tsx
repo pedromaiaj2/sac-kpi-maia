@@ -53,7 +53,7 @@ export function AssistenciasMotorista({
   return (
     <ModalLogistica
       titulo={`Assistências · ${nome}`}
-      subtitulo={`${itens.length} chamado${itens.length === 1 ? "" : "s"} no período: ${porAtribuicao("carga")} pela carga do chamado, ${porAtribuicao(
+      subtitulo={`${itens.length} chamado${itens.length === 1 ? "" : "s"} das entregas do período: ${porAtribuicao("carga")} pela carga do chamado, ${porAtribuicao(
         "produto",
       )} pelo cliente + produto, ${porAtribuicao("cliente")} só pelo cliente (≈).`}
       onFechar={onFechar}

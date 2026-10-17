@@ -66,7 +66,7 @@ const COLUNAS: { key: SortKey; label: string; hint: string }[] = [
   {
     key: "assistencias",
     label: "Assistências",
-    hint: "Chamados de assistência técnica abertos no período (troca, peça, recolhimento, envio de produto novo) ligados a uma nota que saiu numa carga deste motorista. Não entram no Índice de Volta. Ligação: carga informada no chamado, ou nota ao mesmo cliente com o produto do chamado; sem o produto, a nota mais recente ao cliente (≈). Clique no número pra ver os chamados.",
+    hint: "Chamados de assistência técnica (troca, peça, recolhimento, envio de produto novo) referentes às notas que este motorista entregou no período -- conta pela data da entrega, não pelo dia em que o chamado foi aberto (o número de um período pode crescer depois, quando chegam chamados novos). Não entram no Índice de Volta. Ligação: carga informada no chamado, ou nota ao mesmo cliente com o produto do chamado; sem o produto, a nota mais recente ao cliente (≈). Clique no número pra ver os chamados.",
   },
   {
     key: "assistenciasErroMotorista",
@@ -151,6 +151,21 @@ function NumBtn({ valor, onClick, title }: { valor: number; onClick: () => void;
   );
 }
 
+type FiltroVinculo = "todos" | "Próprio" | "Terceirizado";
+const FILTROS_VINCULO: { valor: FiltroVinculo; rotulo: string }[] = [
+  { valor: "todos", rotulo: "Todos" },
+  { valor: "Próprio", rotulo: "Próprios" },
+  { valor: "Terceirizado", rotulo: "Terceirizados" },
+];
+
+// Índice do grupo de motoristas na tela (mesma conta do card do topo).
+function resumoGrupo(ms: MotoristaEntregas[]) {
+  const notas = ms.reduce((t, m) => t + m.visitas, 0);
+  const voltas = ms.reduce((t, m) => t + m.insucessos.total + m.parciais, 0);
+  const logistica = ms.reduce((t, m) => t + m.insucessos.logistica, 0);
+  return { notas, indiceVolta: notas > 0 ? voltas / notas : null, indiceVoltaLogistica: notas > 0 ? logistica / notas : null };
+}
+
 export function VinculoTag({ vinculo, transportadora }: { vinculo: string | null; transportadora?: string | null }) {
   if (!vinculo) return <span style={{ color: "var(--text-muted)" }}>—</span>;
   const cor = vinculo === "Próprio" ? "var(--brand-green)" : "var(--series-5)";
@@ -184,13 +199,16 @@ export function TabelaMotoristasOrdenavel({
   onAbrirDetalhe: (m: MotoristaEntregas, tipo: TipoDetalheMotorista) => void;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "indiceVolta", dir: "desc" });
+  // Próprios x terceirizados só nesta tabela -- pedido do Victor 17/10/2026.
+  const [vinculo, setVinculo] = useState<FiltroVinculo>("todos");
 
   function toggleSort(key: SortKey) {
     setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" }));
   }
 
   const linhas = useMemo(() => {
-    const base = filtroCodigo ? motoristas.filter((m) => m.codigo === filtroCodigo) : motoristas;
+    const doVinculo = vinculo === "todos" ? motoristas : motoristas.filter((m) => m.vinculo === vinculo);
+    const base = filtroCodigo ? doVinculo.filter((m) => m.codigo === filtroCodigo) : doVinculo;
     const sorted = [...base].sort((a, b) => {
       const va = valorOrdenavel(a, sort.key, produtos);
       const vb = valorOrdenavel(b, sort.key, produtos);
@@ -198,7 +216,8 @@ export function TabelaMotoristasOrdenavel({
       return sort.dir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [motoristas, produtos, filtroCodigo, sort]);
+  }, [motoristas, produtos, filtroCodigo, sort, vinculo]);
+  const grupo = resumoGrupo(linhas);
 
   if (motoristas.length === 0) {
     return (
@@ -210,6 +229,31 @@ export function TabelaMotoristasOrdenavel({
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="inline-flex rounded-lg p-0.5" role="group" aria-label="Motoristas" style={{ background: "var(--surface-2)" }}>
+          {FILTROS_VINCULO.map((f) => (
+            <button
+              key={f.valor}
+              type="button"
+              onClick={() => setVinculo(f.valor)}
+              aria-pressed={vinculo === f.valor}
+              className="text-xs font-semibold px-3 py-1 rounded-md"
+              style={{
+                background: vinculo === f.valor ? "var(--surface-1)" : "transparent",
+                color: vinculo === f.valor ? "var(--text-primary)" : "var(--text-secondary)",
+                boxShadow: vinculo === f.valor ? "0 1px 2px rgb(0 0 0 / 0.12)" : undefined,
+              }}
+            >
+              {f.rotulo}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
+          {linhas.length} motorista{linhas.length === 1 ? "" : "s"} · {grupo.notas.toLocaleString("pt-BR")} notas · volta total{" "}
+          <b style={{ color: "var(--text-primary)" }}>{pct(grupo.indiceVolta)}</b> · volta logística{" "}
+          <b style={{ color: "var(--text-primary)" }}>{pct(grupo.indiceVoltaLogistica)}</b>
+        </span>
+      </div>
       {filtroCodigo ? (
         <div className="flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 self-start" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
           Filtrado pela carga selecionada no monitor

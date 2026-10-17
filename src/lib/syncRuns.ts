@@ -6,10 +6,11 @@
 import { getSupabaseAdmin } from "./supabaseAdmin.ts";
 import { notifyAdmin } from "./notifications.ts";
 
-export type SyncJob = "totvs" | "ghl" | "backup" | "ai-classify" | "reconcile-tags" | "sac-cronograma-check";
+export type SyncJob = "totvs" | "totvs-cargas" | "ghl" | "backup" | "ai-classify" | "reconcile-tags" | "sac-cronograma-check";
 
 const JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS",
+  "totvs-cargas": "TOTVS — cargas do dia",
   ghl: "GoHighLevel",
   backup: "Backup diário",
   "ai-classify": "Classificação por IA (SAC)",
