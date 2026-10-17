@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { getEmAndamentoList } from "@/lib/emAndamento";
-import { AppHeader } from "@/components/AppHeader";
 import { AutoRefresher } from "@/components/AutoRefresher";
 import { storeLabel, categoryLabel, URGENCY_LABELS } from "@/lib/labels";
 
@@ -19,7 +18,6 @@ export default async function EmAndamentoPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 flex flex-col gap-6">
-      <AppHeader />
       <AutoRefresher />
 
       <div className="flex flex-col gap-1">
@@ -34,7 +32,7 @@ export default async function EmAndamentoPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+      <div className="cartao p-5">
         {rows.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum atendimento em andamento no momento.

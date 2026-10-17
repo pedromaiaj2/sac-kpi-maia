@@ -1,7 +1,6 @@
 import { getKpiData, getKpiMonthlyEvolution } from "@/lib/kpi";
 import { resolveRange } from "@/lib/dateRange";
 import { Dashboard } from "@/components/Dashboard";
-import { AppHeader } from "@/components/AppHeader";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 
 export const revalidate = 60;
@@ -19,7 +18,6 @@ export default async function KpisPage({
   return (
     <>
       <div className="max-w-6xl mx-auto px-6 pt-6 flex flex-col gap-4">
-        <AppHeader />
         <KpisSectionTabs active="sac" />
       </div>
       <Dashboard data={data} range={range} monthlyEvolution={monthlyEvolution} />

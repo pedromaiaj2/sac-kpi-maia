@@ -346,14 +346,22 @@ a:active {
   transform: scale(0.97);
 }
 
-/* Painel escuro da Logística (/kpis/logistica) -- pedido do Victor
-   17/10/2026: tela de monitoramento em tempo real, sempre escura (TV/sala do
-   CD), independente do tema do resto do app. Redefine os mesmos tokens que
-   os componentes já usam, então tudo dentro do painel (modais inclusive)
-   herda. Categóricas validadas no fundo #1E1E22 (validate_palette, dark):
-   azul / âmbar escuro / verde-azulado / violeta / vermelho. O âmbar vivo
-   (#F59E0B) é só de alerta (status), nunca série. */
-.painel-escuro {
+/* Painel do app (Início, KPIs, Clientes, Avaliações, Logística) -- pedido
+   do Victor 17/10/2026: todas as telas com o layout da Logística (menu
+   lateral, fundo escuro premium, mesmos cartões). Um tema só pro app: segue
+   a classe .dark da <html> (botão sol/lua do menu lateral; o script de
+   layout.tsx já começa no escuro nessas telas). Claro = tokens do :root. */
+.painel {
+  --canvas: #f7f8f6;
+  background: var(--canvas);
+  color: var(--text-primary);
+}
+
+/* Escuro: redefine os tokens que os componentes usam (e os do shadcn), então
+   tudo dentro do painel herda -- modais inclusive. Categóricas validadas no
+   fundo #1E1E22 (validate_palette, dark): azul / âmbar escuro / verde-azulado
+   / violeta / vermelho. O âmbar vivo (#F59E0B) é de alerta, nunca série. */
+html.dark .painel {
   color-scheme: dark;
   --canvas: #121214;
   --surface-1: #1e1e22;
@@ -366,10 +374,14 @@ a:active {
   --border: #27272a;
   --brand-green: #10b981;
   --brand-orange: #f59e0b;
+  --brand-green-soft: color-mix(in srgb, #10b981 16%, #1e1e22);
+  --brand-orange-soft: color-mix(in srgb, #f59e0b 16%, #1e1e22);
   --status-good: #10b981;
   --status-warning: #f59e0b;
   --status-serious: #f97316;
   --status-critical: #ef4444;
+  --status-info: #14b8a6;
+  --series-1: #10b981;
   --series-3: #c97a05;
   --series-5: #3b82f6;
   --series-7: #0f9488;
@@ -381,49 +393,28 @@ a:active {
   --porte-p: #c97a05;
   --porte-m: #3b82f6;
   --porte-g: #0f9488;
-  background: var(--canvas);
-  color: var(--text-primary);
-}
-/* Versão clara do mesmo painel (botão sol/lua no menu lateral): os valores
-   do tema claro do app, fixados aqui pra valer mesmo com o resto do app no
-   modo noturno. */
-.painel-claro {
-  color-scheme: light;
-  --canvas: #f7f8f6;
-  --surface-1: #ffffff;
-  --surface-2: #f0f0ec;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #6e6c66;
-  --gridline: #e1e0d9;
-  --axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
-  --brand-green: #1b5e3c;
-  --brand-orange: #f2871a;
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
-  --series-3: #eda100;
-  --series-5: #2a78d6;
-  --series-7: #1baf7a;
-  --viz-1: #2a78d6;
-  --viz-2: #ea7a0f;
-  --viz-3: #16794a;
-  --viz-4: #8b5cf6;
-  --viz-5: #d03b3b;
-  --porte-p: #ea7a0f;
-  --porte-m: #3b82f6;
-  --porte-g: #16794a;
-  background: var(--canvas);
-  color: var(--text-primary);
+  --background: #121214;
+  --foreground: #fafafa;
+  --card: #1e1e22;
+  --card-foreground: #fafafa;
+  --popover: #1e1e22;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #121214;
+  --secondary: #2a2a30;
+  --secondary-foreground: #fafafa;
+  --muted: #2a2a30;
+  --muted-foreground: #a1a1aa;
+  --accent: #2a2a30;
+  --accent-foreground: #fafafa;
+  --input: #27272a;
 }
 
 /* Lista que abre do <select>: o Chrome no Windows desenhava as opções com
    texto escuro sobre fundo escuro (Victor 17/10/2026: "cor preta e sem
    mostrar a palavra"). */
-.painel-escuro option,
-.painel-escuro optgroup {
+html.dark .painel option,
+html.dark .painel optgroup {
   background-color: var(--surface-1);
   color: var(--text-primary);
 }

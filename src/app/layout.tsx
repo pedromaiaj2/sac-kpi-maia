@@ -29,7 +29,10 @@ const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var stored = localStorage.getItem("theme");
-    var dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    // Telas do painel (tudo fora da área /assistencia) nascem no escuro --
+    // pedido do Victor 17/10/2026; a assistência segue o sistema.
+    var painel = !/(^|[/])assistencia([/]|$)/.test(location.pathname);
+    var dark = stored ? stored === "dark" : painel || window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.classList.toggle("dark", dark);
   } catch (e) {}
 })();

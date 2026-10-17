@@ -3,7 +3,6 @@ import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { listTicketsForDay } from "@/lib/kpi";
 import { categoryLabel, storeLabel, productLabel, URGENCY_LABELS } from "@/lib/labels";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
-import { AppHeader } from "@/components/AppHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +55,6 @@ export default async function ChamadosDoDiaPage({
 
   return (
     <div className="max-w-3xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
-      <AppHeader />
 
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
@@ -99,7 +97,7 @@ export default async function ChamadosDoDiaPage({
       </p>
 
       {tickets.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="cartao p-6 text-center">
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum chamado nesse dia/horário.
           </p>

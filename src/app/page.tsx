@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { BarChart3, Users, SquareStar } from "lucide-react";
-import { AppHeader } from "@/components/AppHeader";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
+import { AppShell } from "@/components/painel/AppShell";
 
 // Redesenho pedido pelo Victor 24/09/2026: seção central mais imponente
-// (título + subtítulo) e cards com ícone/hover mais trabalhados -- as abas
-// do cabeçalho somem nessa tela (ver AppHeader.tsx), já que esses 4 cards
-// fazem a mesma navegação.
+// (título + subtítulo) e cards com ícone/hover mais trabalhados. Desde
+// 17/10/2026 a navegação fica no menu lateral (AppShell), como no resto do
+// painel; os cards continuam como atalho.
 const AREAS = [
   {
     href: "/kpis",
@@ -34,8 +34,8 @@ const AREAS = [
 export default async function Home() {
   await requireDashboardAuth();
   return (
+    <AppShell>
     <div className="max-w-4xl mx-auto p-6 flex flex-col gap-10">
-      <AppHeader />
 
       <div className="flex flex-col items-center gap-2 text-center pt-6">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
@@ -76,5 +76,6 @@ export default async function Home() {
         })}
       </div>
     </div>
+    </AppShell>
   );
 }

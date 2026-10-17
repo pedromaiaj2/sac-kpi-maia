@@ -63,7 +63,7 @@ export function AgentDrilldownModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="fixed inset-x-4 top-[8vh] z-50 mx-auto max-w-lg max-h-[80vh] overflow-y-auto rounded-lg border p-4 shadow-lg"
+        className="fixed inset-x-4 top-[8vh] z-50 mx-auto max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl border p-4 shadow-2xl"
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         <div className="flex items-center justify-between gap-4 mb-3">

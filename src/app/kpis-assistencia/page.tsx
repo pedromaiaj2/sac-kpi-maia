@@ -1,6 +1,5 @@
 import { getAssistenciaKpiData, getAssistenciaMonthlyEvolution } from "@/lib/kpiAssistencia";
 import { resolveRange } from "@/lib/dateRange";
-import { AppHeader } from "@/components/AppHeader";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 import { RangePicker } from "@/components/RangePicker";
 import { KpisAssistenciaView } from "@/components/KpisAssistenciaView";
@@ -52,7 +51,6 @@ export default async function KpisAssistenciaPage({
 
   return (
     <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
-      <AppHeader />
       <KpisSectionTabs active="assistencia" />
 
       <div>

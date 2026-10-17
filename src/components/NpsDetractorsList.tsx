@@ -42,7 +42,7 @@ export function NpsDetractorsList({ data }: { data: NpsDetractor[] }) {
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            className="fixed inset-x-4 top-[15vh] z-50 mx-auto max-w-sm max-h-[65vh] overflow-y-auto rounded-lg border p-4 shadow-lg"
+            className="fixed inset-x-4 top-[15vh] z-50 mx-auto max-w-sm max-h-[65vh] overflow-y-auto rounded-2xl border p-4 shadow-2xl"
             style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
           >
             <div className="flex items-center justify-between gap-4 mb-3">

@@ -11,7 +11,6 @@ import {
   type ProdutoCategoriaKey,
   type DateRange,
 } from "@/lib/vendasProduto";
-import { AppHeader } from "@/components/AppHeader";
 import { ProdutoVendaCurvaChart } from "@/components/assistencia/ProdutoVendaCurvaChart";
 import { VendasPorCategoriaList } from "@/components/assistencia/VendasPorCategoriaList";
 import { ProdutoRankingList } from "@/components/assistencia/ProdutoRankingList";
@@ -114,7 +113,6 @@ export default async function VendasProdutoPage({
 
   return (
     <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
-      <AppHeader />
 
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>

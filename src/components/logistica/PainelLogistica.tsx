@@ -1,5 +1,3 @@
-import { SidebarPainel } from "./SidebarPainel";
-import { PainelTema } from "./PainelTema";
 import { ThHint } from "./ThHint";
 import { LogisticaTerminal } from "./LogisticaTerminal";
 import { IndiceTicker, type TickerItem } from "./IndiceTicker";
@@ -198,74 +196,71 @@ export function PainelLogistica({
     : [];
 
   return (
-    // Painel escuro (pedido do Victor 17/10/2026): menu lateral, Rotas de
-    // hoje no topo e os indicadores do período abaixo, com os filtros.
-    <PainelTema>
-      <SidebarPainel />
-      <main className="flex-1 min-w-0 w-full max-w-[1440px] mx-auto px-4 sm:px-8 pt-6 pb-16 flex flex-col gap-8">
-        {rotas && <RotasDoDia rotas={rotas} agora={horaRecife(new Date())} dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null} />}
+    // Rotas de hoje no topo e os indicadores do período abaixo, com os
+    // filtros (17/10/2026). Menu lateral e tema vêm de AppShell (kpis/layout).
+    <main className="flex-1 min-w-0 w-full max-w-[1440px] mx-auto px-4 sm:px-8 pt-6 pb-16 flex flex-col gap-8">
+      {rotas && <RotasDoDia rotas={rotas} agora={horaRecife(new Date())} dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null} />}
 
-        <div className="flex flex-col gap-4 pt-2">
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            <ThHint hint="Cargas despachadas pelo CD, notas e produtos por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que aconteceu com a nota na rua). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). O código 000058 (LOJAS MAIA TREINAMENTO) é o motorista em treinamento e entra nos números como qualquer outro.">
-              Indicadores do período
-            </ThHint>
-          </h1>
-          <FiltrosLogistica
-            preset={sel.preset}
-            de={sel.de}
-            ate={sel.ate}
-            tipo={sel.tipo}
-            veiculo={sel.veiculo}
-            vinculo={sel.vinculo}
-            presets={presets}
-            tipos={TIPOS_CARGA.filter((t) => t !== "Retirada").map((t) => ({ valor: t, rotulo: t }))}
-            veiculos={TIPOS_VEICULO.map((v) => ({ valor: v, rotulo: v === "Carro" ? "Carro (Strada)" : v === "Não identificado" ? "Sem placa (não identificado)" : v }))}
-            vinculos={VINCULOS.map((v) => ({ valor: v, rotulo: ROTULO_VINCULO[v] }))}
-            dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null}
-            dadosAtrasados={dadosAtrasados}
-          />
-        </div>
+      <div className="flex flex-col gap-4 pt-2">
+        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+          <ThHint hint="Cargas despachadas pelo CD, notas e produtos por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que aconteceu com a nota na rua). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). O código 000058 (LOJAS MAIA TREINAMENTO) é o motorista em treinamento e entra nos números como qualquer outro.">
+            Indicadores do período
+          </ThHint>
+        </h1>
+        <FiltrosLogistica
+          preset={sel.preset}
+          de={sel.de}
+          ate={sel.ate}
+          tipo={sel.tipo}
+          veiculo={sel.veiculo}
+          vinculo={sel.vinculo}
+          presets={presets}
+          tipos={TIPOS_CARGA.filter((t) => t !== "Retirada").map((t) => ({ valor: t, rotulo: t }))}
+          veiculos={TIPOS_VEICULO.map((v) => ({ valor: v, rotulo: v === "Carro" ? "Carro (Strada)" : v === "Não identificado" ? "Sem placa (não identificado)" : v }))}
+          vinculos={VINCULOS.map((v) => ({ valor: v, rotulo: ROTULO_VINCULO[v] }))}
+          dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null}
+          dadosAtrasados={dadosAtrasados}
+        />
+      </div>
 
-        {erro || !kpis || !resumo ? (
-          <p className="text-sm rounded-lg px-4 py-3" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
-            {erro ?? "Sem dados."}
+      {erro || !kpis || !resumo ? (
+        <p className="text-sm rounded-lg px-4 py-3" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
+          {erro ?? "Sem dados."}
+        </p>
+      ) : (
+        <>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {dataBr(kpis.periodo.de)} a {dataBr(kpis.periodo.ate)}
+            {kpis.periodo.tipo ? ` · ${kpis.periodo.tipo}` : ""}
+            {kpis.periodo.tipoVeiculo ? ` · ${kpis.periodo.tipoVeiculo}` : ""}
+            {kpis.periodo.vinculo ? ` · motoristas ${ROTULO_VINCULO[kpis.periodo.vinculo]?.toLowerCase() ?? kpis.periodo.vinculo}` : ""}
           </p>
-        ) : (
-          <>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {dataBr(kpis.periodo.de)} a {dataBr(kpis.periodo.ate)}
-              {kpis.periodo.tipo ? ` · ${kpis.periodo.tipo}` : ""}
-              {kpis.periodo.tipoVeiculo ? ` · ${kpis.periodo.tipoVeiculo}` : ""}
-              {kpis.periodo.vinculo ? ` · motoristas ${ROTULO_VINCULO[kpis.periodo.vinculo]?.toLowerCase() ?? kpis.periodo.vinculo}` : ""}
-            </p>
 
-            <IndiceTicker items={tickerItems} labelComparacao="período anterior" />
+          <IndiceTicker items={tickerItems} labelComparacao="período anterior" />
 
-            <Bloco
-              titulo="Notas e produtos por veículo"
-              hint="Cargas, notas e produtos pela data da carga (ZAG_DTPREV). Por dia: média de veículos na rua nos dias com carga (placa distinta; sem placa, pelo motorista -- estimativa). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das notas do período."
-            >
-              <GradeVeiculos linhas={grade} dias={resumo.dias} />
-            </Bloco>
+          <Bloco
+            titulo="Notas e produtos por veículo"
+            hint="Cargas, notas e produtos pela data da carga (ZAG_DTPREV). Por dia: média de veículos na rua nos dias com carga (placa distinta; sem placa, pelo motorista -- estimativa). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das notas do período."
+          >
+            <GradeVeiculos linhas={grade} dias={resumo.dias} />
+          </Bloco>
 
-            <LogisticaTerminal
-              cargas={kpis.cargas}
-              motoristas={kpis.motoristas}
-              porDia={porDia}
-              causasVolta={resumo.causasVolta}
-              motivos={kpis.motivosInsucesso}
-              produtos={produtosPorMotorista(kpis.cargas)}
-              assistencias={kpis.assistencias}
-              ocorrencias={kpis.ocorrencias}
-              insucessos={kpis.insucessos}
-              parciais={kpis.parciais}
-              produtosPorte={kpis.produtosPorte}
-              regrasPorte={kpis.regrasPorte}
-            />
-          </>
-        )}
-      </main>
-    </PainelTema>
+          <LogisticaTerminal
+            cargas={kpis.cargas}
+            motoristas={kpis.motoristas}
+            porDia={porDia}
+            causasVolta={resumo.causasVolta}
+            motivos={kpis.motivosInsucesso}
+            produtos={produtosPorMotorista(kpis.cargas)}
+            assistencias={kpis.assistencias}
+            ocorrencias={kpis.ocorrencias}
+            insucessos={kpis.insucessos}
+            parciais={kpis.parciais}
+            produtosPorte={kpis.produtosPorte}
+            regrasPorte={kpis.regrasPorte}
+          />
+        </>
+      )}
+    </main>
   );
 }
