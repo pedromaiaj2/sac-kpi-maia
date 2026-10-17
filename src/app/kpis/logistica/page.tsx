@@ -90,9 +90,16 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     getLastSuccessfulRunAt("totvs-cargas").catch(() => null),
   ]).then(([completo, cargas]) => maisRecente(completo, cargas));
   const rotasPromise = getRotasDoDia(hojeRecife()).catch(() => null);
+  // Falha (ex.: timeout do banco, 17/10/2026) não derruba a página: o mural
+  // Rotas de hoje continua e os indicadores mostram o aviso.
+  let falhaKpis = false;
   const [kpis, kpisAnteriores] = parsed.ok
     ? await Promise.all([
-        getKpisEntregas({ ...parsed.periodo, vinculo }),
+        getKpisEntregas({ ...parsed.periodo, vinculo }).catch((err) => {
+          console.error("[kpis/logistica]", (err as Error).message);
+          falhaKpis = true;
+          return null;
+        }),
         getKpisEntregas({ ...periodoAnterior(sel.de, sel.ate), tipo: parsed.periodo.tipo, tipoVeiculo: parsed.periodo.tipoVeiculo, vinculo }).catch(
           () => null,
         ),
@@ -103,7 +110,13 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     <PainelLogistica
       sel={sel}
       presets={PRESETS.map((p) => ({ valor: p.key, rotulo: p.label }))}
-      erro={parsed.ok ? null : parsed.erro.mensagem}
+      erro={
+        !parsed.ok
+          ? parsed.erro.mensagem
+          : falhaKpis
+            ? "Os indicadores do período não carregaram agora (o banco demorou demais). Clique em atualizar ou tente de novo em instantes."
+            : null
+      }
       kpis={kpis}
       kpisAnteriores={kpisAnteriores}
       rotas={rotas}

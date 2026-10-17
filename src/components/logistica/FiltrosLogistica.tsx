@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 
 // Barra de filtros da aba Logística -- pedido do Victor 13/10/2026 ("mova
 // todos os filtros para uma barra de ferramentas dedicada, alinhada
@@ -84,6 +84,11 @@ export function FiltrosLogistica({
   }, [router]);
   const [datas, setDatas] = useState({ de, ate });
   const custom = preset === "custom";
+  // A página leva alguns segundos pra recalcular (Server Component): o
+  // botão clicado fica marcado na hora, com o ícone girando, até chegar --
+  // sem isso parecia que o clique não tinha funcionado (Victor 17/10/2026).
+  const [carregando, iniciar] = useTransition();
+  const [alvo, setAlvo] = useState<string | null>(null);
 
   function ir(mudanca: Record<string, string | undefined>) {
     const atual: Record<string, string | undefined> = {
@@ -95,10 +100,11 @@ export function FiltrosLogistica({
     };
     const q = new URLSearchParams(Object.entries(atual).filter((e): e is [string, string] => !!e[1]));
     const s = q.toString();
-    router.push(s ? `/kpis/logistica?${s}` : "/kpis/logistica");
+    iniciar(() => router.push(s ? `/kpis/logistica?${s}` : "/kpis/logistica"));
   }
 
   function trocarPeriodo(valor: string) {
+    setAlvo(valor);
     if (valor === "custom") {
       ir({ periodo: undefined, de: datas.de, ate: datas.ate });
     } else {
@@ -113,16 +119,17 @@ export function FiltrosLogistica({
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex flex-wrap rounded-full p-1 gap-0.5" role="group" aria-label="Período" style={{ background: "var(--surface-1)" }}>
           {[...presets, { valor: "custom", rotulo: "Datas livres" }].map((p) => {
-            const ativo = preset === p.valor;
+            const ativo = carregando && alvo ? alvo === p.valor : preset === p.valor;
             return (
               <button
                 key={p.valor}
                 type="button"
                 aria-pressed={ativo}
                 onClick={() => trocarPeriodo(p.valor)}
-                className="rounded-full text-sm px-3.5 py-1.5 font-medium transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-full text-sm px-3.5 py-1.5 font-medium transition-colors"
                 style={{ background: ativo ? "var(--text-primary)" : "transparent", color: ativo ? "var(--canvas)" : "var(--text-secondary)" }}
               >
+                {ativo && carregando && <Loader2 aria-hidden size={13} className="animate-spin" />}
                 {p.rotulo}
               </button>
             );
@@ -130,7 +137,8 @@ export function FiltrosLogistica({
         </div>
         <button
           type="button"
-          onClick={() => router.refresh()}
+          onClick={() => iniciar(() => router.refresh())}
+          aria-busy={carregando}
           className="ml-auto inline-flex items-center gap-1.5 text-xs rounded-full px-3.5 py-2"
           style={{
             color: dadosAtrasados ? "var(--text-primary)" : "var(--text-secondary)",
@@ -138,8 +146,12 @@ export function FiltrosLogistica({
           }}
           title="As cargas do dia vêm do Protheus a cada 10 min e o resto a cada 30. A tela recarrega sozinha a cada 2 min; clique pra recarregar agora."
         >
-          <RefreshCw aria-hidden size={13} />
-          {dadosDe ? `Dados do Protheus das ${dadosDe}${dadosAtrasados ? " (atrasado)" : ""}` : "Sem sincronização recente"}
+          <RefreshCw aria-hidden size={13} className={carregando ? "animate-spin" : undefined} />
+          {carregando
+            ? "Atualizando…"
+            : dadosDe
+              ? `Dados do Protheus das ${dadosDe}${dadosAtrasados ? " (atrasado)" : ""}`
+              : "Sem sincronização recente"}
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
