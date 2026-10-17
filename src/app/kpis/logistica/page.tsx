@@ -167,7 +167,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         },
         {
           key: "volta",
-          hint: "De cada 100 notas que saíram e voltaram com resultado, quantas voltaram com problema: (insucessos + parciais) ÷ notas. Nota que sai duas vezes conta duas. Mede o retrabalho, não a culpa do motorista. Verde até 5%, amarelo até 10%, vermelho acima.",
+          hint: "De cada 100 notas que saíram e voltaram com resultado, quantas voltaram com problema: (insucessos + parciais) ÷ notas. Nota que sai duas vezes conta duas: se voltou e foi entregue depois em outra carga, a visita que falhou continua contando (a lista mostra a situação de hoje). Mede o retrabalho, não a culpa do motorista. Verde até 5%, amarelo até 10%, vermelho acima.",
           label: "Índice de Volta",
           valor: pct(resumo.indiceVolta),
           variacao: variar(resumo.indiceVolta, resumoAnterior?.indiceVolta ?? null, true),
