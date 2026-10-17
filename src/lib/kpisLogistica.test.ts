@@ -5,6 +5,7 @@ import {
   periodoAnterior,
   produtosPorMotorista,
   resumirLogistica,
+  situacaoDepois,
   volumesPorDia,
   type CargaEntregas,
   type KpisEntregas,
@@ -176,5 +177,33 @@ describe("produtosPorMotorista", () => {
     const comMotorista = (c: ReturnType<typeof carga>, codigo: string) => ({ ...c, motorista: { codigo, nome: null } });
     const m = produtosPorMotorista([comMotorista(base.cargas[0], "1"), comMotorista(base.cargas[1], "1"), comMotorista(base.cargas[2], "2"), base.cargas[0]]);
     expect(m).toEqual({ "1": 8, "2": 4 });
+  });
+});
+
+describe("situacaoDepois", () => {
+  const depois = { carga: "005480", statusOrigem: "ENTREGA", statusCodigo: "1", statusCarga: "Encerrada", dia: "2026-10-16", hora: "19:27", motorista: "JOANDERSON" };
+
+  it("nota que voltou e foi entregue em outra carga (caso do pedido 019610)", () => {
+    expect(situacaoDepois({ situacaoAtual: "Entregue", depois })).toEqual({
+      rotulo: "Entregue depois",
+      detalhe: "16/10 19:27 · carga #005480 · JOANDERSON",
+      tom: "bom",
+    });
+  });
+
+  it("voltou de novo, parcial e cancelada", () => {
+    expect(situacaoDepois({ situacaoAtual: "Não Entregue", depois: { ...depois, statusCodigo: "3" } }).rotulo).toBe("Voltou de novo");
+    expect(situacaoDepois({ situacaoAtual: "Entregue Parcial", depois: { ...depois, statusCodigo: "2" } }).tom).toBe("atencao");
+    expect(situacaoDepois({ situacaoAtual: "Cancelada", depois: { ...depois, statusCodigo: "4" } }).rotulo).toBe("Cancelada depois");
+  });
+
+  it("em nova carga ainda sem resultado", () => {
+    const r = situacaoDepois({ situacaoAtual: "Em Rota", depois: { ...depois, statusOrigem: "CARGA", statusCodigo: "5", statusCarga: "Em Rota", dia: null, hora: null } });
+    expect(r).toEqual({ rotulo: "Em nova carga", detalhe: "carga #005480 · Em Rota", tom: "neutro" });
+  });
+
+  it("sem outra carga", () => {
+    expect(situacaoDepois({ situacaoAtual: "Não Entregue", depois: null })).toEqual({ rotulo: "Não entregue", detalhe: "sem nova carga", tom: "critico" });
+    expect(situacaoDepois({ situacaoAtual: null, depois: null }).rotulo).toBe("Não entregue");
   });
 });

@@ -162,7 +162,45 @@ export type InsucessoDetalhe = {
   // antes da data da carga, não um cruzamento exato por nota fiscal (o
   // número de NF que a entrega guarda não é o mesmo da NF de venda).
   vendedor: string | null;
+  // Status atual do pedido no Protheus e a tentativa mais recente da mesma
+  // nota em outra carga, depois desta (0178) -- a visita que falhou continua
+  // contando, mas a lista mostra que a nota foi entregue depois.
+  situacaoAtual: string | null;
+  depois: TentativaPosterior | null;
 };
+
+// statusOrigem "ENTREGA" = voltou com resultado (statusCodigo 1 entregue, 2
+// parcial, 3 não entregue, 4 cancelada); "CARGA" = ainda no CD/em rota
+// (statusCarga diz onde).
+export type TentativaPosterior = {
+  carga: string;
+  statusOrigem: string | null;
+  statusCodigo: string | null;
+  statusCarga: string | null;
+  dia: string | null;
+  hora: string | null;
+  motorista: string | null;
+};
+
+export type SituacaoDepois = { rotulo: string; detalhe: string | null; tom: "bom" | "atencao" | "critico" | "neutro" };
+
+// O que aconteceu com a nota depois da visita que falhou -- coluna "Situação
+// hoje" da lista de insucessos/parciais.
+export function situacaoDepois(i: Pick<InsucessoDetalhe, "depois" | "situacaoAtual">): SituacaoDepois {
+  const d = i.depois;
+  if (d && d.statusOrigem === "ENTREGA") {
+    const quando = [d.dia ? d.dia.split("-").reverse().slice(0, 2).join("/") : null, d.hora].filter(Boolean).join(" ");
+    const detalhe = [quando || null, `carga #${d.carga}`, d.motorista].filter(Boolean).join(" · ");
+    if (d.statusCodigo === "1") return { rotulo: "Entregue depois", detalhe, tom: "bom" };
+    if (d.statusCodigo === "2") return { rotulo: "Entregue parcial depois", detalhe, tom: "atencao" };
+    if (d.statusCodigo === "3") return { rotulo: "Voltou de novo", detalhe, tom: "critico" };
+    return { rotulo: "Cancelada depois", detalhe, tom: "neutro" };
+  }
+  if (d) return { rotulo: "Em nova carga", detalhe: [`carga #${d.carga}`, d.statusCarga].filter(Boolean).join(" · "), tom: "neutro" };
+  if (i.situacaoAtual === "Entregue") return { rotulo: "Entregue", detalhe: null, tom: "bom" };
+  if (!i.situacaoAtual || i.situacaoAtual === "Não Entregue") return { rotulo: "Não entregue", detalhe: "sem nova carga", tom: "critico" };
+  return { rotulo: i.situacaoAtual, detalhe: null, tom: "neutro" };
+}
 
 // atribuicao: "carga" (carga informada no chamado), "produto" (entrega ao
 // mesmo cliente com o produto do chamado) ou "cliente" (só pelo cliente,
