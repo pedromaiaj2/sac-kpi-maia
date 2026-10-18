@@ -4,8 +4,9 @@ import { useState } from "react";
 import { ModalLogistica } from "./ModalLogistica";
 import {
   grupoDaCarga,
-  minutosDesde,
+  MINUTOS_SEM_BAIXA_ALERTA,
   regioesVisiveis,
+  situacaoBaixa,
   resumirRotas,
   STATUS_CARGA_ORDEM,
   type CargaRota,
@@ -20,9 +21,6 @@ import {
 // dados vêm da rodada rápida do sync (a cada 10 min) e a página recarrega
 // sozinha (FiltrosLogistica). Visual do painel escuro (mesmo dia): números
 // grandes, barras finas estilo player, cartões arredondados sem borda.
-
-// Em rota sem nenhuma baixa nova há mais que isso: destaca em âmbar.
-const MINUTOS_SEM_BAIXA_ALERTA = 90;
 
 const COR = {
   entregue: "var(--status-good)",
@@ -54,9 +52,8 @@ function iniciais(nome: string | null | undefined) {
   return ((p[0]?.[0] ?? "?") + (p.length > 1 ? (p[p.length - 1][0] ?? "") : "")).toUpperCase();
 }
 
-function parada(c: CargaRota, agora: string) {
-  const desde = c.statusCodigo === "5" ? minutosDesde(c.ultimaBaixa, agora) : null;
-  return { desde, parada: c.statusCodigo === "5" && c.pendentes > 0 && desde !== null && desde > MINUTOS_SEM_BAIXA_ALERTA };
+function diaCurto(iso: string) {
+  return iso.split("-").reverse().slice(0, 2).join("/");
 }
 
 // Barra fina segmentada (estilo player): 2px de respiro entre os trechos.
@@ -103,8 +100,9 @@ function Destaque({ rotulo, valor, children }: { rotulo: string; valor: string; 
   );
 }
 
-function CartaoCarga({ c, grupo, agora, onAbrir }: { c: CargaRota; grupo: GrupoRota; agora: string; onAbrir: () => void }) {
-  const { desde, parada: estaParada } = parada(c, agora);
+function CartaoCarga({ c, grupo, dia, agora, onAbrir }: { c: CargaRota; grupo: GrupoRota; dia: string; agora: string; onAbrir: () => void }) {
+  const { desde, parada: estaParada, texto: textoBaixa } = situacaoBaixa(c, dia, agora);
+  const deOutroDia = c.dia < dia;
   const regioes = regioesVisiveis(c.regioes);
   const produtos = c.volumes.P + c.volumes.M + c.volumes.G + c.volumes.naoClassificado;
   const comResultado = c.notas - c.pendentes;
@@ -161,15 +159,24 @@ function CartaoCarga({ c, grupo, agora, onAbrir }: { c: CargaRota; grupo: GrupoR
             <span className="rounded-full px-2.5 py-1 font-medium" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
               {STATUS_CARGA_ORDEM[c.statusCodigo ?? ""] ?? c.status ?? "—"}
             </span>
+            {deOutroDia && (
+              <span
+                className="rounded-full px-2.5 py-1 font-medium"
+                style={{ background: "color-mix(in srgb, var(--status-warning) 18%, transparent)", color: "var(--text-primary)" }}
+                title="Carga de outro dia que continua em rota"
+              >
+                desde {diaCurto(c.dia)}
+              </span>
+            )}
             <span className="tabular-nums" style={{ color: "var(--text-secondary)" }}>
               <b style={{ color: "var(--text-primary)" }}>{comResultado}</b>/{c.notas} notas
               {voltaram > 0 ? ` · ${voltaram} ${voltaram === 1 ? "voltou" : "voltaram"}` : ""}
             </span>
           </span>
-          {c.ultimaBaixa && (
+          {textoBaixa && (
             <span className="inline-flex items-center gap-1.5 tabular-nums" style={{ color: estaParada ? "var(--status-warning)" : "var(--text-muted)" }}>
               {estaParada && <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-warning)" }} />}
-              última baixa {c.ultimaBaixa}
+              {textoBaixa}
               {desde !== null ? ` · há ${tempo(desde)}` : ""}
             </span>
           )}
@@ -198,7 +205,21 @@ function CartaoCarga({ c, grupo, agora, onAbrir }: { c: CargaRota; grupo: GrupoR
   );
 }
 
-function Grupo({ grupo, titulo, cargas, agora, onAbrir }: { grupo: GrupoRota; titulo: string; cargas: CargaRota[]; agora: string; onAbrir: (c: CargaRota) => void }) {
+function Grupo({
+  grupo,
+  titulo,
+  cargas,
+  dia,
+  agora,
+  onAbrir,
+}: {
+  grupo: GrupoRota;
+  titulo: string;
+  cargas: CargaRota[];
+  dia: string;
+  agora: string;
+  onAbrir: (c: CargaRota) => void;
+}) {
   const r = resumirRotas(cargas);
   return (
     <div className="flex flex-col gap-3 min-w-0">
@@ -213,12 +234,12 @@ function Grupo({ grupo, titulo, cargas, agora, onAbrir }: { grupo: GrupoRota; ti
       </div>
       {cargas.length === 0 ? (
         <p className="text-sm rounded-2xl p-5" style={{ color: "var(--text-muted)", background: "var(--surface-1)" }}>
-          Nenhuma carga hoje.
+          Nenhuma carga.
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
           {cargas.map((c) => (
-            <CartaoCarga key={c.carga} c={c} grupo={grupo} agora={agora} onAbrir={() => onAbrir(c)} />
+            <CartaoCarga key={c.carga} c={c} grupo={grupo} dia={dia} agora={agora} onAbrir={() => onAbrir(c)} />
           ))}
         </ul>
       )}
@@ -289,7 +310,21 @@ function NotasCarga({ c, onFechar }: { c: CargaRota; onFechar: () => void }) {
   );
 }
 
-export function RotasDoDia({ rotas, agora, dadosDe }: { rotas: Rotas; agora: string; dadosDe: string | null }) {
+// historico: o dia de hoje não tem carga (domingo) e o mural mostra o último
+// dia de operação -- sem "ao vivo" nem alerta de carga parada.
+export function RotasDoDia({
+  rotas,
+  agora,
+  dadosDe,
+  atrasado,
+  historico = false,
+}: {
+  rotas: Rotas;
+  agora: string;
+  dadosDe: string | null;
+  atrasado: boolean;
+  historico?: boolean;
+}) {
   const [aberta, setAberta] = useState<CargaRota | null>(null);
   const porGrupo = (g: GrupoRota) => rotas.cargas.filter((c) => grupoDaCarga(c) === g);
   const proprias = porGrupo("Próprio");
@@ -303,25 +338,43 @@ export function RotasDoDia({ rotas, agora, dadosDe }: { rotas: Rotas; agora: str
     (t, c) => ({ P: t.P + c.volumes.P, M: t.M + c.volumes.M, G: t.G + c.volumes.G, N: t.N + c.volumes.naoClassificado }),
     { P: 0, M: 0, G: 0, N: 0 },
   );
-  const paradas = naRua.filter((c) => parada(c, agora).parada).length;
+  const agoraEfetivo = historico ? "" : agora;
+  const paradas = historico ? 0 : naRua.filter((c) => situacaoBaixa(c, rotas.dia, agoraEfetivo).parada).length;
   const dia = new Date(`${rotas.dia}T12:00:00Z`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "UTC" });
 
   return (
     <section className="flex flex-col gap-6" aria-label="Rotas de hoje, ao vivo">
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="flex flex-col gap-1">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest" style={{ color: "var(--brand-green)" }}>
-            <span aria-hidden className="luz-ao-vivo inline-block w-2.5 h-2.5 rounded-full shrink-0" />
-            AO VIVO
-          </span>
+          {historico ? (
+            <span className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest" style={{ color: "var(--text-muted)" }}>
+              <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "var(--text-muted)" }} />
+              HOJE NÃO TEM CARGA · ÚLTIMO DIA DE OPERAÇÃO
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest"
+              style={{ color: atrasado ? "var(--status-warning)" : "var(--brand-green)" }}
+              title={atrasado ? "O Protheus não sincroniza há mais de 45 minutos" : undefined}
+            >
+              <span aria-hidden className={`luz-ao-vivo ${atrasado ? "atrasada" : ""} inline-block w-2.5 h-2.5 rounded-full shrink-0`} />
+              {atrasado ? "ATRASADO" : "AO VIVO"}
+            </span>
+          )}
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-            Rotas de hoje
+            {historico ? `Rotas de ${dia.split(",")[0]}` : "Rotas de hoje"}
           </h1>
           <p className="text-sm capitalize" style={{ color: "var(--text-secondary)" }}>
             {dia}
           </p>
         </div>
-        <span className="text-xs rounded-full px-3.5 py-2" style={{ background: "var(--surface-1)", color: "var(--text-secondary)" }}>
+        <span
+          className="text-xs rounded-full px-3.5 py-2"
+          style={{
+            background: atrasado ? "color-mix(in srgb, var(--status-warning) 18%, var(--surface-1))" : "var(--surface-1)",
+            color: atrasado ? "var(--text-primary)" : "var(--text-secondary)",
+          }}
+        >
           {dadosDe ? `Protheus às ${dadosDe}` : "Sem sincronização recente"} · atualiza a cada 10 min
         </span>
       </header>
@@ -386,8 +439,8 @@ export function RotasDoDia({ rotas, agora, dadosDe }: { rotas: Rotas; agora: str
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Grupo grupo="Próprio" titulo="Nossos" cargas={proprias} agora={agora} onAbrir={setAberta} />
-            <Grupo grupo="Terceirizado" titulo="Terceirizados" cargas={terceiras} agora={agora} onAbrir={setAberta} />
+            <Grupo grupo="Próprio" titulo="Nossos" cargas={proprias} dia={rotas.dia} agora={agoraEfetivo} onAbrir={setAberta} />
+            <Grupo grupo="Terceirizado" titulo="Terceirizados" cargas={terceiras} dia={rotas.dia} agora={agoraEfetivo} onAbrir={setAberta} />
           </div>
 
           {noCd.length > 0 && (

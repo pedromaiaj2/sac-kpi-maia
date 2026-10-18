@@ -8,7 +8,10 @@
 // outras (ver kpiAssistencia.ts/vendasProduto.ts/serviceRequests.ts, 3
 // funções diferentes precisaram sair do unstable_cache pra /kpis-assistencia
 // parar de quebrar). Sem esse teto, mesmo balde de tempo de sempre.
-type CacheEntry<T> = { value: T; expiresAt: number };
+// Guarda a PROMESSA (17/10/2026, logística): duas telas pedindo a mesma chave
+// ao mesmo tempo (TVs recarregando juntas) esperam a mesma consulta em vez de
+// abrir duas no banco. Erro não fica guardado: a próxima chamada tenta de novo.
+type CacheEntry<T> = { value: Promise<T>; expiresAt: number };
 
 export function memoizeWithTtl<Args extends unknown[], T>(
   fn: (...args: Args) => Promise<T>,
@@ -17,18 +20,21 @@ export function memoizeWithTtl<Args extends unknown[], T>(
 ): (...args: Args) => Promise<T> {
   const cache = new Map<string, CacheEntry<T>>();
 
-  return async (...args: Args): Promise<T> => {
+  return (...args: Args): Promise<T> => {
     const key = keyFn(...args);
     const now = Date.now();
     const hit = cache.get(key);
     if (hit && hit.expiresAt > now) return hit.value;
 
-    const value = await fn(...args);
-
     for (const [k, entry] of cache) {
       if (entry.expiresAt <= now) cache.delete(k);
     }
-    cache.set(key, { value, expiresAt: now + ttlMs });
+    const value = fn(...args);
+    const entry = { value, expiresAt: now + ttlMs };
+    cache.set(key, entry);
+    value.catch(() => {
+      if (cache.get(key) === entry) cache.delete(key);
+    });
     return value;
   };
 }

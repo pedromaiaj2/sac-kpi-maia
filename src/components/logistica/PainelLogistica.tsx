@@ -5,6 +5,7 @@ import { FiltrosLogistica } from "./FiltrosLogistica";
 import { GradeVeiculos } from "./GradeVeiculos";
 import { AssistenciasTotal } from "./AssistenciasTotal";
 import { RotasDoDia } from "./RotasDoDia";
+import { QualidadeDados } from "./QualidadeDados";
 import { TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
 import {
   gradeVeiculos,
@@ -12,8 +13,10 @@ import {
   resumirLogistica,
   volumesPorDia,
   calcularVariacao,
+  assistenciasMesmaIdade,
   VINCULOS,
   type KpisEntregas,
+  type QualidadeDadosLogistica,
   type LinhaVeiculo,
   type Variacao,
 } from "@/lib/kpisLogistica";
@@ -22,6 +25,12 @@ import { num, pct, dataBr } from "@/lib/logisticaFormat";
 
 // Rodada completa a cada 30 min e a rápida das cargas do dia a cada 10:
 // passou de 45 min sem nenhuma das duas, alguma coisa falhou.
+function hojeRecifeIso(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Recife" }).format(new Date());
+}
+
+const SEM_VARIACAO: Variacao = { atual: 0, anterior: null, delta: null, melhorou: null };
+
 function syncAtrasado(ultimoSync: string | null): boolean {
   return !ultimoSync || Date.now() - Date.parse(ultimoSync) > 45 * 60_000;
 }
@@ -71,7 +80,9 @@ export function PainelLogistica({
   erro,
   kpis,
   kpisAnteriores,
+  qualidade,
   rotas,
+  rotasHistorico,
   ultimoSync,
 }: {
   sel: Selecao;
@@ -80,7 +91,10 @@ export function PainelLogistica({
   erro: string | null;
   kpis: KpisEntregas | null;
   kpisAnteriores: KpisEntregas | null;
+  qualidade: QualidadeDadosLogistica | null;
   rotas: Rotas | null;
+  // rotas de outro dia (hoje não tem carga): mural em modo "último dia"
+  rotasHistorico: boolean;
   ultimoSync: string | null;
 }) {
   const dadosAtrasados = syncAtrasado(ultimoSync);
@@ -99,6 +113,13 @@ export function PainelLogistica({
   const notasDia = resumo ? porDiaDe(resumo.pedidos, resumo.dias) : null;
   const notasDiaAnterior = resumoAnterior ? porDiaDe(resumoAnterior.pedidos, resumoAnterior.dias) : null;
   const decimal = (n: number | null) => (n === null ? "—" : n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+
+  // Período "Hoje" (revisão 18/10/2026): volta e assistências do dia ainda
+  // estão acontecendo -- comparar com o dia anterior inteiro dava queda
+  // falsa. Cargas/notas/produtos seguem comparando (cargas do dia já estão
+  // planejadas desde cedo).
+  const diaEmAndamento = sel.preset === "hoje";
+  const emAndamento = diaEmAndamento ? { variacao: SEM_VARIACAO, semComparacao: "dia em andamento" } : null;
 
   const tickerItems: TickerItem[] = resumo && kpis
     ? [
@@ -119,6 +140,7 @@ export function PainelLogistica({
           valor: pct(resumo.indiceVolta),
           variacao: variar(resumo.indiceVolta, resumoAnterior?.indiceVolta ?? null, true),
           formatarDelta: formatarDeltaPct,
+          ...emAndamento,
         },
         {
           key: "volta-logistica",
@@ -127,6 +149,7 @@ export function PainelLogistica({
           valor: pct(resumo.indiceVoltaLogistica),
           variacao: variar(resumo.indiceVoltaLogistica, resumoAnterior?.indiceVoltaLogistica ?? null, true),
           formatarDelta: formatarDeltaPct,
+          ...emAndamento,
         },
         {
           key: "cargas",
@@ -178,7 +201,7 @@ export function PainelLogistica({
         },
         {
           key: "assistencias",
-          hint: "Chamados de assistência técnica (troca, peça, recolhimento, envio de produto novo) referentes às notas entregues no período, pela data da entrega e não pelo dia em que o chamado foi aberto. Ligação: carga do chamado, cliente + produto ou, sem o produto, a nota mais recente ao cliente, nos 180 dias antes. Não entram no Índice de Volta. Segue os filtros da tela. Clique no número pra ver cada chamado.",
+          hint: "Chamados de assistência técnica (troca, peça, recolhimento, envio de produto novo) referentes às notas entregues no período, pela data da entrega e não pelo dia em que o chamado foi aberto. Ligação: carga do chamado, cliente + produto ou, sem o produto, a nota mais recente ao cliente, nos 180 dias antes. Não entram no Índice de Volta. Segue os filtros da tela. Clique no número pra ver cada chamado. A variação compara com o período anterior como ele estava quando tinha a mesma idade: um chamado leva em média 12 dias pra ser aberto depois da entrega, então o período mais recente sempre tem menos chamados só por ser mais novo.",
           label: "Assistências",
           largo: true,
           valor: num(kpis.assistencias.length),
@@ -190,8 +213,13 @@ export function PainelLogistica({
             />
           ),
           complemento: `${num(kpis.assistenciasPeriodo.total - kpis.assistenciasPeriodo.vinculadas)} chamados abertos no período sem nota ligada (retirada, sem CPF...)`,
-          variacao: variar(kpis.assistencias.length, kpisAnteriores?.assistencias.length ?? null, true),
+          variacao: variar(
+            kpis.assistencias.length,
+            kpisAnteriores ? assistenciasMesmaIdade(kpisAnteriores.assistencias, kpis.periodo.de, kpis.periodo.ate, hojeRecifeIso()) : null,
+            true,
+          ),
           formatarDelta: formatarDeltaNum,
+          ...emAndamento,
         },
       ]
     : [];
@@ -200,7 +228,7 @@ export function PainelLogistica({
     // Rotas de hoje no topo e os indicadores do período abaixo, com os
     // filtros (17/10/2026). Menu lateral e tema vêm de AppShell (kpis/layout).
     <main className="flex-1 min-w-0 w-full max-w-[1440px] mx-auto px-4 sm:px-8 pt-6 pb-16 flex flex-col gap-8">
-      {rotas && <RotasDoDia rotas={rotas} agora={horaRecife(new Date())} dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null} />}
+      {rotas && <RotasDoDia rotas={rotas} agora={horaRecife(new Date())} dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null} atrasado={dadosAtrasados} historico={rotasHistorico} />}
 
       <div className="flex flex-col gap-4 pt-2">
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
@@ -237,7 +265,7 @@ export function PainelLogistica({
             {kpis.periodo.vinculo ? ` · motoristas ${ROTULO_VINCULO[kpis.periodo.vinculo]?.toLowerCase() ?? kpis.periodo.vinculo}` : ""}
           </p>
 
-          <IndiceTicker items={tickerItems} labelComparacao="período anterior" />
+          <IndiceTicker items={tickerItems} labelComparacao={sel.preset === "hoje" || sel.preset === "ontem" ? "dia anterior" : "período anterior"} />
 
           <Bloco
             titulo="Notas e produtos por veículo"
@@ -261,6 +289,15 @@ export function PainelLogistica({
             regrasPorte={kpis.regrasPorte}
             periodo={kpis.periodo}
           />
+
+          {qualidade && (
+            <Bloco
+              titulo="Qualidade dos dados"
+              hint="Lançamentos do Protheus no período que distorcem esta tela, pra corrigir na origem. Clique em cada grupo pra ver as cargas."
+            >
+              <QualidadeDados dados={qualidade} />
+            </Bloco>
+          )}
         </>
       )}
     </main>

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { grupoDaCarga, minutosDesde, regioesVisiveis, resumirRotas, type CargaRota } from "./rotasDoDiaCore";
+import { grupoDaCarga, minutosDesde, regioesVisiveis, resumirRotas, situacaoBaixa, type CargaRota } from "./rotasDoDiaCore";
 
 function carga(over: Partial<CargaRota>): CargaRota {
   return {
-    carga: "005454", statusCodigo: "5", status: "Em Rota", tipo: "Entrega",
+    carga: "005454", dia: "2026-10-17", ultimaBaixaDia: "2026-10-17", statusCodigo: "5", status: "Em Rota", tipo: "Entrega",
     motorista: { codigo: "000003", nome: "RONALDO" }, veiculo: "FORD", tipoVeiculo: "Caminhão",
     vinculo: "Terceirizado", transportadora: "RONALDO TRANSPORTES", regioes: ["Zona Sul"],
     notas: 20, entregues: 3, parciais: 0, naoEntregues: 0, canceladas: 0, pendentes: 17,
@@ -39,5 +39,28 @@ describe("rotas do dia", () => {
     expect(minutosDesde("08:20", "09:05")).toBe(45);
     expect(minutosDesde(null, "09:05")).toBeNull();
     expect(minutosDesde("10:00", "09:05")).toBeNull();
+  });
+});
+
+describe("situacaoBaixa", () => {
+  const base = { statusCodigo: "5", pendentes: 4, ultimaBaixa: "08:20", ultimaBaixaDia: "2026-10-17", dia: "2026-10-17" };
+
+  it("mesmo dia: minutos desde a baixa e parada só passando de 1h30", () => {
+    expect(situacaoBaixa(base, "2026-10-17", "09:30")).toEqual({ desde: 70, parada: false, texto: "última baixa 08:20" });
+    expect(situacaoBaixa(base, "2026-10-17", "10:00").parada).toBe(true);
+  });
+
+  it("carga de ontem ainda em rota: baixa com data e parada", () => {
+    expect(situacaoBaixa({ ...base, dia: "2026-10-16", ultimaBaixaDia: "2026-10-16", ultimaBaixa: "17:50" }, "2026-10-17", "08:00")).toEqual({
+      desde: null,
+      parada: true,
+      texto: "última baixa 16/10 17:50",
+    });
+    expect(situacaoBaixa({ ...base, dia: "2026-10-16", ultimaBaixa: null, ultimaBaixaDia: null }, "2026-10-17", "08:00").texto).toBe("sem baixa desde 16/10");
+  });
+
+  it("encerrada ou sem pendência nunca está parada", () => {
+    expect(situacaoBaixa({ ...base, statusCodigo: "6" }, "2026-10-17", "15:00").parada).toBe(false);
+    expect(situacaoBaixa({ ...base, pendentes: 0 }, "2026-10-17", "15:00").parada).toBe(false);
   });
 });

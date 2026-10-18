@@ -36,7 +36,16 @@ function statusCarga(c: CargaEntregas, ocorrencias: Ocorrencias): { label: strin
       ? { label: "Falha logística", color: "var(--status-critical)", detalhe: motivosTexto(c, ocorrencias) }
       : { label: "Voltou", color: "var(--status-warning)", detalhe: motivosTexto(c, ocorrencias) };
   }
-  if (c.pedidos > 0 && c.entregues === c.pedidos) return { label: "Concluída", color: "var(--status-good)" };
+  // Encerrada no Protheus (ou toda nota com resultado) = concluída, mesmo com
+  // nota parcial -- antes só "tudo entregue" contava e a carga encerrada com
+  // parcial ficava "Em rota" pra sempre (revisão 18/10/2026).
+  if (c.encerrada || (c.pedidos > 0 && c.entregues + c.parciais === c.pedidos)) {
+    return {
+      label: "Concluída",
+      color: "var(--status-good)",
+      detalhe: c.parciais > 0 ? `${c.parciais} nota${c.parciais === 1 ? "" : "s"} entregue${c.parciais === 1 ? "" : "s"} em parte` : undefined,
+    };
+  }
   return { label: "Em rota", color: "var(--series-5)" };
 }
 

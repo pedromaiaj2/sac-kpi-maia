@@ -1,7 +1,7 @@
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { PainelLogistica } from "@/components/logistica/PainelLogistica";
 import { parsePeriodoKpis, TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
-import { getKpisEntregas, periodoAnterior, VINCULOS } from "@/lib/kpisLogistica";
+import { getKpisEntregas, getQualidadeDados, periodoAnterior, VINCULOS } from "@/lib/kpisLogistica";
 import { getLastSuccessfulRunAt } from "@/lib/syncRuns";
 import { getRotasDoDia } from "@/lib/rotasDoDia";
 
@@ -89,10 +89,18 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     getLastSuccessfulRunAt("totvs").catch(() => null),
     getLastSuccessfulRunAt("totvs-cargas").catch(() => null),
   ]).then(([completo, cargas]) => maisRecente(completo, cargas));
-  const rotasPromise = getRotasDoDia(hojeRecife()).catch(() => null);
+  // Dia sem carga (domingo): o mural mostra o último dia de operação.
+  const rotasPromise = getRotasDoDia(hojeRecife())
+    .then(async (r) =>
+      r.cargas.length === 0 && r.ultimoDiaComCargas
+        ? { rotas: await getRotasDoDia(r.ultimoDiaComCargas), historico: true }
+        : { rotas: r, historico: false },
+    )
+    .catch(() => null);
   // Falha (ex.: timeout do banco, 17/10/2026) não derruba a página: o mural
   // Rotas de hoje continua e os indicadores mostram o aviso.
   let falhaKpis = false;
+  const qualidadePromise = parsed.ok ? getQualidadeDados(parsed.periodo.de, parsed.periodo.ate).catch(() => null) : Promise.resolve(null);
   const [kpis, kpisAnteriores] = parsed.ok
     ? await Promise.all([
         getKpisEntregas({ ...parsed.periodo, vinculo }).catch((err) => {
@@ -119,7 +127,9 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
       }
       kpis={kpis}
       kpisAnteriores={kpisAnteriores}
-      rotas={rotas}
+      qualidade={await qualidadePromise}
+      rotas={rotas?.rotas ?? null}
+      rotasHistorico={rotas?.historico ?? false}
       ultimoSync={ultimoSync}
     />
   );
