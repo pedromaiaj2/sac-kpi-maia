@@ -10,14 +10,16 @@ import { ThHint } from "./ThHint";
 // botão). A escolha fica salva neste navegador por seção (`id`).
 // variante "cartao": a seção inteira num cartão (blocos da tela);
 // "simples": só o cabeçalho, sem cartão (grupos do mural Rotas de hoje).
-const CHAVE = (id: string) => `logistica:secao:${id}`;
+// Começa recolhida (Victor 18/10/2026: "traga todos os campos recolhidos");
+// chave "v2" pra quem já tinha aberto alguma também começar recolhido.
+const CHAVE = (id: string) => `logistica:secao:v2:${id}`;
 
 export function Recolhivel({
   id,
   titulo,
   hint,
   extra,
-  inicialAberto = true,
+  inicialAberto = false,
   variante = "cartao",
   className = "",
   tituloClassName = "text-base font-semibold",
