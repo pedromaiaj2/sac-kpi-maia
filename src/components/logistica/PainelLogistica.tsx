@@ -5,6 +5,7 @@ import { FiltrosLogistica } from "./FiltrosLogistica";
 import { GradeVeiculos } from "./GradeVeiculos";
 import { AssistenciasTotal } from "./AssistenciasTotal";
 import { RotasDoDia } from "./RotasDoDia";
+import { Recolhivel } from "./Recolhivel";
 import { QualidadeDados } from "./QualidadeDados";
 import { TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
 import {
@@ -40,14 +41,11 @@ const horaRecife = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "Am
 // Card de seção do painel escuro (17/10/2026): sem borda dura, cantos bem
 // arredondados e respiro. Título com ícone "i" (ThHint) em vez de texto
 // solto. Mesmo padrão de Secao em LogisticaTerminal.tsx.
-function Bloco({ titulo, hint, children }: { titulo: string; hint?: string; children: React.ReactNode }) {
+function Bloco({ id, titulo, hint, children }: { id: string; titulo: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl p-5 sm:p-6 flex flex-col gap-4 shadow-lg shadow-black/20" style={{ background: "var(--surface-1)" }}>
-      <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-        {hint ? <ThHint hint={hint}>{titulo}</ThHint> : titulo}
-      </h2>
+    <Recolhivel id={id} titulo={titulo} hint={hint}>
       {children}
-    </section>
+    </Recolhivel>
   );
 }
 
@@ -268,6 +266,7 @@ export function PainelLogistica({
           <IndiceTicker items={tickerItems} labelComparacao={sel.preset === "hoje" || sel.preset === "ontem" ? "dia anterior" : "período anterior"} />
 
           <Bloco
+            id="notas-por-veiculo"
             titulo="Notas e produtos por veículo"
             hint="Cargas, notas e produtos pela data da carga (ZAG_DTPREV). Por dia: média de veículos na rua nos dias com carga (placa distinta; sem placa, pelo motorista -- estimativa). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das notas do período."
           >
@@ -292,6 +291,7 @@ export function PainelLogistica({
 
           {qualidade && (
             <Bloco
+              id="qualidade-dados"
               titulo="Qualidade dos dados"
               hint="Lançamentos do Protheus no período que distorcem esta tela, pra corrigir na origem. Clique em cada grupo pra ver as cargas."
             >

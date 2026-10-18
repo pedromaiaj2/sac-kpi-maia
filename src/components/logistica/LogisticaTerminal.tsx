@@ -5,7 +5,7 @@ import { CargasMonitor } from "./CargasMonitor";
 import { VolumePorteChart } from "./VolumePorteChart";
 import { CausasVoltaChart } from "./CausasVoltaChart";
 import { TabelaMotoristasOrdenavel, type TipoDetalheMotorista } from "./TabelaMotoristasOrdenavel";
-import { ThHint } from "./ThHint";
+import { Recolhivel } from "./Recolhivel";
 import { MotivosInsucesso } from "./MotivosInsucesso";
 import { AssistenciasMotorista } from "./AssistenciasMotorista";
 import { InsucessosMotivo } from "./InsucessosMotivo";
@@ -29,14 +29,24 @@ import type {
 // explicação -- nunca mais um parágrafo de texto solto ocupando espaço
 // vertical. O texto completo continua acessível (tooltip nativo), só não
 // fica mais sempre visível.
-function Secao({ titulo, hint, className = "", children }: { titulo: string; hint?: string; className?: string; children: React.ReactNode }) {
+// Recolhe e expande (pedido do Victor 18/10/2026, ver Recolhivel.tsx).
+function Secao({
+  id,
+  titulo,
+  hint,
+  className = "",
+  children,
+}: {
+  id: string;
+  titulo: string;
+  hint?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className={`rounded-2xl p-5 sm:p-6 flex flex-col gap-4 min-w-0 shadow-lg shadow-black/20 ${className}`} style={{ background: "var(--surface-1)" }}>
-      <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-        {hint ? <ThHint hint={hint}>{titulo}</ThHint> : titulo}
-      </h2>
+    <Recolhivel id={id} titulo={titulo} hint={hint} className={className}>
       {children}
-    </section>
+    </Recolhivel>
   );
 }
 
@@ -106,14 +116,16 @@ export function LogisticaTerminal({
     <div className="flex flex-col gap-7">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         <Secao
+          id="monitor-cargas"
           titulo="Monitor de Cargas"
           hint="Cargas do período, da mais recente. Falha logística (vermelho) = alguma nota voltou por falha do transporte (L01 rota estourada, L02 veículo quebrado...). Voltou (amarelo) = nota que voltou por cliente, CD (L06) ou outro motivo, ou cancelada. Concluída = todas as notas com o cliente. Em rota = ainda sem resultado de todas. Passe o mouse na carga pra ver os motivos; clique pra filtrar a tabela de motoristas pelo motorista dela."
         >
           <CargasMonitor cargas={cargas} ocorrencias={ocorrencias} selecionada={selecionado?.codigo ?? null} onSelect={handleSelect} />
         </Secao>
         <Secao
+          id="produtos-porte"
           titulo={`Produtos por porte (P/M/G) · ${porDia.reduce((t, d) => t + d.P + d.M + d.G + d.naoClassificado, 0).toLocaleString("pt-BR")} produtos no total`}
-          hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande. Passe o mouse numa barra pra ver os números do dia e quantos caminhões e Stradas estavam na rua. Na legenda, o total de produtos (unidades) de cada classe no período; clique numa classe pra ver quais produtos são dela e as regras que a definem."
+          hint="Produtos (unidades) despachados por dia, pelo porte do produto: P pequeno, M médio, G grande. Passe o mouse numa barra pra ver os números do dia e quantos caminhões e Stradas estavam na rua. Na legenda, o total de produtos (unidades) de cada classe no período; embaixo do gráfico, cada classe dividida por grupo de produto (colchão, guarda-roupa, cadeira...). Clique numa classe pra ver quais produtos são dela e as regras que a definem."
           className="lg:col-span-2"
         >
           <VolumePorteChart data={porDia} produtos={produtosPorte} regras={regrasPorte} />
@@ -122,12 +134,14 @@ export function LogisticaTerminal({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         <Secao
+          id="causas-volta"
           titulo="Causas da Volta"
           hint="Tudo o que entra no Índice de Volta, por tipo: insucessos (pela categoria do motivo) e notas parciais. A soma das barras é o total de voltas do período."
         >
           <CausasVoltaChart causas={causasVolta} />
         </Secao>
         <Secao
+          id="motivos-insucessos"
           titulo="Motivos dos insucessos"
           hint="Cada nota que voltou, pelo código de ocorrência lançado no Protheus. Nas barras: vermelho = logística (conta na Volta Logística); azul = L06, pedido não carregado (falha do CD); o resto é do cliente ou outros. Troque para Rosca pra ver a fatia de cada motivo. Clique num motivo pra ver as notas com cliente, CPF e produto."
           className="lg:col-span-2"
@@ -137,6 +151,7 @@ export function LogisticaTerminal({
       </div>
 
       <Secao
+        id="indice-volta-motorista"
         titulo="Índice de Volta por motorista"
         hint={`Um motorista por linha. Passe o mouse no "i" de cada coluna pra ver o que ela significa. Motoristas com menos de ${VISITAS_MINIMAS} notas aparecem apagados (índice instável). Clique num cabeçalho pra ordenar.`}
       >
