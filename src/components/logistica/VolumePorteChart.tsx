@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ProdutosPorte } from "./ProdutosPorte";
+import { gruposPorPorte } from "@/lib/produtoGrupo";
 import type { KpisEntregas, ProdutoPorte, VolumeDia } from "@/lib/kpisLogistica";
 
 const SERIES = [
@@ -64,6 +65,7 @@ export function VolumePorteChart({
 }) {
   const [aberto, setAberto] = useState<ProdutoPorte["porte"] | null>(null);
   const unidades = (key: (typeof SERIES)[number]["key"]) => data.reduce((t, d) => t + d[key], 0);
+  const porGrupo = gruposPorPorte(produtos);
   return (
     <div className="pb-4">
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
@@ -111,6 +113,48 @@ export function VolumePorteChart({
             ))}
           </BarChart>
         </ResponsiveContainer>
+      )}
+      {produtos.length > 0 && (
+        // Divisão por grupo de produto dentro de cada porte, sem precisar
+        // abrir a lista (pedido do Victor 18/10/2026).
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          {SERIES.filter((s) => s.porte !== "N").map((s) => {
+            const grupos = porGrupo[s.porte] ?? [];
+            const maior = grupos[0]?.unidades ?? 1;
+            return (
+              <div key={s.porte} className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAberto(s.porte)}
+                  className="flex items-center justify-between gap-2 text-left text-sm font-semibold rounded-lg px-2 py-1 -mx-2 transition-colors hover:bg-[var(--surface-2)]"
+                  style={{ color: "var(--text-primary)" }}
+                  title="Ver os produtos"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} />
+                    {s.label}
+                  </span>
+                  <span className="tabular-nums">{fmt(unidades(s.key))}</span>
+                </button>
+                <ul className="flex flex-col gap-1.5">
+                  {grupos.map((g) => (
+                    <li key={g.chave} className="flex flex-col gap-0.5 text-xs">
+                      <span className="flex justify-between gap-2" style={{ color: "var(--text-secondary)" }}>
+                        <span className="truncate">{g.label}</span>
+                        <span className="tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
+                          {fmt(g.unidades)}
+                        </span>
+                      </span>
+                      <span className="h-1 rounded-full" style={{ background: "var(--surface-2)" }}>
+                        <span className="block h-full rounded-full" style={{ width: `${Math.max(3, (g.unidades / maior) * 100)}%`, background: s.color }} />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

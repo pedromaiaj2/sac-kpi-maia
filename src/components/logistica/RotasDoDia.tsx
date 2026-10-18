@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ModalLogistica } from "./ModalLogistica";
+import { Recolhivel } from "./Recolhivel";
 import {
   grupoDaCarga,
   MINUTOS_SEM_BAIXA_ALERTA,
@@ -222,16 +223,22 @@ function Grupo({
 }) {
   const r = resumirRotas(cargas);
   return (
-    <div className="flex flex-col gap-3 min-w-0">
-      <div className="flex items-baseline justify-between gap-3 px-1">
-        <h3 className="inline-flex items-center gap-2 text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+    <Recolhivel
+      id={`rotas-${grupo === "Próprio" ? "nossos" : "terceirizados"}`}
+      variante="simples"
+      tituloClassName="text-lg font-semibold"
+      titulo={
+        <span className="inline-flex items-center gap-2">
           <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: COR_GRUPO[grupo] }} />
           {titulo}
-        </h3>
+        </span>
+      }
+      extra={
         <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
           {r.cargas} carga{r.cargas === 1 ? "" : "s"} · {fmt(r.notas)} notas · {pctTexto(r.andamento)} concluído
         </span>
-      </div>
+      }
+    >
       {cargas.length === 0 ? (
         <p className="text-sm rounded-2xl p-5" style={{ color: "var(--text-muted)", background: "var(--surface-1)" }}>
           Nenhuma carga.
@@ -243,7 +250,7 @@ function Grupo({
           ))}
         </ul>
       )}
-    </div>
+    </Recolhivel>
   );
 }
 
