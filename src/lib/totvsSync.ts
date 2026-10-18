@@ -1388,6 +1388,8 @@ async function syncOpenCargas(supabase: SupabaseAdmin, janela: JanelaCargas = JA
     }
     if (errors.length === errosAntes && (json.data ?? []).length > 0 && (json.totalPages ?? 1) <= 1) {
       await limparLinhasForaDaCarga(supabase, carga, inicio, errors);
+    } else if ((json.data ?? []).length === 0) {
+      upserted += await conferirCargaVazia(supabase, carga, errors);
     }
   }
 
@@ -1501,25 +1503,55 @@ export async function resincronizarPorDocumento(
   }
   return comTravaTotvs(supabase, origem, async () => {
     const errors: string[] = [];
-    let checked = 0;
-    let upserted = 0;
-    for (const document of documentos) {
-      checked++;
-      let json: TotvsDeliveryListResponse;
-      try {
-        json = await fetchTotvs<TotvsDeliveryListResponse>(
-          `${BASE_URL}/rest/ai/deliveries?document=${encodeURIComponent(document)}&page=1&size=50`
-        );
-      } catch (err) {
-        errors.push(`documento ${document}: ${(err as Error).message}`);
-        continue;
-      }
-      for (const d of json.data ?? []) {
-        if (await upsertDelivery(supabase, d, errors)) upserted++;
-      }
-    }
-    return { checked, upserted, errors };
+    const upserted = await reconsultarDocumentos(supabase, documentos, errors);
+    return { checked: documentos.length, upserted, errors };
   });
+}
+
+async function reconsultarDocumentos(supabase: SupabaseAdmin, documentos: string[], errors: string[]): Promise<number> {
+  let upserted = 0;
+  for (const document of documentos) {
+    let json: TotvsDeliveryListResponse;
+    try {
+      json = await fetchTotvs<TotvsDeliveryListResponse>(
+        `${BASE_URL}/rest/ai/deliveries?document=${encodeURIComponent(document)}&page=1&size=50`
+      );
+    } catch (err) {
+      errors.push(`documento ${document}: ${(err as Error).message}`);
+      continue;
+    }
+    for (const d of json.data ?? []) {
+      if (await upsertDelivery(supabase, d, errors)) upserted++;
+    }
+  }
+  return upserted;
+}
+
+// Carga que o load= devolve vazia (Victor 18/10/2026: a 005456 ficou com 1
+// nota no mural depois de esvaziada no Protheus). Resposta vazia não basta
+// pra apagar -- pode ser falha da API --, então cada pedido que a carga
+// tinha é reconsultado pelo documento do cliente, que traz a lista completa
+// de cargas: se a carga não estiver mais lá, upsertDelivery tira a linha.
+const CARGA_VAZIA_MAX_DOCUMENTOS = 10;
+
+async function conferirCargaVazia(supabase: SupabaseAdmin, carga: string, errors: string[]): Promise<number> {
+  const { data, error } = await supabase
+    .from("totvs_delivery_cargas")
+    .select("totvs_deliveries(client_cpf_cnpj)")
+    .eq("carga", carga)
+    .limit(100);
+  if (error) {
+    errors.push(`open carga ${carga} vazia: ${error.message}`);
+    return 0;
+  }
+  const documentos = [
+    ...new Set(
+      ((data ?? []) as unknown as { totvs_deliveries: { client_cpf_cnpj: string | null } | null }[])
+        .map((r) => r.totvs_deliveries?.client_cpf_cnpj)
+        .filter((v): v is string => !!v)
+    ),
+  ].slice(0, CARGA_VAZIA_MAX_DOCUMENTOS);
+  return reconsultarDocumentos(supabase, documentos, errors);
 }
 
 async function runTotvsSyncNaTrava(supabase: SupabaseAdmin): Promise<TotvsSyncSummary> {
