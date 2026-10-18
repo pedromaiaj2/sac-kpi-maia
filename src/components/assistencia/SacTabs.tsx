@@ -28,29 +28,34 @@ const TABS = [
 
 export type SacTabKey = (typeof TABS)[number]["key"];
 
-// Abas por sublinhado (não segmented control) -- Guia de Componentes
-// Maia (Design System, 01/09/2026): com 6 abas, um trilho de pílulas
-// (bg-gray-100 dark:bg-gray-700 p-1, ver fila/agenda) ficaria apertado demais; sublinhado
-// é o padrão certo pra um conjunto largo assim, só com as cores/
-// tipografia atualizadas.
+// Pílulas (era sublinhado) -- migração pro Design System unificado, pedido
+// do Victor 18/10/2026: "elimine a barra laranja horizontal dura do menu
+// superior antigo... os botões ativos devem ganhar uma pílula de cor
+// sólida". Mesma receita de AssistenciaNav.tsx/LojaTabs.tsx -- com 6 abas
+// (contando as `hidden`) continua cabendo numa fileira que rola horizontal,
+// só não precisa mais do trilho `border-b` por baixo.
 export function SacTabs({ active }: { active: SacTabKey }) {
   return (
-    <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-600 overflow-x-auto">
+    <nav className="flex items-center gap-1.5 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
       {TABS.filter((tab) => !("hidden" in tab && tab.hidden)).map((tab) => {
         const isActive = tab.key === active;
         return (
           <Link
             key={tab.key}
             href={tab.href}
-            className={`text-sm px-4 py-2.5 font-medium whitespace-nowrap border-b-2 -mb-px transition-colors duration-150 ${
-              isActive ? "text-gray-800 dark:text-gray-100" : "text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200"
+            className={`text-sm font-medium tracking-wide px-3.5 py-1.5 rounded-full shrink-0 whitespace-nowrap transition-colors duration-200 ${
+              isActive ? "" : "bg-[var(--surface-2)] hover:bg-[var(--brand-green-soft)]"
             }`}
-            style={isActive ? { borderColor: "#1B5E3C" } : undefined}
+            style={{
+              background: isActive ? "var(--brand-green)" : undefined,
+              color: isActive ? "var(--brand-green-ink)" : "var(--text-secondary)",
+              fontWeight: isActive ? 600 : 500,
+            }}
           >
             {tab.label}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

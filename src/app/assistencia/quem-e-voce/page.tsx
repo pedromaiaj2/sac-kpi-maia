@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { ASSISTENCIA_TEAM_COOKIE_NAME, verifyAssistenciaTeamPending } from "@/lib/assistenciaTeamAuth";
 import { chooseAssistenciaIdentity } from "@/app/assistencia/actions";
+import { loginErrorClassName, loginErrorStyle } from "@/components/assistencia/LoginFormShell";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function QuemEVocePage({
         </div>
 
         {erro ? (
-          <p className="text-sm text-center" style={{ color: "var(--status-critical)" }}>
+          <p className={`${loginErrorClassName} text-center`} style={loginErrorStyle}>
             Não foi possível entrar. Tente de novo.
           </p>
         ) : null}
@@ -59,8 +60,8 @@ export default async function QuemEVocePage({
               <form key={m.id} action={chooseAssistenciaIdentity.bind(null, m.id)}>
                 <button
                   type="submit"
-                  className="w-full rounded-xl border p-4 text-left font-medium"
-                  style={{ background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+                  className="cartao w-full p-4 text-left font-medium tracking-wide transition-transform duration-200 hover:-translate-y-0.5"
+                  style={{ color: "var(--text-primary)" }}
                 >
                   {m.full_name}
                 </button>
@@ -69,7 +70,11 @@ export default async function QuemEVocePage({
           )}
         </div>
 
-        <Link href="/assistencia/login" className="text-sm underline text-center" style={{ color: "var(--text-secondary)" }}>
+        <Link
+          href="/assistencia/login"
+          className="self-center inline-flex items-center gap-1.5 text-sm py-2 px-4 rounded-full transition-colors duration-200 hover:bg-[var(--brand-green-soft)]"
+          style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}
+        >
           ← Voltar
         </Link>
       </div>

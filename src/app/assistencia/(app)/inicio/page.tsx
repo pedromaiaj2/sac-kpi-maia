@@ -6,28 +6,41 @@ import { countPendingPayments } from "@/lib/payments";
 import { OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
-// Número simples (sem borda própria, embutido dentro do Card) -- fica
-// sempre neutro/preto, mesmo quando precisa de atenção: em vez de colorir
-// o número inteiro (Tier 0/1 antigo), uma bolinha discreta ao lado sinaliza
-// "precisa de atenção" sem virar texto colorido (Guia de Componentes Maia,
-// mesma régua de StatusBadge/CountBadge -- cor no indicador, não no texto).
+// Redesenho 18/10/2026 -- migração pro Design System unificado (pedido do
+// Victor: "mantenha o fundo claro... e as cores corporativas originais dos
+// cards e menus", "números de métricas/KPIs devem ser grandes, limpos e
+// destacados -- text-3xl ou text-4xl font-bold"). Badge arredondado (era
+// uma bolinha discreta) pra "precisa de atenção" -- continua cor só no
+// indicador, não no número (mesma régua de StatusBadge/CountBadge), só que
+// agora como selo, não mais um ponto quase invisível.
 function Stat({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
+    <div className="flex flex-col gap-1">
+      <span className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
         {value}
-        {warn && value > 0 ? <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: "var(--status-warning)" }} aria-hidden /> : null}
       </span>
-      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
+      <span className="text-xs font-medium uppercase tracking-wide flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+        {label}
+        {warn && value > 0 ? (
+          <span
+            className="text-[10px] font-bold rounded-full px-1.5 py-0.5 normal-case tracking-normal"
+            style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
+          >
+            atenção
+          </span>
+        ) : null}
+      </span>
     </div>
   );
 }
 
-// Cartão branco/borda fina/shadow-sm -- Guia de Componentes Maia (Design
-// System, 01/09/2026), mesmo padrão do resto do SAC. Substitui o Tier 0
-// antigo daqui (rounded-lg border cinza + título colorido) -- achado
-// revisando as telas 02/09/2026: era a pior tela fora desse padrão, a
-// primeira que qualquer gerente/assistência vê depois do login.
+// Cartão `.cartao` (rounded-2xl, sem borda, sombra suave -- mesma casca do
+// Design System unificado já usado em /kpis/logistica) + traço fino colorido
+// no topo carregando a identidade de cada setor (era borderTop 4px sólido
+// junto com borda cinza inteira em volta -- "bordas superiores coloridas
+// muito finas ou sombras suaves", pedido do Victor 18/10/2026). Padding e
+// respiro maiores (p-6/gap-4, eram p-5/gap-3) -- "aumente o padding interno
+// de cada card... pra eliminar a sensação de informações espremidas".
 function Card({
   href,
   title,
@@ -38,28 +51,24 @@ function Card({
   href: string;
   title: string;
   description: string;
-  // Faixa fina colorida -- pedido do Victor 11/09/2026: "preciso que
-  // esteja com esse detalhe" (referência: KpiCardWhite em
-  // relatorios/page.tsx, que já usa essa mesma cor de série por card --
-  // ex.: "Total a pagar a montadores" com --series-4) "só que esse
-  // detalhe é lateral, eu queria que fosse na parte de cima dos cards".
-  // Em CIMA (borderTop) em vez de na esquerda (era borderLeft até
-  // 11/09/2026, só no card "KPIs do SAC") -- todo card agora recebe uma
-  // cor (ver chamadas abaixo), não só o de fora do domínio.
   accent: string;
   children?: React.ReactNode;
 }) {
   return (
     <Link
       href={href}
-      className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-5 flex flex-col gap-3 hover:border-gray-300 dark:hover:border-gray-500 transition-colors duration-150"
-      style={{ borderTop: `4px solid ${accent}` }}
+      className="cartao p-6 flex flex-col gap-4 transition-transform duration-200 hover:-translate-y-0.5"
+      style={{ borderTop: `3px solid ${accent}` }}
     >
-      <div>
-        <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">{title}</h3>
-        <p className="text-sm mt-0.5 text-gray-400 dark:text-gray-500">{description}</p>
+      <div className="flex flex-col gap-1">
+        <h3 className="text-base font-bold tracking-wide" style={{ color: "var(--text-primary)" }}>
+          {title}
+        </h3>
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          {description}
+        </p>
       </div>
-      {children ? <div className="flex flex-wrap gap-5">{children}</div> : null}
+      {children ? <div className="flex flex-wrap gap-6">{children}</div> : null}
     </Link>
   );
 }
@@ -87,7 +96,7 @@ export default async function InicioPage() {
           largura total que o layout ganhou (pedido do Victor 31/08/2026);
           sem esses breakpoints extras os cards ficariam com espaço vazio
           enorme dos dois lados numa tela de desktop. */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         <Card href="/assistencia/fila" title="Solicitações" description="Montagem, desmontagem, recolhimento, troca de peça, vistoria e notificações." accent="var(--series-1)">
           <Stat label="Abertas sem contato" value={requests.openNoContact} warn />
           <Stat label="Aguardando aprovação de prazo" value={requests.pendingDeadline} />

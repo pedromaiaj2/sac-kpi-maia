@@ -186,11 +186,18 @@ export function MobileNav({
               className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
               style={{ color: active ? "var(--brand-green)" : "var(--text-muted)" }}
             >
-              <span className="relative">
+              {/* Pílula sutil atrás do ícone ativo -- mesmo motivo da pílula
+                  no nav de desktop (Design System unificado, 18/10/2026):
+                  antes só a cor do ícone/texto mudava, sem nenhuma marcação
+                  de fundo. */}
+              <span
+                className="relative rounded-full px-3 py-1 -mt-1 transition-colors duration-200"
+                style={{ background: active ? "var(--brand-green-soft)" : "transparent" }}
+              >
                 <Icon />
                 <NavDot count={tabCount} />
               </span>
-              <span className="text-[11px]" style={{ fontWeight: active ? 600 : 400 }}>
+              <span className="text-[11px] tracking-wide" style={{ fontWeight: active ? 600 : 400 }}>
                 {tab.label}
               </span>
             </Link>
@@ -201,11 +208,14 @@ export function MobileNav({
           className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
           style={{ color: moreOpen || moreActive ? "var(--brand-green)" : "var(--text-muted)" }}
         >
-          <span className="relative">
+          <span
+            className="relative rounded-full px-3 py-1 -mt-1 transition-colors duration-200"
+            style={{ background: moreOpen || moreActive ? "var(--brand-green-soft)" : "transparent" }}
+          >
             <DotsIcon />
             <NavDot count={encomendasCount} />
           </span>
-          <span className="text-[11px]" style={{ fontWeight: moreOpen || moreActive ? 600 : 400 }}>
+          <span className="text-[11px] tracking-wide" style={{ fontWeight: moreOpen || moreActive ? 600 : 400 }}>
             Mais
           </span>
         </button>

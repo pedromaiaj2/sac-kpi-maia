@@ -15,12 +15,16 @@ import { UnderlineTab } from "@/components/UnderlineTab";
 // Victor: "fica ruim se for compartilhada com a equipe tecnica a mesma
 // tela da asisstencia" -- antes apontava pra /assistencia/pecas
 // (compartilhada com assistência/admin, só o cabeçalho mudava).
+// `pilula` (era sublinhado, sem essa prop) -- migração pro Design System
+// unificado, pedido do Victor 18/10/2026: mesmo visual de pílula das outras
+// navegações agora (AssistenciaNav/SacTabs/SupervisaoTabs/LojaTabs), sem o
+// trilho `border-b` por baixo.
 export function TecnicoTabs({ active }: { active: "fila" | "estoque" | "pecas" }) {
   return (
-    <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
-      <UnderlineTab href="/assistencia/tecnico" label="Fila de classificação" active={active === "fila"} />
-      <UnderlineTab href="/assistencia/tecnico/estoque" label="Estoque" active={active === "estoque"} />
-      <UnderlineTab href="/assistencia/tecnico/pecas" label="Peças" active={active === "pecas"} />
+    <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
+      <UnderlineTab href="/assistencia/tecnico" label="Fila de classificação" active={active === "fila"} pilula />
+      <UnderlineTab href="/assistencia/tecnico/estoque" label="Estoque" active={active === "estoque"} pilula />
+      <UnderlineTab href="/assistencia/tecnico/pecas" label="Peças" active={active === "pecas"} pilula />
     </div>
   );
 }

@@ -2,7 +2,16 @@
 
 import { useActionState, useState } from "react";
 import { signIn, type FormState } from "@/app/assistencia/actions";
-import { LoginFormShell, loginInputClassName, loginInputStyle } from "@/components/assistencia/LoginFormShell";
+import {
+  LoginFormShell,
+  loginInputClassName,
+  loginInputStyle,
+  loginCardClassName,
+  loginButtonClassName,
+  loginButtonStyle,
+  loginErrorClassName,
+  loginErrorStyle,
+} from "@/components/assistencia/LoginFormShell";
 
 // "Lembrar meu e-mail" -- conveniência por navegador (localStorage), nunca
 // a senha. Tentativa de leitura/escrita embrulhada em try/catch: janela
@@ -32,12 +41,7 @@ export default function LoginPage() {
 
   return (
     <LoginFormShell roleTitle="Equipe / Admin" roleSubtitle="Entre com seu e-mail e senha.">
-      <form
-        action={formAction}
-        onSubmit={handleSubmit}
-        className="rounded-xl border p-6 flex flex-col gap-4"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-green)" }}
-      >
+      <form action={formAction} onSubmit={handleSubmit} className={loginCardClassName}>
         <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
           E-mail
           <input
@@ -68,16 +72,11 @@ export default function LoginPage() {
         </label>
 
         {state?.error ? (
-          <p className="text-sm" style={{ color: "var(--status-critical)" }}>
+          <p className={loginErrorClassName} style={loginErrorStyle}>
             {state.error}
           </p>
         ) : null}
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-lg px-3 py-2.5 font-semibold text-white disabled:opacity-60 transition-colors"
-          style={{ background: "#1B5E3C" }}
-        >
+        <button type="submit" disabled={pending} className={loginButtonClassName} style={loginButtonStyle}>
           {pending ? "Entrando…" : "Entrar"}
         </button>
       </form>

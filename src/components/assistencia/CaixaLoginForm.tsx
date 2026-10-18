@@ -4,7 +4,15 @@ import { useActionState } from "react";
 import { caixaSignIn, type CaixaFormState } from "@/app/assistencia/caixa-actions";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 import { usePinAutoSubmit } from "./usePinAutoSubmit";
-import { loginInputClassName, loginInputStyle } from "./LoginFormShell";
+import {
+  loginInputClassName,
+  loginInputStyle,
+  loginCardClassName,
+  loginButtonClassName,
+  loginButtonStyle,
+  loginErrorClassName,
+  loginErrorStyle,
+} from "./LoginFormShell";
 
 // Caixa é individual (nome + PIN próprio), mesmo padrão de login por PIN
 // usado em CdLoginForm.tsx/FabricaLoginForm.tsx.
@@ -13,12 +21,7 @@ export function CaixaLoginForm() {
   const { formRef, onPinChange } = usePinAutoSubmit(pending);
 
   return (
-    <form
-      ref={formRef}
-      action={formAction}
-      className="rounded-xl border p-6 flex flex-col gap-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
-    >
+    <form ref={formRef} action={formAction} className={loginCardClassName}>
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         Seu nome
         <input name="name" type="text" required autoComplete="off" className={loginInputClassName} style={loginInputStyle} />
@@ -39,16 +42,11 @@ export function CaixaLoginForm() {
         />
       </label>
       {state?.error ? (
-        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
+        <p className={loginErrorClassName} style={loginErrorStyle}>
           {state.error}
         </p>
       ) : null}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-lg px-3 py-2.5 font-semibold text-white disabled:opacity-60 transition-colors"
-        style={{ background: "#1B5E3C" }}
-      >
+      <button type="submit" disabled={pending} className={loginButtonClassName} style={loginButtonStyle}>
         {pending ? "Entrando…" : "Entrar"}
       </button>
     </form>

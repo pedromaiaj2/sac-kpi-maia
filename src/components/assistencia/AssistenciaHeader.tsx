@@ -11,14 +11,20 @@ export function AssistenciaHeader({
   children?: React.ReactNode;
 }) {
   return (
+    // Barra laranja horizontal dura (borderBottom: 3px solid var(--brand-orange))
+    // removida 18/10/2026 -- pedido do Victor, migração pro Design System
+    // unificado ("elimine a barra laranja horizontal dura do menu superior
+    // antigo"). Divisória fina e neutra (var(--border)) no lugar, mais
+    // respiro (pb-5 em vez de pb-4) -- a identidade da marca continua no
+    // título/pílulas ativas, não precisa mais de uma faixa inteira.
     <header
-      className="flex items-center justify-between gap-4 pb-4 flex-wrap"
-      style={{ borderBottom: "3px solid var(--brand-orange)" }}
+      className="flex items-center justify-between gap-4 pb-5 flex-wrap"
+      style={{ borderBottom: "1px solid var(--border)" }}
     >
       <div className="flex items-center gap-4">
         <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-14 w-14 object-contain shrink-0" />
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: "var(--brand-green)" }}>
+          <h1 className="text-2xl font-semibold tracking-wide" style={{ color: "var(--brand-green)" }}>
             {title}
           </h1>
           {subtitle ? (

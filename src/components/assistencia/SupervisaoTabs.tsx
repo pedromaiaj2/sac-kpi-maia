@@ -13,24 +13,30 @@ const TABS = [
 
 export type SupervisaoTabKey = (typeof TABS)[number]["key"];
 
+// Pílulas (era sublinhado) -- mesma migração de SacTabs.tsx (Design System
+// unificado, pedido do Victor 18/10/2026).
 export function SupervisaoTabs({ active }: { active: SupervisaoTabKey }) {
   return (
-    <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-600 overflow-x-auto">
+    <nav className="flex items-center gap-1.5 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
       {TABS.map((tab) => {
         const isActive = tab.key === active;
         return (
           <Link
             key={tab.key}
             href={tab.href}
-            className={`text-sm px-4 py-2.5 font-medium whitespace-nowrap border-b-2 -mb-px transition-colors duration-150 ${
-              isActive ? "text-gray-800 dark:text-gray-100" : "text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200"
+            className={`text-sm font-medium tracking-wide px-3.5 py-1.5 rounded-full shrink-0 whitespace-nowrap transition-colors duration-200 ${
+              isActive ? "" : "bg-[var(--surface-2)] hover:bg-[var(--brand-green-soft)]"
             }`}
-            style={isActive ? { borderColor: "#1B5E3C" } : undefined}
+            style={{
+              background: isActive ? "var(--brand-green)" : undefined,
+              color: isActive ? "var(--brand-green-ink)" : "var(--text-secondary)",
+              fontWeight: isActive ? 600 : 500,
+            }}
           >
             {tab.label}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

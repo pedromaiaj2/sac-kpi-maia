@@ -23,11 +23,15 @@ export function LojaTabs() {
           <Link
             key={tab.href}
             href={tab.href}
-            className="text-sm px-4 py-2 rounded-full shrink-0 whitespace-nowrap font-medium"
+            // Mesma receita de AssistenciaNav.tsx (Design System unificado,
+            // 18/10/2026): fundo sutil + hover suave nas inativas, sem borda
+            // (era `1px solid var(--border)`, mais "formulário" que pílula).
+            className={`text-sm px-4 py-2 rounded-full shrink-0 whitespace-nowrap font-medium tracking-wide transition-colors duration-200 ${
+              isActive ? "" : "bg-[var(--surface-2)] hover:bg-[var(--brand-green-soft)]"
+            }`}
             style={{
-              background: isActive ? "var(--brand-green)" : "transparent",
+              background: isActive ? "var(--brand-green)" : undefined,
               color: isActive ? "var(--brand-green-ink)" : "var(--text-secondary)",
-              border: isActive ? "none" : "1px solid var(--border)",
             }}
           >
             {tab.label}

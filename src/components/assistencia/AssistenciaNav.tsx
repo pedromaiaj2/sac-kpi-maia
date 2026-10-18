@@ -74,18 +74,27 @@ export function AssistenciaNav({
     // Scrollbar visível de propósito (era escondida, `scrollbarWidth: "none"`)
     // -- sem nenhum sinal visual, "tem mais aba rolando pra direita" ficava
     // invisível, e a última aba (era "Admin") quase nunca era vista.
-    <nav className="flex items-center gap-2 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
+    <nav className="flex items-center gap-1.5 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
       {tabs.map((tab) => {
         const active = (tab.matches ?? [tab.href]).some((path) => pathname.startsWith(path));
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            className="text-sm px-3 py-1.5 rounded-full shrink-0 whitespace-nowrap flex items-center gap-1.5"
+            // Pílula ativa sólida + inativa com fundo sutil e hover suave
+            // (era transparente puro, só mudava a cor do texto) -- pedido do
+            // Victor 18/10/2026, Design System unificado: "os inativos devem
+            // ter fundos sutis e elegantes com efeito hover suave". Fundo
+            // inativo via className (não `style`, que tem prioridade sobre
+            // `hover:` e deixaria o hover sem efeito nenhum) pra herdar a
+            // transição de cor do Tailwind.
+            className={`text-sm font-medium tracking-wide px-3.5 py-1.5 rounded-full shrink-0 whitespace-nowrap flex items-center gap-1.5 transition-colors duration-200 ${
+              active ? "" : "bg-[var(--surface-2)] hover:bg-[var(--brand-green-soft)]"
+            }`}
             style={{
-              background: active ? "var(--brand-green)" : "transparent",
+              background: active ? "var(--brand-green)" : undefined,
               color: active ? "var(--brand-green-ink)" : "var(--text-secondary)",
-              fontWeight: active ? 600 : 400,
+              fontWeight: active ? 600 : 500,
             }}
           >
             {tab.label}

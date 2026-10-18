@@ -4,28 +4,26 @@ import { useActionState } from "react";
 import { fabricaSignIn, type FabricaFormState } from "@/app/assistencia/fabrica-actions";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 import { usePinAutoSubmit } from "./usePinAutoSubmit";
+import {
+  loginInputClassName,
+  loginInputStyle,
+  loginCardClassName,
+  loginButtonClassName,
+  loginButtonStyle,
+  loginErrorClassName,
+  loginErrorStyle,
+} from "./LoginFormShell";
 
+// Mesma migração de CdLoginForm.tsx (Design System unificado, 18/10/2026).
 export function FabricaLoginForm() {
   const [state, formAction, pending] = useActionState<FabricaFormState, FormData>(fabricaSignIn, undefined);
   const { formRef, onPinChange } = usePinAutoSubmit(pending);
 
   return (
-    <form
-      ref={formRef}
-      action={formAction}
-      className="rounded-xl border p-6 flex flex-col gap-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-green)" }}
-    >
+    <form ref={formRef} action={formAction} className={loginCardClassName}>
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         Seu nome
-        <input
-          name="name"
-          type="text"
-          required
-          autoComplete="off"
-          className="rounded border px-3 py-2"
-          style={{ borderColor: "var(--border)" }}
-        />
+        <input name="name" type="text" required autoComplete="off" className={loginInputClassName} style={loginInputStyle} />
       </label>
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         PIN
@@ -38,21 +36,16 @@ export function FabricaLoginForm() {
           required
           autoComplete="off"
           onChange={onPinChange}
-          className="rounded border px-3 py-2 text-center text-2xl tracking-[0.5em]"
-          style={{ borderColor: "var(--border)" }}
+          className={`${loginInputClassName} text-center text-2xl tracking-[0.5em]`}
+          style={loginInputStyle}
         />
       </label>
       {state?.error ? (
-        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
+        <p className={loginErrorClassName} style={loginErrorStyle}>
           {state.error}
         </p>
       ) : null}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded px-3 py-2 font-medium disabled:opacity-60"
-        style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-      >
+      <button type="submit" disabled={pending} className={loginButtonClassName} style={loginButtonStyle}>
         {pending ? "Entrando…" : "Entrar"}
       </button>
     </form>

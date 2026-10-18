@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { RedefinirSenhaForm } from "@/components/assistencia/RedefinirSenhaForm";
+import { loginErrorClassName, loginErrorStyle } from "@/components/assistencia/LoginFormShell";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +27,16 @@ export default async function RedefinirSenhaPage({
         {token_hash ? (
           <RedefinirSenhaForm tokenHash={token_hash} />
         ) : (
-          <p className="text-sm text-center" style={{ color: "var(--status-critical)" }}>
+          <p className={`${loginErrorClassName} text-center`} style={loginErrorStyle}>
             Link inválido. Peça um novo link de redefinição.
           </p>
         )}
 
-        <Link href="/assistencia/login" className="text-sm underline text-center" style={{ color: "var(--text-secondary)" }}>
+        <Link
+          href="/assistencia/login"
+          className="self-center inline-flex items-center gap-1.5 text-sm py-2 px-4 rounded-full transition-colors duration-200 hover:bg-[var(--brand-green-soft)]"
+          style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}
+        >
           ← Voltar
         </Link>
       </div>
