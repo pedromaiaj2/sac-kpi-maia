@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ddmmyyyyToIso, isoDate, totvsHeaders, detectDeliveryRiskTrigger, nextOrdersCursor, mapCargaItens } from "./totvsSync";
+import { ddmmyyyyToIso, isoDate, totvsHeaders, detectDeliveryRiskTrigger, nextOrdersCursor, mapCargaItens, tentativaParcial } from "./totvsSync";
 
 describe("ddmmyyyyToIso", () => {
   it("converte DD/MM/YYYY pra YYYY-MM-DD", () => {
@@ -126,6 +126,21 @@ describe("detectDeliveryRiskTrigger", () => {
     expect(detectDeliveryRiskTrigger(existing, incoming)).toBeNull();
   });
 
+  it("payload parcial (load=<carga>) sem as outras cargas -> sem gatilho", () => {
+    const existing = [
+      { carga: "005453", tentativa: 1, status_entrega: "Não Entregue" },
+      { carga: "005490", tentativa: 2, status_entrega: "Em Montagem" },
+    ];
+    const incoming = [{ carga: "005490", tentativa: 2, statusEntrega: "Em Montagem" }];
+    expect(detectDeliveryRiskTrigger(existing, incoming, true)).toBeNull();
+  });
+
+  it("payload parcial com carga nova depois de uma que voltou -> gatilho de nova tentativa", () => {
+    const existing = [{ carga: "005453", tentativa: 1, status_entrega: "Não Entregue" }];
+    const incoming = [{ carga: "005490", tentativa: 2, statusEntrega: "Em Montagem" }];
+    expect(detectDeliveryRiskTrigger(existing, incoming, true)?.reason).toMatch(/nova tentativa/i);
+  });
+
   it("carga some do payload -> gatilho (pedido retirado da carga)", () => {
     const existing = [{ carga: "C1", tentativa: 1, status_entrega: "Programada" }];
     const incoming: { carga: string; tentativa?: number; statusEntrega?: string }[] = [];
@@ -215,5 +230,22 @@ describe("mapCargaItens", () => {
       NOW
     );
     expect(rows.map((r) => r.quantidade)).toEqual([0, 0, 1.5]);
+  });
+});
+
+// load=<carga> reconta a tentativa a partir de 1 (Victor 18/10/2026).
+describe("tentativaParcial", () => {
+  const existing = [{ carga: "005453", tentativa: 1, status_entrega: "Não Entregue" }];
+
+  it("carga nova depois de tentativa conhecida -> próxima tentativa", () => {
+    expect(tentativaParcial(existing, "005490", 1)).toBe(2);
+  });
+
+  it("carga já conhecida -> mantém a tentativa do banco", () => {
+    expect(tentativaParcial([...existing, { carga: "005490", tentativa: 2, status_entrega: null }], "005490", 1)).toBe(2);
+  });
+
+  it("pedido sem nada no banco -> tentativa do payload", () => {
+    expect(tentativaParcial([], "005490", 1)).toBe(1);
   });
 });

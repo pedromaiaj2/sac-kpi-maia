@@ -952,9 +952,12 @@ export type DeliveryRiskTrigger = { reason: string } | null;
 // listEntregasEmRisco em src/lib/entregasRisco.ts). Comparação por rótulo
 // texto (não por código), ver nota em entregasRisco.ts sobre a ambiguidade
 // dos códigos numéricos entre os namespaces CARGA/ENTREGA.
+// parcial: payload de load=<carga>, que só traz a carga consultada -- a
+// ausência das outras não quer dizer que o pedido saiu delas.
 export function detectDeliveryRiskTrigger(
   existingCargas: ExistingDeliveryCarga[],
-  incomingCargas: TotvsDeliveryCarga[]
+  incomingCargas: TotvsDeliveryCarga[],
+  parcial = false
 ): DeliveryRiskTrigger {
   // Pedido já entregue por alguma carga não é risco, mesmo que outra carga
   // do mesmo pedido apareça cancelada ou suma da lista depois -- caso comum
@@ -989,6 +992,7 @@ export function detectDeliveryRiskTrigger(
     }
   }
 
+  if (parcial) return null;
   for (const e of existingCargas) {
     if (!incomingCodes.has(e.carga)) {
       return { reason: `Carga ${e.carga} não aparece mais no pedido (pedido retirado da carga).` };
@@ -1065,7 +1069,21 @@ async function syncCargaItens(
   if (deleteError) errors.push(`${context} remover itens antigos: ${deleteError.message}`);
 }
 
-async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, errors: string[]): Promise<boolean> {
+// Achado do Victor 18/10/2026 (mural mostrava 98 notas, depois 96): a
+// consulta load=<carga> devolve o pedido só com a carga consultada, e com a
+// tentativa recontada a partir de 1 -- o pedido 038480 voltou na 005453
+// (tentativa 1) e foi pra 005490 (tentativa 2), mas load=005490 diz
+// "005490 tentativa 1" e nem cita a 005453. Tratado como lista completa, isso
+// apagava a tentativa que voltou (some do mural e do Índice de Volta) até o
+// sync completo trazer de volta, e disparava alerta falso de "pedido
+// retirado da carga". Com parcial: não apaga as outras cargas, não mexe no
+// total_cargas e mantém a tentativa que já sabíamos (ver tentativaParcial).
+async function upsertDelivery(
+  supabase: SupabaseAdmin,
+  d: TotvsDeliveryOrder,
+  errors: string[],
+  parcial = false
+): Promise<boolean> {
   const { data: existingDelivery } = await supabase
     .from("totvs_deliveries")
     .select("id")
@@ -1098,7 +1116,7 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
         client_state: d.cliente?.uf || null,
         status_atual: d.statusAtual || null,
         status_atual_codigo: d.statusAtualCodigo || null,
-        total_cargas: d.totalCargas ?? (d.cargas?.length ?? 0),
+        ...(parcial && existingDelivery ? {} : { total_cargas: d.totalCargas ?? (d.cargas?.length ?? 0) }),
         synced_at: new Date().toISOString(),
       },
       { onConflict: "pedido,filial_venda" }
@@ -1110,9 +1128,12 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
     return false;
   }
 
-  const trigger = detectDeliveryRiskTrigger(existingCargas, d.cargas ?? []);
+  const incoming = (d.cargas ?? []).map((c) =>
+    parcial ? { ...c, tentativa: tentativaParcial(existingCargas, c.carga, c.tentativa) } : c
+  );
+  const trigger = detectDeliveryRiskTrigger(existingCargas, incoming, parcial);
 
-  for (const c of d.cargas ?? []) {
+  for (const c of incoming) {
     const { data: cargaRow, error: cargaError } = await supabase.from("totvs_delivery_cargas").upsert(
       {
         delivery_id: deliveryRow.id,
@@ -1166,7 +1187,7 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
   // de existingCargas ANTES de qualquer escrita, então apagar agora não
   // muda o diff que ele calculou.
   const incomingCargaCodes = new Set((d.cargas ?? []).map((c) => c.carga));
-  const staleCargaCodes = existingCargas.map((e) => e.carga).filter((carga) => !incomingCargaCodes.has(carga));
+  const staleCargaCodes = parcial ? [] : existingCargas.map((e) => e.carga).filter((carga) => !incomingCargaCodes.has(carga));
   if (staleCargaCodes.length > 0) {
     const { error: deleteError } = await supabase
       .from("totvs_delivery_cargas")
@@ -1192,6 +1213,20 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
   }
 
   return true;
+}
+
+// Tentativa de uma carga vinda de load=<carga> (recontada a partir de 1):
+// carga já conhecida fica com a tentativa que tinha; carga nova vem depois
+// da maior tentativa já conhecida do pedido.
+export function tentativaParcial(
+  existingCargas: ExistingDeliveryCarga[],
+  carga: string,
+  doPayload: number | undefined
+): number | undefined {
+  const atual = existingCargas.find((e) => e.carga === carga);
+  if (atual) return atual.tentativa ?? doPayload;
+  const maior = Math.max(0, ...existingCargas.map((e) => e.tentativa ?? 0));
+  return maior > 0 ? Math.max(maior + 1, doPayload ?? 0) : doPayload;
 }
 
 type StaleDeliveryCandidate = { pedido: string; client_cpf_cnpj: string | null; status_atual: string | null; synced_at: string };
@@ -1322,7 +1357,7 @@ async function syncOpenCargas(supabase: SupabaseAdmin, janela: JanelaCargas = JA
     const inicio = new Date(Date.now() - 60_000).toISOString();
     const errosAntes = errors.length;
     for (const d of json.data ?? []) {
-      if (await upsertDelivery(supabase, d, errors)) upserted++;
+      if (await upsertDelivery(supabase, d, errors, true)) upserted++;
     }
     if (errors.length === errosAntes && (json.data ?? []).length > 0 && (json.totalPages ?? 1) <= 1) {
       await limparLinhasForaDaCarga(supabase, carga, inicio, errors);
@@ -1423,6 +1458,40 @@ export async function runTotvsSyncCargasDoDia(supabase: SupabaseAdmin, origem: s
     const r = await syncOpenCargas(supabase, JANELA_CARGAS_DO_DIA);
     await recordSyncRun("totvs-cargas", r.errors.length === 0, { checked: r.checked, upserted: r.upserted }, r.errors);
     return r;
+  });
+}
+
+// Reconsulta pedidos pelo documento do cliente (lista completa de cargas).
+// Usada pra devolver as tentativas que a rodada por carga apagava (ver
+// upsertDelivery, parcial) -- uma chamada por vez, debaixo da mesma trava.
+export async function resincronizarPorDocumento(
+  supabase: SupabaseAdmin,
+  origem: string,
+  documentos: string[]
+): Promise<SyncResult | TravaOcupada> {
+  if (!BASE_URL || !process.env.TOTVS_API_KEY) {
+    throw new Error("TOTVS_API_BASE_URL/TOTVS_API_KEY ausentes");
+  }
+  return comTravaTotvs(supabase, origem, async () => {
+    const errors: string[] = [];
+    let checked = 0;
+    let upserted = 0;
+    for (const document of documentos) {
+      checked++;
+      let json: TotvsDeliveryListResponse;
+      try {
+        json = await fetchTotvs<TotvsDeliveryListResponse>(
+          `${BASE_URL}/rest/ai/deliveries?document=${encodeURIComponent(document)}&page=1&size=50`
+        );
+      } catch (err) {
+        errors.push(`documento ${document}: ${(err as Error).message}`);
+        continue;
+      }
+      for (const d of json.data ?? []) {
+        if (await upsertDelivery(supabase, d, errors)) upserted++;
+      }
+    }
+    return { checked, upserted, errors };
   });
 }
 
