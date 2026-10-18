@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Users, Star, MessageSquare, Wrench, MessagesSquare, Truck, LogOut, Moon, Sun } from "lucide-react";
+import { Home, Users, Star, MessageSquare, Wrench, MessagesSquare, Truck, LogOut, Moon, Sun, BarChart3, ChevronDown } from "lucide-react";
 import { signOutDashboard } from "@/app/login/actions";
 
 // Menu lateral de todas as telas do painel (pedido do Victor 17/10/2026:
@@ -47,6 +47,64 @@ function Item({ item, pathname }: { item: ItemMenu; pathname: string }) {
       />
       <span className={ativo ? "font-semibold" : undefined}>{item.rotulo}</span>
     </Link>
+  );
+}
+
+// Grupo "KPIs" (pedido do Victor 18/10/2026): SAC, Assistência, GHL e
+// Logística ficam dentro de um botão recolhido que abre ao clicar. A escolha
+// fica salva neste navegador. Recolhido numa tela de KPI, o botão fica marcado
+// pra mostrar onde você está.
+const CHAVE_KPIS = "painel:menu-kpis";
+
+function GrupoKpis({ itens, pathname }: { itens: ItemMenu[]; pathname: string }) {
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- escolha salva só existe no navegador
+      if (localStorage.getItem(CHAVE_KPIS) === "1") setAberto(true);
+    } catch {
+      // storage bloqueado: fica recolhido
+    }
+  }, []);
+  function alternar() {
+    setAberto((a) => {
+      try {
+        localStorage.setItem(CHAVE_KPIS, a ? "0" : "1");
+      } catch {
+        // vale nesta visita
+      }
+      return !a;
+    });
+  }
+  const dentro = itens.some((i) => i.ativo(pathname));
+  const marcado = dentro && !aberto;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={alternar}
+        aria-expanded={aberto}
+        className={`group ${base} ${marcado ? "bg-[var(--surface-2)] text-[var(--text-primary)]" : `text-[var(--text-muted)] ${hover}`}`}
+      >
+        <BarChart3
+          aria-hidden
+          size={20}
+          strokeWidth={1.75}
+          className={`transition-transform duration-200 ${marcado ? "text-[var(--brand-green)]" : "group-hover:scale-110"}`}
+        />
+        <span className={`inline-flex items-center gap-0.5 ${marcado ? "font-semibold" : ""}`}>
+          KPIs
+          <ChevronDown aria-hidden size={12} className={`transition-transform duration-200 ${aberto ? "" : "-rotate-90"}`} />
+        </span>
+      </button>
+      {aberto && (
+        <div className="flex flex-col gap-1 rounded-xl py-1" style={{ background: "color-mix(in srgb, var(--text-primary) 4%, transparent)" }}>
+          {itens.map((i) => (
+            <Item key={i.href} item={i} pathname={pathname} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -111,12 +169,7 @@ export function SidebarApp() {
           {ITENS.slice(0, 3).map((i) => (
             <Item key={i.href} item={i} pathname={pathname} />
           ))}
-          <span className="mt-2 mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-center" style={{ color: "var(--text-muted)" }}>
-            KPIs
-          </span>
-          {ITENS.slice(3).map((i) => (
-            <Item key={i.href} item={i} pathname={pathname} />
-          ))}
+          <GrupoKpis itens={ITENS.slice(3)} pathname={pathname} />
         </nav>
         <div className="mt-auto flex flex-col gap-1">
           <BotaoTema />
@@ -129,9 +182,10 @@ export function SidebarApp() {
         aria-label="Seções"
       >
         <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-8 w-8 object-contain shrink-0 mr-1" />
-        {ITENS.map((i) => (
+        {ITENS.slice(0, 3).map((i) => (
           <Item key={i.href} item={i} pathname={pathname} />
         ))}
+        <GrupoKpis itens={ITENS.slice(3)} pathname={pathname} />
         <BotaoTema />
         <Sair />
       </nav>
