@@ -454,6 +454,12 @@ html.dark .cartao {
     opacity: 0.75;
   }
 }
+/* Dados atrasados (sync parado há 45+ min): luz âmbar e parada -- não
+   finge estar ao vivo (revisão 18/10/2026). */
+.luz-ao-vivo.atrasada {
+  --luz: #f59e0b;
+  animation: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .luz-ao-vivo {
     animation: none;

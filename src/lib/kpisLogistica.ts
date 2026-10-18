@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { memoizeWithTtl } from "@/lib/memoCache";
 import type { PeriodoKpis } from "@/lib/logisticaApi";
 
 // Motorista próprio x terceirizado (migração 0162), pela transportadora
@@ -67,6 +68,8 @@ export type CargaEntregas = CargaKpi & {
   transportadora: string | null;
   // não entregues da carga por código de ocorrência ("—" = sem código) -- 0164
   insucessosPorMotivo: Record<string, number>;
+  // carga encerrada no Protheus (status 6) -- 0185
+  encerrada?: boolean;
 };
 
 export type MotoristaEntregas = {
@@ -227,16 +230,30 @@ export function unidades(v: VolumesPorte): number {
   return v.P + v.M + v.G + v.naoClassificado;
 }
 
-export async function getKpisEntregas({ de, ate, tipo, tipoVeiculo, vinculo }: PeriodoKpis & { vinculo: string | null }): Promise<KpisEntregas> {
-  const { data, error } = await getSupabaseAdmin().rpc("kpis_entregas", {
-    p_de: de,
-    p_ate: ate,
-    p_tipo: tipo,
-    p_tipo_veiculo: tipoVeiculo,
-    p_vinculo: vinculo,
-  });
-  if (error) throw new Error(`kpis_entregas: ${error.message}`);
-  return data as KpisEntregas;
+// 2 min em memória (17/10/2026): cada tela aberta recarrega a cada 2 min e a
+// RPC leva 1-5 s; os dados só mudam a cada 10 min (sync das cargas). Sem
+// isso, telas abertas juntas + sync passavam do limite de 8 s do banco.
+// Em memória, não unstable_cache: o JSON de 90 dias tem ~1,3 MB e o Data
+// Cache do Next recusa acima de 2 MB derrubando a página (ver memoCache.ts).
+const KPIS_ENTREGAS_TTL_MS = 2 * 60_000;
+
+const kpisEntregasCache = memoizeWithTtl(
+  async (de: string, ate: string, tipo: string | null, tipoVeiculo: string | null, vinculo: string | null): Promise<KpisEntregas> => {
+    const { data, error } = await getSupabaseAdmin().rpc("kpis_entregas", {
+      p_de: de,
+      p_ate: ate,
+      p_tipo: tipo,
+      p_tipo_veiculo: tipoVeiculo,
+      p_vinculo: vinculo,
+    });
+    if (error) throw new Error(`kpis_entregas: ${error.message}`);
+    return data as KpisEntregas;
+  },
+  KPIS_ENTREGAS_TTL_MS,
+);
+
+export function getKpisEntregas({ de, ate, tipo, tipoVeiculo, vinculo }: PeriodoKpis & { vinculo: string | null }): Promise<KpisEntregas> {
+  return kpisEntregasCache(de, ate, tipo ?? null, tipoVeiculo ?? null, vinculo);
 }
 
 // Lida direto no servidor pela rota da API -- a X-API-Key só protege a
@@ -455,6 +472,19 @@ export function periodoAnterior(de: string, ate: string): { de: string; ate: str
   return { de: anteriorIni.toISOString().slice(0, 10), ate: anteriorFim.toISOString().slice(0, 10) };
 }
 
+// Assistências do período anterior "na mesma idade" (revisão 18/10/2026): um
+// chamado leva em média 12 dias pra ser aberto depois da entrega (1 em 4
+// passa de 34), então o período atual sempre tem menos chamados que o
+// anterior só por ser mais novo -- a seta pintava isso de verde. Conta só os
+// chamados do anterior abertos até `hoje` menos a duração do período, ou
+// seja, o anterior como ele estava quando tinha a idade do atual.
+export function assistenciasMesmaIdade(itens: Pick<AssistenciaEntrega, "dia">[], de: string, ate: string, hoje: string): number {
+  const dia = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
+  const duracao = Math.round((dia(ate) - dia(de)) / 86_400_000) + 1;
+  const corte = new Date(dia(hoje) - duracao * 86_400_000).toISOString().slice(0, 10);
+  return itens.filter((a) => a.dia <= corte).length;
+}
+
 // Variação de um indicador entre dois períodos -- "pp" (pontos
 // percentuais) pros índices (0-1), valor bruto pros outros. `null` quando
 // falta base de comparação (ex.: período anterior sem visita nenhuma).
@@ -468,3 +498,25 @@ export function calcularVariacao(atual: number, anterior: number | null, menorEh
   const melhorou = delta === null || menorEhMelhor === undefined ? null : menorEhMelhor ? delta < 0 : delta > 0;
   return { atual, anterior, delta, melhorou };
 }
+
+// Lançamentos do Protheus que distorcem a tela (RPC qualidade_dados_logistica,
+// 0187) -- bloco "Qualidade dos dados", pra corrigir na origem.
+export type QualidadeDadosLogistica = {
+  previsaoIncoerente: { carga: string; previsao: string; primeiraBaixa: string; ultimaBaixa: string; motorista: string | null }[];
+  transportadoraDivergente: {
+    carga: string;
+    previsao: string;
+    motorista: string | null;
+    transportadora: string;
+    vinculoTransportadora: string;
+    vinculoMotorista: string;
+    transportadoraMotorista: string | null;
+  }[];
+  semPlaca: { carga: string; previsao: string; motorista: string | null; veiculo: string | null }[];
+};
+
+export const getQualidadeDados = memoizeWithTtl(async (de: string, ate: string): Promise<QualidadeDadosLogistica> => {
+  const { data, error } = await getSupabaseAdmin().rpc("qualidade_dados_logistica", { p_de: de, p_ate: ate });
+  if (error) throw new Error(`qualidade_dados_logistica: ${error.message}`);
+  return data as QualidadeDadosLogistica;
+}, 5 * 60_000);

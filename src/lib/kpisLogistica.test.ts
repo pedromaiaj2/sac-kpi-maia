@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assistenciasMesmaIdade,
   calcularVariacao,
   gradeVeiculos,
   periodoAnterior,
@@ -205,5 +206,17 @@ describe("situacaoDepois", () => {
   it("sem outra carga", () => {
     expect(situacaoDepois({ situacaoAtual: "Não Entregue", depois: null })).toEqual({ rotulo: "Não entregue", detalhe: "sem nova carga", tom: "critico" });
     expect(situacaoDepois({ situacaoAtual: null, depois: null }).rotulo).toBe("Não entregue");
+  });
+});
+
+describe("assistenciasMesmaIdade", () => {
+  it("conta o período anterior como ele estava quando tinha a idade do atual", () => {
+    // atual: 18/09 a 17/10 (30 dias), hoje 18/10 -> corte 18/09
+    const itens = [{ dia: "2026-09-10" }, { dia: "2026-09-18" }, { dia: "2026-09-19" }, { dia: "2026-10-05" }];
+    expect(assistenciasMesmaIdade(itens, "2026-09-18", "2026-10-17", "2026-10-18")).toBe(2);
+  });
+
+  it("período de 1 dia: o anterior (ontem) só com o que foi aberto até ontem", () => {
+    expect(assistenciasMesmaIdade([{ dia: "2026-10-17" }, { dia: "2026-10-18" }], "2026-10-18", "2026-10-18", "2026-10-18")).toBe(1);
   });
 });

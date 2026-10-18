@@ -16,6 +16,9 @@ export type NotaRota = {
 
 export type CargaRota = {
   carga: string;
+  // previsão da carga -- pode ser de até 3 dias antes do mural se ela
+  // continua Em Rota (0186)
+  dia: string;
   statusCodigo: string | null;
   status: string | null;
   tipo: string | null;
@@ -33,12 +36,16 @@ export type CargaRota = {
   pendentes: number;
   primeiraBaixa: string | null;
   ultimaBaixa: string | null;
+  // dia da última baixa (pode não ser o do mural) -- 0186
+  ultimaBaixaDia: string | null;
   volumes: { P: number; M: number; G: number; naoClassificado: number };
   insucessos: { codigo: string; descricao: string | null; n: number }[];
   notasLista: NotaRota[];
 };
 
-export type RotasDoDia = { dia: string; cargas: CargaRota[] };
+// ultimoDiaComCargas: último dia com carga antes deste, pro mural mostrar
+// quando o dia não tem nenhuma (domingo) -- 0186
+export type RotasDoDia = { dia: string; ultimoDiaComCargas: string | null; cargas: CargaRota[] };
 
 export type GrupoRota = "Próprio" | "Terceirizado" | "No CD";
 
@@ -89,6 +96,34 @@ export const STATUS_CARGA_ORDEM: Record<string, string> = {
   "5": "Em rota",
   "6": "Encerrada",
 };
+
+// Em rota sem nenhuma baixa nova há mais que isso: carga parada.
+export const MINUTOS_SEM_BAIXA_ALERTA = 90;
+
+function diaBr(iso: string): string {
+  return iso.split("-").reverse().slice(0, 2).join("/");
+}
+
+// Última baixa da carga em relação ao dia do mural: há quantos minutos (se
+// foi no próprio dia), o texto pra mostrar e se a carga está parada (em rota,
+// com nota pendente e sem baixa há mais de MINUTOS_SEM_BAIXA_ALERTA, ou com a
+// última baixa num dia anterior).
+export function situacaoBaixa(
+  c: Pick<CargaRota, "statusCodigo" | "pendentes" | "ultimaBaixa" | "ultimaBaixaDia" | "dia">,
+  diaMural: string,
+  agora: string,
+): { desde: number | null; parada: boolean; texto: string | null } {
+  const emRota = c.statusCodigo === "5" && c.pendentes > 0;
+  if (!c.ultimaBaixa || !c.ultimaBaixaDia) {
+    const deOutroDia = c.dia < diaMural;
+    return { desde: null, parada: emRota && deOutroDia, texto: emRota && deOutroDia ? `sem baixa desde ${diaBr(c.dia)}` : null };
+  }
+  if (c.ultimaBaixaDia < diaMural) {
+    return { desde: null, parada: emRota, texto: `última baixa ${diaBr(c.ultimaBaixaDia)} ${c.ultimaBaixa}` };
+  }
+  const desde = minutosDesde(c.ultimaBaixa, agora);
+  return { desde, parada: emRota && desde !== null && desde > MINUTOS_SEM_BAIXA_ALERTA, texto: `última baixa ${c.ultimaBaixa}` };
+}
 
 // Minutos desde a última baixa (hora "HH:MM" de Recife, no dia de hoje).
 export function minutosDesde(hora: string | null, agoraRecife: string): number | null {

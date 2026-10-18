@@ -39,6 +39,9 @@ type TickerItem = {
   // card principal: ocupa 2 colunas e valor maior
   destaque?: boolean;
   variacao: Variacao;
+  // texto no lugar da variação quando ela não se aplica (ex.: "dia em
+  // andamento" no período Hoje)
+  semComparacao?: string;
   // Formata só o delta (sem o valor absoluto) -- cada métrica tem unidade
   // diferente (pp pros índices, inteiro pras contagens).
   formatarDelta: (delta: number) => string;
@@ -72,7 +75,7 @@ export function IndiceTicker({ items, labelComparacao }: { items: TickerItem[]; 
             )}
             <span className="flex items-center gap-1 text-[11px] tabular-nums" style={{ color: cor }}>
               {item.variacao.delta === null ? (
-                <span style={{ color: "var(--text-muted)" }}>sem {labelComparacao}</span>
+                <span style={{ color: "var(--text-muted)" }}>{item.semComparacao ?? `sem ${labelComparacao}`}</span>
               ) : (
                 <>
                   <Seta delta={item.variacao.delta} />
