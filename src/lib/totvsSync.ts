@@ -1503,13 +1503,20 @@ export async function resincronizarPorDocumento(
   }
   return comTravaTotvs(supabase, origem, async () => {
     const errors: string[] = [];
-    const upserted = await reconsultarDocumentos(supabase, documentos, errors);
+    const { upserted } = await reconsultarDocumentos(supabase, documentos, errors);
     return { checked: documentos.length, upserted, errors };
   });
 }
 
-async function reconsultarDocumentos(supabase: SupabaseAdmin, documentos: string[], errors: string[]): Promise<number> {
+// Devolve também, por documento consultado com sucesso (1 página), os
+// pedidos ("pedido/filial") que o Protheus ainda lista pro cliente.
+async function reconsultarDocumentos(
+  supabase: SupabaseAdmin,
+  documentos: string[],
+  errors: string[]
+): Promise<{ upserted: number; pedidosPorDocumento: Map<string, Set<string>> }> {
   let upserted = 0;
+  const pedidosPorDocumento = new Map<string, Set<string>>();
   for (const document of documentos) {
     let json: TotvsDeliveryListResponse;
     try {
@@ -1520,11 +1527,14 @@ async function reconsultarDocumentos(supabase: SupabaseAdmin, documentos: string
       errors.push(`documento ${document}: ${(err as Error).message}`);
       continue;
     }
+    const pedidos = new Set<string>();
     for (const d of json.data ?? []) {
+      pedidos.add(`${d.order}/${d.branch}`);
       if (await upsertDelivery(supabase, d, errors)) upserted++;
     }
+    if ((json.totalPages ?? 1) <= 1) pedidosPorDocumento.set(document, pedidos);
   }
-  return upserted;
+  return { upserted, pedidosPorDocumento };
 }
 
 // Carga que o load= devolve vazia (Victor 18/10/2026: a 005456 ficou com 1
@@ -1532,26 +1542,42 @@ async function reconsultarDocumentos(supabase: SupabaseAdmin, documentos: string
 // pra apagar -- pode ser falha da API --, então cada pedido que a carga
 // tinha é reconsultado pelo documento do cliente, que traz a lista completa
 // de cargas: se a carga não estiver mais lá, upsertDelivery tira a linha.
+// Pedido que nem a consulta do cliente lista mais (cancelado/estornado no
+// Protheus -- 24 assim na auditoria de 18/10) também sai da carga: os dois
+// lados confirmam.
 const CARGA_VAZIA_MAX_DOCUMENTOS = 10;
 
 async function conferirCargaVazia(supabase: SupabaseAdmin, carga: string, errors: string[]): Promise<number> {
   const { data, error } = await supabase
     .from("totvs_delivery_cargas")
-    .select("totvs_deliveries(client_cpf_cnpj)")
+    .select("id, totvs_deliveries(pedido, filial_venda, client_cpf_cnpj)")
     .eq("carga", carga)
     .limit(100);
   if (error) {
     errors.push(`open carga ${carga} vazia: ${error.message}`);
     return 0;
   }
+  const linhas = (data ?? []) as unknown as {
+    id: string;
+    totvs_deliveries: { pedido: string; filial_venda: string; client_cpf_cnpj: string | null } | null;
+  }[];
   const documentos = [
-    ...new Set(
-      ((data ?? []) as unknown as { totvs_deliveries: { client_cpf_cnpj: string | null } | null }[])
-        .map((r) => r.totvs_deliveries?.client_cpf_cnpj)
-        .filter((v): v is string => !!v)
-    ),
+    ...new Set(linhas.map((r) => r.totvs_deliveries?.client_cpf_cnpj).filter((v): v is string => !!v)),
   ].slice(0, CARGA_VAZIA_MAX_DOCUMENTOS);
-  return reconsultarDocumentos(supabase, documentos, errors);
+  const { upserted, pedidosPorDocumento } = await reconsultarDocumentos(supabase, documentos, errors);
+
+  const sumidos = linhas
+    .filter((r) => {
+      const d = r.totvs_deliveries;
+      const listados = d?.client_cpf_cnpj ? pedidosPorDocumento.get(d.client_cpf_cnpj) : undefined;
+      return !!d && !!listados && !listados.has(`${d.pedido}/${d.filial_venda}`);
+    })
+    .map((r) => r.id);
+  if (sumidos.length > 0) {
+    const { error: delError } = await supabase.from("totvs_delivery_cargas").delete().in("id", sumidos);
+    if (delError) errors.push(`open carga ${carga} pedidos sumidos: ${delError.message}`);
+  }
+  return upserted;
 }
 
 async function runTotvsSyncNaTrava(supabase: SupabaseAdmin): Promise<TotvsSyncSummary> {
