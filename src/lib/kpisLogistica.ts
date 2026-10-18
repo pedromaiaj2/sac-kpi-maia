@@ -513,10 +513,49 @@ export type QualidadeDadosLogistica = {
     transportadoraMotorista: string | null;
   }[];
   semPlaca: { carga: string; previsao: string; motorista: string | null; veiculo: string | null }[];
+  // última conferência noturna com o Protheus (auditoria_logistica, 0188);
+  // null se ainda não rodou ou a leitura falhou
+  conferencia: ConferenciaProtheus | null;
 };
 
+export type ConferenciaProtheus = {
+  executadaEm: string;
+  de: string;
+  ate: string;
+  cargas: number;
+  linhas: number;
+  itens: number;
+  falhas: number;
+  encontradas: number;
+  divergencias: { tipo: string; carga: string; pedido: string; detalhe: string }[];
+};
+
+async function ultimaConferencia(): Promise<ConferenciaProtheus | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("auditoria_logistica")
+    .select("executada_em, de, ate, cargas, linhas, itens, falhas, encontradas, divergencias")
+    .order("executada_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    executadaEm: data.executada_em,
+    de: data.de,
+    ate: data.ate,
+    cargas: data.cargas,
+    linhas: data.linhas,
+    itens: data.itens,
+    falhas: data.falhas,
+    encontradas: data.encontradas,
+    divergencias: data.divergencias ?? [],
+  };
+}
+
 export const getQualidadeDados = memoizeWithTtl(async (de: string, ate: string): Promise<QualidadeDadosLogistica> => {
-  const { data, error } = await getSupabaseAdmin().rpc("qualidade_dados_logistica", { p_de: de, p_ate: ate });
+  const [{ data, error }, conferencia] = await Promise.all([
+    getSupabaseAdmin().rpc("qualidade_dados_logistica", { p_de: de, p_ate: ate }),
+    ultimaConferencia(),
+  ]);
   if (error) throw new Error(`qualidade_dados_logistica: ${error.message}`);
-  return data as QualidadeDadosLogistica;
+  return { ...(data as Omit<QualidadeDadosLogistica, "conferencia">), conferencia };
 }, 5 * 60_000);

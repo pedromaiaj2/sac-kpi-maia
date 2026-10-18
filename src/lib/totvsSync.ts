@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { getSupabaseAdmin } from "./supabaseAdmin.ts";
 import { recordSyncRun } from "./syncRuns.ts";
+import { compararCarga, type ApiPedido, type Divergencia, type LinhaAuditoria } from "./auditoriaCargas.ts";
 
 // O certificado de protheus.lojasmaia.com.br é autoassinado por uma CA
 // interna da própria TOTVS (não uma CA pública) -- fetch() rejeitaria com
@@ -1578,6 +1579,131 @@ async function conferirCargaVazia(supabase: SupabaseAdmin, carga: string, errors
     if (delError) errors.push(`open carga ${carga} pedidos sumidos: ${delError.message}`);
   }
   return upserted;
+}
+
+// Conferência noturna (Victor 18/10/2026, ver auditoriaCargas.ts): cada carga
+// com previsão nos últimos AUDITORIA_DIAS (até 3 dias à frente) é comparada
+// com o load= do Protheus. O que não bate é reconsultado pelo documento do
+// cliente (lista completa); pedido que nem o documento lista mais sai da
+// carga (os dois lados confirmam). As cargas com divergência são conferidas
+// de novo e o que sobrar fica em auditoria_logistica, que o bloco "Qualidade
+// dos dados" mostra. Uma chamada por vez, debaixo da trava.
+const AUDITORIA_DIAS = 45;
+const AUDITORIA_SELECT =
+  "id, carga, status_entrega_codigo, dt_previsao, dt_retorno, hr_retorno, motorista_codigo, veiculo, nota_fiscal, totvs_deliveries(pedido, filial_venda, client_cpf_cnpj), totvs_delivery_carga_itens(item, produto, quantidade, status_codigo)";
+
+export type ResultadoAuditoria = {
+  cargas: number;
+  linhas: number;
+  itens: number;
+  falhas: number;
+  encontradas: number;
+  removidas: number;
+  restantes: Divergencia[];
+  errors: string[];
+};
+
+async function linhasAuditoria(
+  supabase: SupabaseAdmin,
+  filtro: { de: string; ate: string } | { cargas: string[] }
+): Promise<LinhaAuditoria[]> {
+  const out: LinhaAuditoria[] = [];
+  for (let off = 0; ; off += 500) {
+    let q = supabase.from("totvs_delivery_cargas").select(AUDITORIA_SELECT);
+    q = "cargas" in filtro ? q.in("carga", filtro.cargas) : q.gte("dt_previsao", filtro.de).lte("dt_previsao", filtro.ate);
+    const { data, error } = await q.order("id").range(off, off + 499);
+    if (error) throw new Error(`auditoria linhas: ${error.message}`);
+    out.push(...((data ?? []) as unknown as LinhaAuditoria[]));
+    if ((data ?? []).length < 500) return out;
+  }
+}
+
+async function compararCargas(
+  linhas: LinhaAuditoria[],
+  errors: string[]
+): Promise<{ divergencias: Divergencia[]; falhas: number }> {
+  const porCarga = new Map<string, LinhaAuditoria[]>();
+  for (const l of linhas) porCarga.set(l.carga, [...(porCarga.get(l.carga) ?? []), l]);
+  const divergencias: Divergencia[] = [];
+  let falhas = 0;
+  for (const [carga, banco] of porCarga) {
+    let json: TotvsDeliveryListResponse;
+    try {
+      json = await fetchTotvs<TotvsDeliveryListResponse>(`${BASE_URL}/rest/ai/deliveries?load=${encodeURIComponent(carga)}&page=1&size=200`);
+    } catch (err) {
+      falhas++;
+      errors.push(`auditoria carga ${carga}: ${(err as Error).message}`);
+      continue;
+    }
+    if ((json.totalPages ?? 1) > 1) {
+      falhas++;
+      continue;
+    }
+    divergencias.push(...compararCarga(carga, (json.data ?? []) as ApiPedido[], banco));
+  }
+  return { divergencias, falhas };
+}
+
+async function auditarNaTrava(supabase: SupabaseAdmin): Promise<ResultadoAuditoria> {
+  const errors: string[] = [];
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Recife" }).format(new Date());
+  const dia = (n: number) => isoDate(new Date(Date.parse(`${hoje}T12:00:00Z`) + n * DAY_MS));
+  const linhas = await linhasAuditoria(supabase, { de: dia(-AUDITORIA_DIAS), ate: dia(3) });
+  const { divergencias, falhas } = await compararCargas(linhas, errors);
+
+  const documentos = [...new Set(divergencias.map((d) => d.documento).filter((v): v is string => !!v))];
+  const { pedidosPorDocumento } = await reconsultarDocumentos(supabase, documentos, errors);
+  const sumidas = divergencias
+    .filter((d) => {
+      const listados = d.tipo === "pedido sobrando" && d.documento ? pedidosPorDocumento.get(d.documento) : undefined;
+      return !!d.linhaId && !!listados && !listados.has(d.pedido);
+    })
+    .map((d) => d.linhaId!);
+  let removidas = 0;
+  if (sumidas.length > 0) {
+    const { error } = await supabase.from("totvs_delivery_cargas").delete().in("id", sumidas);
+    if (error) errors.push(`auditoria remover sumidos: ${error.message}`);
+    else removidas = sumidas.length;
+  }
+
+  const cargasDivergentes = [...new Set(divergencias.map((d) => d.carga))];
+  let restantes: Divergencia[] = [];
+  if (cargasDivergentes.length > 0) {
+    const reconferir = await compararCargas(await linhasAuditoria(supabase, { cargas: cargasDivergentes }), errors);
+    restantes = reconferir.divergencias;
+  }
+
+  const resultado: ResultadoAuditoria = {
+    cargas: new Set(linhas.map((l) => l.carga)).size,
+    linhas: linhas.length,
+    itens: linhas.reduce((t, l) => t + l.totvs_delivery_carga_itens.length, 0),
+    falhas,
+    encontradas: divergencias.length,
+    removidas,
+    restantes,
+    errors,
+  };
+  const { error: insError } = await supabase.from("auditoria_logistica").insert({
+    de: dia(-AUDITORIA_DIAS),
+    ate: dia(3),
+    cargas: resultado.cargas,
+    linhas: resultado.linhas,
+    itens: resultado.itens,
+    falhas: resultado.falhas,
+    encontradas: resultado.encontradas,
+    removidas: resultado.removidas,
+    divergencias: restantes.slice(0, 200).map(({ tipo, carga, pedido, detalhe }) => ({ tipo, carga, pedido, detalhe })),
+    erros: errors.slice(0, 50),
+  });
+  if (insError) errors.push(`auditoria gravar: ${insError.message}`);
+  return resultado;
+}
+
+export async function runAuditoriaCargas(supabase: SupabaseAdmin, origem: string): Promise<ResultadoAuditoria | TravaOcupada> {
+  if (!BASE_URL || !process.env.TOTVS_API_KEY) {
+    throw new Error("TOTVS_API_BASE_URL/TOTVS_API_KEY ausentes");
+  }
+  return comTravaTotvs(supabase, origem, () => auditarNaTrava(supabase));
 }
 
 async function runTotvsSyncNaTrava(supabase: SupabaseAdmin): Promise<TotvsSyncSummary> {
