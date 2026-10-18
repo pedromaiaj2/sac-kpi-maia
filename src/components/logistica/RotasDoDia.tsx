@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { ModalLogistica } from "./ModalLogistica";
 import { Recolhivel } from "./Recolhivel";
 import {
@@ -61,7 +62,7 @@ function diaCurto(iso: string) {
 function BarraFina({ partes, total, alta = "h-1.5" }: { partes: { n: number; cor: string; rotulo: string }[]; total: number; alta?: string }) {
   const visiveis = partes.filter((p) => p.n > 0);
   return (
-    <div
+    <span
       className={`flex ${alta} w-full gap-[2px] rounded-full overflow-hidden`}
       style={{ background: "var(--surface-2)" }}
       role="img"
@@ -70,34 +71,42 @@ function BarraFina({ partes, total, alta = "h-1.5" }: { partes: { n: number; cor
       {visiveis.map((p) => (
         <span key={p.rotulo} className="h-full" style={{ width: `${(p.n / Math.max(1, total)) * 100}%`, background: p.cor }} />
       ))}
-    </div>
+    </span>
   );
 }
 
 function Legenda({ itens }: { itens: { cor: string; texto: string }[] }) {
   return (
-    <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+    <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: "var(--text-secondary)" }}>
       {itens.map((i) => (
-        <li key={i.texto} className="inline-flex items-center gap-1.5">
+        <span key={i.texto} className="inline-flex items-center gap-1.5">
           <span aria-hidden className="inline-block w-2 h-2 rounded-full" style={{ background: i.cor }} />
           {i.texto}
-        </li>
+        </span>
       ))}
-    </ul>
+    </span>
   );
 }
 
-function Destaque({ rotulo, valor, children }: { rotulo: string; valor: string; children?: React.ReactNode }) {
+// Clicável (Victor 18/10/2026): o card abre a janela com o detalhe do número.
+function Destaque({ rotulo, valor, onAbrir, children }: { rotulo: string; valor: string; onAbrir: () => void; children?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl p-5 flex flex-col gap-3 min-w-0 shadow-lg shadow-black/20" style={{ background: "var(--surface-1)" }}>
-      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+    <button
+      type="button"
+      onClick={onAbrir}
+      title={`Ver detalhe: ${rotulo.toLowerCase()}`}
+      className="group w-full text-left rounded-2xl p-5 flex flex-col gap-3 min-w-0 shadow-lg shadow-black/20 transition-colors hover:bg-[var(--surface-2)]"
+      style={{ background: "var(--surface-1)" }}
+    >
+      <span className="flex items-center justify-between gap-2 w-full text-sm" style={{ color: "var(--text-secondary)" }}>
         {rotulo}
-      </p>
-      <p className="text-4xl font-bold tracking-tight tabular-nums leading-none" style={{ color: "var(--text-primary)" }}>
+        <ChevronRight aria-hidden size={16} className="shrink-0 transition-transform group-hover:translate-x-0.5" style={{ color: "var(--text-muted)" }} />
+      </span>
+      <span className="text-4xl font-bold tracking-tight tabular-nums leading-none" style={{ color: "var(--text-primary)" }}>
         {valor}
-      </p>
+      </span>
       {children}
-    </div>
+    </button>
   );
 }
 
@@ -317,6 +326,320 @@ function NotasCarga({ c, onFechar }: { c: CargaRota; onFechar: () => void }) {
   );
 }
 
+// Detalhe dos cards do topo (Victor 18/10/2026: "esses cards fiquem
+// clicáveis"). Notas hoje e Andamento abrem a lista de notas do dia, com
+// filtro por grupo e situação; Andamento já vem só com as cargas na rua,
+// que é a base da porcentagem. Produtos abre o porte por carga; Cargas, a
+// lista de cargas (clicar numa delas abre as notas dela).
+type FiltroGrupo = "todas" | "rua" | GrupoRota;
+type FiltroSituacao = "todas" | "entregue" | "voltou" | "pendente";
+type Detalhe =
+  | { tipo: "notas"; grupo: FiltroGrupo; situacao: FiltroSituacao }
+  | { tipo: "produtos" }
+  | { tipo: "cargas" };
+
+function situacaoNota(n: NotaRota): Exclude<FiltroSituacao, "todas"> {
+  if (n.status === "1" || n.status === "2") return "entregue";
+  if (n.status === "3" || n.status === "4") return "voltou";
+  return "pendente";
+}
+
+const ORDEM_SITUACAO: Record<Exclude<FiltroSituacao, "todas">, number> = { voltou: 0, pendente: 1, entregue: 2 };
+
+function nomeMotorista(c: CargaRota) {
+  return c.motorista?.nome ?? "sem motorista";
+}
+
+function Pilulas<T extends string>({
+  rotulo,
+  opcoes,
+  valor,
+  onTrocar,
+}: {
+  rotulo: string;
+  opcoes: { valor: T; texto: string; n: number }[];
+  valor: T;
+  onTrocar: (v: T) => void;
+}) {
+  return (
+    <div className="inline-flex flex-wrap rounded-full p-1 gap-0.5" role="group" aria-label={rotulo} style={{ background: "var(--surface-2)" }}>
+      {opcoes.map((o) => {
+        const ativo = o.valor === valor;
+        return (
+          <button
+            key={o.valor}
+            type="button"
+            aria-pressed={ativo}
+            onClick={() => onTrocar(o.valor)}
+            className="rounded-full text-xs px-3 py-1 font-medium tabular-nums transition-colors"
+            style={{ background: ativo ? "var(--text-primary)" : "transparent", color: ativo ? "var(--canvas)" : "var(--text-secondary)" }}
+          >
+            {o.texto} · {fmt(o.n)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Th({ children, direita = false }: { children: React.ReactNode; direita?: boolean }) {
+  return (
+    <th className={`px-3 py-2.5 font-medium whitespace-nowrap ${direita ? "text-right" : "text-left"}`} style={{ color: "var(--text-muted)" }}>
+      {children}
+    </th>
+  );
+}
+
+function NotasDoDia({
+  cargas,
+  grupoInicial,
+  situacaoInicial,
+  onFechar,
+  onAbrirCarga,
+}: {
+  cargas: CargaRota[];
+  grupoInicial: FiltroGrupo;
+  situacaoInicial: FiltroSituacao;
+  onFechar: () => void;
+  onAbrirCarga: (c: CargaRota) => void;
+}) {
+  const [grupo, setGrupo] = useState<FiltroGrupo>(grupoInicial);
+  const [situacao, setSituacao] = useState<FiltroSituacao>(situacaoInicial);
+  const todas = cargas.flatMap((c) => c.notasLista.map((n) => ({ n, c, g: grupoDaCarga(c), s: situacaoNota(n) })));
+  const noGrupo = (g: FiltroGrupo) => (x: (typeof todas)[number]) => g === "todas" || (g === "rua" ? x.g !== "No CD" : x.g === g);
+  const doGrupo = todas.filter(noGrupo(grupo));
+  const linhas = doGrupo
+    .filter((x) => situacao === "todas" || x.s === situacao)
+    .sort((a, b) => ORDEM_SITUACAO[a.s] - ORDEM_SITUACAO[b.s] || (b.n.hora ?? "").localeCompare(a.n.hora ?? ""));
+  const temCd = todas.some((x) => x.g === "No CD");
+  const contaSit = (s: Exclude<FiltroSituacao, "todas">) => doGrupo.filter((x) => x.s === s).length;
+
+  return (
+    <ModalLogistica
+      titulo={grupoInicial === "rua" ? "Andamento das rotas · notas" : "Notas do dia"}
+      subtitulo="Voltaram primeiro, depois pendentes e entregues; baixas mais recentes no topo. Clique na carga pra ver as notas dela."
+      onFechar={onFechar}
+    >
+      <div className="flex flex-wrap gap-2 px-5 pt-4">
+        <Pilulas<FiltroGrupo>
+          rotulo="Grupo"
+          valor={grupo}
+          onTrocar={setGrupo}
+          opcoes={[
+            { valor: "todas", texto: "Todas", n: todas.length },
+            ...(temCd ? [{ valor: "rua" as const, texto: "Na rua", n: todas.filter(noGrupo("rua")).length }] : []),
+            { valor: "Próprio", texto: "Nossas", n: todas.filter(noGrupo("Próprio")).length },
+            { valor: "Terceirizado", texto: "Terceirizadas", n: todas.filter(noGrupo("Terceirizado")).length },
+            ...(temCd ? [{ valor: "No CD" as const, texto: "No CD", n: todas.filter(noGrupo("No CD")).length }] : []),
+          ]}
+        />
+        <Pilulas<FiltroSituacao>
+          rotulo="Situação"
+          valor={situacao}
+          onTrocar={setSituacao}
+          opcoes={[
+            { valor: "todas", texto: "Todas", n: doGrupo.length },
+            { valor: "entregue", texto: "Entregues", n: contaSit("entregue") },
+            { valor: "voltou", texto: "Voltaram", n: contaSit("voltou") },
+            { valor: "pendente", texto: "Pendentes", n: contaSit("pendente") },
+          ]}
+        />
+      </div>
+      {linhas.length === 0 ? (
+        <p className="px-5 py-6 text-sm" style={{ color: "var(--text-muted)" }}>
+          Nenhuma nota neste filtro.
+        </p>
+      ) : (
+        <table className="w-full text-xs mt-2">
+          <thead className="sticky top-0" style={{ background: "var(--surface-1)" }}>
+            <tr>
+              <Th>Situação</Th>
+              <Th>Hora</Th>
+              <Th>Cliente</Th>
+              <Th>Bairro</Th>
+              <Th>Carga · motorista</Th>
+              <Th>NF / pedido</Th>
+              <Th>Ocorrência</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+            {linhas.map(({ n, c, g }, i) => {
+              const st = n.status ? ROTULO_NOTA[n.status] : null;
+              return (
+                <tr key={`${c.carga}-${n.pedido}-${n.notaFiscal}-${i}`} className="align-top" style={{ borderColor: "var(--border)" }}>
+                  <td className="px-3 py-2.5 whitespace-nowrap font-medium" style={{ color: "var(--text-primary)" }}>
+                    <span aria-hidden className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: st?.cor ?? "var(--text-muted)" }} />
+                    {st?.rotulo ?? "Pendente"}
+                    {n.tentativa && n.tentativa > 1 ? (
+                      <span className="block font-normal" style={{ color: "var(--text-muted)" }}>
+                        {n.tentativa}ª tentativa
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2.5 tabular-nums">{n.hora ?? "—"}</td>
+                  <td className="px-3 py-2.5 font-medium min-w-[160px]" style={{ color: "var(--text-primary)" }}>
+                    {n.cliente ?? "—"}
+                  </td>
+                  <td className="px-3 py-2.5 min-w-[110px]" style={{ color: "var(--text-secondary)" }}>
+                    {n.bairro ?? "—"}
+                  </td>
+                  <td className="px-3 py-2.5 min-w-[140px]">
+                    <button type="button" onClick={() => onAbrirCarga(c)} className="text-left hover:underline" style={{ color: "var(--text-primary)" }}>
+                      <span aria-hidden className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: COR_GRUPO[g] }} />#{c.carga}
+                      <span className="block" style={{ color: "var(--text-muted)" }}>
+                        {nomeMotorista(c)}
+                      </span>
+                    </button>
+                  </td>
+                  <td className="px-3 py-2.5 tabular-nums whitespace-nowrap">
+                    {n.notaFiscal ?? "—"}
+                    <span className="block" style={{ color: "var(--text-muted)" }}>
+                      {n.pedido ?? ""}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 min-w-[140px]" style={{ color: "var(--text-secondary)" }}>
+                    {n.ocorrencia ?? ""}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </ModalLogistica>
+  );
+}
+
+function ProdutosDoDia({ cargas, onFechar }: { cargas: CargaRota[]; onFechar: () => void }) {
+  const total = (c: CargaRota) => c.volumes.G + c.volumes.M + c.volumes.P + c.volumes.naoClassificado;
+  const linhas = [...cargas].sort((a, b) => total(b) - total(a));
+  const soma = cargas.reduce(
+    (t, c) => ({ G: t.G + c.volumes.G, M: t.M + c.volumes.M, P: t.P + c.volumes.P, N: t.N + c.volumes.naoClassificado }),
+    { G: 0, M: 0, P: 0, N: 0 },
+  );
+  const tdNum = "px-3 py-2.5 text-right tabular-nums";
+  return (
+    <ModalLogistica titulo="Produtos do dia por carga" subtitulo="Quantidade de produtos de cada porte em cada carga, da maior pra menor." onFechar={onFechar}>
+      <table className="w-full text-xs">
+        <thead className="sticky top-0" style={{ background: "var(--surface-1)" }}>
+          <tr>
+            <Th>Carga · motorista</Th>
+            <Th direita>G</Th>
+            <Th direita>M</Th>
+            <Th direita>P</Th>
+            <Th direita>Sem porte</Th>
+            <Th direita>Total</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+          {linhas.map((c) => (
+            <tr key={c.carga} style={{ borderColor: "var(--border)" }}>
+              <td className="px-3 py-2.5" style={{ color: "var(--text-primary)" }}>
+                <span aria-hidden className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: COR_GRUPO[grupoDaCarga(c)] }} />#{c.carga}
+                <span className="block" style={{ color: "var(--text-muted)" }}>
+                  {nomeMotorista(c)}
+                </span>
+              </td>
+              <td className={tdNum}>{fmt(c.volumes.G)}</td>
+              <td className={tdNum}>{fmt(c.volumes.M)}</td>
+              <td className={tdNum}>{fmt(c.volumes.P)}</td>
+              <td className={tdNum}>{c.volumes.naoClassificado ? fmt(c.volumes.naoClassificado) : "—"}</td>
+              <td className={`${tdNum} font-semibold`} style={{ color: "var(--text-primary)" }}>
+                {fmt(total(c))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t font-semibold" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+            <td className="px-3 py-2.5">Total</td>
+            <td className={tdNum}>{fmt(soma.G)}</td>
+            <td className={tdNum}>{fmt(soma.M)}</td>
+            <td className={tdNum}>{fmt(soma.P)}</td>
+            <td className={tdNum}>{soma.N ? fmt(soma.N) : "—"}</td>
+            <td className={tdNum}>{fmt(soma.G + soma.M + soma.P + soma.N)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </ModalLogistica>
+  );
+}
+
+const ORDEM_GRUPO: Record<GrupoRota, number> = { "Próprio": 0, Terceirizado: 1, "No CD": 2 };
+
+function CargasDoDia({
+  cargas,
+  dia,
+  agora,
+  onFechar,
+  onAbrirCarga,
+}: {
+  cargas: CargaRota[];
+  dia: string;
+  agora: string;
+  onFechar: () => void;
+  onAbrirCarga: (c: CargaRota) => void;
+}) {
+  const linhas = [...cargas].sort((a, b) => ORDEM_GRUPO[grupoDaCarga(a)] - ORDEM_GRUPO[grupoDaCarga(b)] || a.carga.localeCompare(b.carga));
+  return (
+    <ModalLogistica titulo="Cargas do dia" subtitulo="Nossas, terceirizadas e as que ainda estão no CD. Clique numa carga pra ver as notas dela." onFechar={onFechar}>
+      <table className="w-full text-xs">
+        <thead className="sticky top-0" style={{ background: "var(--surface-1)" }}>
+          <tr>
+            <Th>Carga</Th>
+            <Th>Motorista · veículo</Th>
+            <Th>Situação</Th>
+            <Th direita>Notas</Th>
+            <Th direita>Entregues</Th>
+            <Th direita>Voltaram</Th>
+            <Th direita>Pendentes</Th>
+            <Th>Última baixa</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+          {linhas.map((c) => {
+            const g = grupoDaCarga(c);
+            const b = situacaoBaixa(c, dia, agora);
+            const voltaram = c.naoEntregues + c.canceladas;
+            return (
+              <tr key={c.carga} onClick={() => onAbrirCarga(c)} className="cursor-pointer transition-colors hover:bg-[var(--surface-2)]" style={{ borderColor: "var(--border)" }}>
+                <td className="px-3 py-2.5 whitespace-nowrap font-medium" style={{ color: "var(--text-primary)" }}>
+                  <button type="button" onClick={() => onAbrirCarga(c)} className="hover:underline">
+                    <span aria-hidden className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: COR_GRUPO[g] }} />#{c.carga}
+                  </button>
+                  {c.dia < dia && (
+                    <span className="block font-normal" style={{ color: "var(--status-warning)" }}>
+                      desde {diaCurto(c.dia)}
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 min-w-[150px]" style={{ color: "var(--text-primary)" }}>
+                  {c.motorista?.nome ?? "Sem motorista"}
+                  <span className="block" style={{ color: "var(--text-muted)" }}>
+                    {g === "No CD" ? "No CD" : g === "Terceirizado" ? `Terceirizado${c.transportadora ? ` · ${c.transportadora}` : ""}` : "Nosso"}
+                    {c.veiculo ? ` · ${c.veiculo}` : ""}
+                  </span>
+                </td>
+                <td className="px-3 py-2.5 whitespace-nowrap">{STATUS_CARGA_ORDEM[c.statusCodigo ?? ""] ?? c.status ?? "—"}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{fmt(c.notas)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{fmt(c.entregues + c.parciais)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: voltaram ? "var(--status-critical)" : undefined }}>
+                  {fmt(voltaram)}
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{fmt(c.pendentes)}</td>
+                <td className="px-3 py-2.5 whitespace-nowrap tabular-nums" style={{ color: b.parada ? "var(--status-warning)" : "var(--text-secondary)" }}>
+                  {b.texto ?? "—"}
+                  {b.desde !== null ? ` · há ${tempo(b.desde)}` : ""}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </ModalLogistica>
+  );
+}
+
 // historico: o dia de hoje não tem carga (domingo) e o mural mostra o último
 // dia de operação -- sem "ao vivo" nem alerta de carga parada.
 export function RotasDoDia({
@@ -333,6 +656,7 @@ export function RotasDoDia({
   historico?: boolean;
 }) {
   const [aberta, setAberta] = useState<CargaRota | null>(null);
+  const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
   const porGrupo = (g: GrupoRota) => rotas.cargas.filter((c) => grupoDaCarga(c) === g);
   const proprias = porGrupo("Próprio");
   const terceiras = porGrupo("Terceirizado");
@@ -393,7 +717,7 @@ export function RotasDoDia({
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <Destaque rotulo="Notas hoje" valor={fmt(totalNotas)}>
+            <Destaque rotulo="Notas hoje" valor={fmt(totalNotas)} onAbrir={() => setDetalhe({ tipo: "notas", grupo: "todas", situacao: "todas" })}>
               <BarraFina
                 total={totalNotas}
                 partes={[
@@ -410,7 +734,7 @@ export function RotasDoDia({
                 ]}
               />
             </Destaque>
-            <Destaque rotulo="Andamento das rotas" valor={pctTexto(r.andamento)}>
+            <Destaque rotulo="Andamento das rotas" valor={pctTexto(r.andamento)} onAbrir={() => setDetalhe({ tipo: "notas", grupo: "rua", situacao: "todas" })}>
               <BarraFina
                 total={r.notas}
                 partes={[
@@ -426,21 +750,21 @@ export function RotasDoDia({
                 ]}
               />
             </Destaque>
-            <Destaque rotulo="Produtos" valor={fmt(volumes.P + volumes.M + volumes.G + volumes.N)}>
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            <Destaque rotulo="Produtos" valor={fmt(volumes.P + volumes.M + volumes.G + volumes.N)} onAbrir={() => setDetalhe({ tipo: "produtos" })}>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 G {fmt(volumes.G)} · M {fmt(volumes.M)} · P {fmt(volumes.P)}
                 {volumes.N > 0 ? ` · ${fmt(volumes.N)} sem porte` : ""}
-              </p>
+              </span>
             </Destaque>
-            <Destaque rotulo="Cargas" valor={fmt(rotas.cargas.length)}>
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            <Destaque rotulo="Cargas" valor={fmt(rotas.cargas.length)} onAbrir={() => setDetalhe({ tipo: "cargas" })}>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 {r.emRota} em rota · {noCd.length} no CD
-              </p>
+              </span>
               {paradas > 0 && (
-                <p className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--status-warning)" }}>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--status-warning)" }}>
                   <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--status-warning)" }} />
                   {paradas} sem baixa há mais de {tempo(MINUTOS_SEM_BAIXA_ALERTA)}
-                </p>
+                </span>
               )}
             </Destaque>
           </div>
@@ -471,6 +795,31 @@ export function RotasDoDia({
         </>
       )}
       {aberta && <NotasCarga c={aberta} onFechar={() => setAberta(null)} />}
+      {detalhe?.tipo === "notas" && (
+        <NotasDoDia
+          cargas={rotas.cargas}
+          grupoInicial={detalhe.grupo}
+          situacaoInicial={detalhe.situacao}
+          onFechar={() => setDetalhe(null)}
+          onAbrirCarga={(c) => {
+            setDetalhe(null);
+            setAberta(c);
+          }}
+        />
+      )}
+      {detalhe?.tipo === "produtos" && <ProdutosDoDia cargas={rotas.cargas} onFechar={() => setDetalhe(null)} />}
+      {detalhe?.tipo === "cargas" && (
+        <CargasDoDia
+          cargas={rotas.cargas}
+          dia={rotas.dia}
+          agora={agoraEfetivo}
+          onFechar={() => setDetalhe(null)}
+          onAbrirCarga={(c) => {
+            setDetalhe(null);
+            setAberta(c);
+          }}
+        />
+      )}
     </section>
   );
 }
