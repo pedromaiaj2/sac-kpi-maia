@@ -410,7 +410,34 @@ async function fetchTotvs<T>(url: string, attempt = 1): Promise<T> {
     }
     throw new Error(`${res.status} ${url}: ${res.body.slice(0, 200)}`);
   }
-  return JSON.parse(res.body) as T;
+  return JSON.parse(consertarAcentos(res.body)) as T;
+}
+
+// Achado 18/10/2026: a consulta document= devolve o texto em UTF-8 lido como
+// Windows-1252 e codificado de novo ("NÃ£o Entregue", "ARAÃšJO"), e o sync
+// gravava assim -- comparações por texto (risco, NPS) não batiam e o nome do
+// cliente aparecia quebrado. Cada sequência UTF-8 dupla volta pros bytes
+// originais e é lida de novo; se não for UTF-8 válido, fica como está. Texto
+// já correto não casa com o padrão ("JOÃO": Ã seguido de letra comum).
+const CP1252: Record<string, number> = {
+  "€": 0x80, "‚": 0x82, "ƒ": 0x83, "„": 0x84, "…": 0x85, "†": 0x86, "‡": 0x87, "ˆ": 0x88,
+  "‰": 0x89, "Š": 0x8a, "‹": 0x8b, "Œ": 0x8c, "Ž": 0x8e, "‘": 0x91, "’": 0x92, "“": 0x93,
+  "”": 0x94, "•": 0x95, "–": 0x96, "—": 0x97, "˜": 0x98, "™": 0x99, "š": 0x9a, "›": 0x9b,
+  "œ": 0x9c, "ž": 0x9e, "Ÿ": 0x9f,
+};
+const CONT = `[\\u0080-\\u00bf${Object.keys(CP1252).join("")}]`;
+const UTF8_DUPLO = new RegExp(`[\\u00c2-\\u00df]${CONT}|[\\u00e0-\\u00ef]${CONT}{2}`, "g");
+const utf8Estrito = new TextDecoder("utf-8", { fatal: true });
+
+export function consertarAcentos(texto: string): string {
+  return texto.replace(UTF8_DUPLO, (m) => {
+    const bytes = Uint8Array.from([...m].map((ch) => CP1252[ch] ?? ch.charCodeAt(0)));
+    try {
+      return utf8Estrito.decode(bytes);
+    } catch {
+      return m;
+    }
+  });
 }
 
 export function ddmmyyyyToIso(value: string | undefined): string | null {

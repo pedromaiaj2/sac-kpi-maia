@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ddmmyyyyToIso, isoDate, totvsHeaders, detectDeliveryRiskTrigger, nextOrdersCursor, mapCargaItens, tentativaParcial } from "./totvsSync";
+import { ddmmyyyyToIso, isoDate, totvsHeaders, detectDeliveryRiskTrigger, nextOrdersCursor, mapCargaItens, tentativaParcial, consertarAcentos } from "./totvsSync";
 
 describe("ddmmyyyyToIso", () => {
   it("converte DD/MM/YYYY pra YYYY-MM-DD", () => {
@@ -247,5 +247,24 @@ describe("tentativaParcial", () => {
 
   it("pedido sem nada no banco -> tentativa do payload", () => {
     expect(tentativaParcial([], "005490", 1)).toBe(1);
+  });
+});
+
+// document= devolve UTF-8 codificado duas vezes (18/10/2026).
+describe("consertarAcentos", () => {
+  it("desfaz a codificação dupla", () => {
+    expect(consertarAcentos("NÃ£o Entregue")).toBe("Não Entregue");
+    expect(consertarAcentos("Em SeparaÃ§Ã£o")).toBe("Em Separação");
+    expect(consertarAcentos("JOÃƒO")).toBe("JOÃO");
+    expect(consertarAcentos("ROSIANE PAIVA DE ARAÃšJO")).toBe("ROSIANE PAIVA DE ARAÚJO");
+    expect(consertarAcentos("ANTÃ”NIO")).toBe("ANTÔNIO");
+    expect(consertarAcentos("ANGÃ‰LICA")).toBe("ANGÉLICA");
+    expect(consertarAcentos("VeÃ­culo Quebrou")).toBe("Veículo Quebrou");
+  });
+
+  it("texto já correto fica igual", () => {
+    for (const t of ["Não Entregue", "Em Separação", "JOÃO PESSOA", "MÁRIO ANDREAZZA", "Entregue", "FALCÃO", "ÁGUA", "AÇÃO", "Pão – café"]) {
+      expect(consertarAcentos(t)).toBe(t);
+    }
   });
 });
