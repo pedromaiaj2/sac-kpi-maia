@@ -64,6 +64,11 @@ const PASSTHROUGH_PREFIXES = [
   // (ESTORNO_EMBED), mas o passthrough fica disponível sempre, mesmo
   // padrão dos outros acima.
   "/api/estornos/resumo",
+  // Reprocessamento único do backlog do NPS Compra (ver
+  // api/admin/reprocess-compra-nps/route.ts) -- mesmo motivo dos crons
+  // acima: não começa com /api/sync nem /assistencia, cairia no redirect
+  // de auth do painel de KPIs sem isso.
+  "/api/admin/reprocess-compra-nps",
   "/_next/static",
   "/_next/image",
   "/favicon.ico",
