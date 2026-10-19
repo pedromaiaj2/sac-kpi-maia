@@ -5,6 +5,7 @@ import { hostname } from "node:os";
 import { getSupabaseAdmin } from "./supabaseAdmin.ts";
 import { recordSyncRun } from "./syncRuns.ts";
 import { compararCarga, type ApiPedido, type Divergencia, type LinhaAuditoria } from "./auditoriaCargas.ts";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination.ts";
 
 // O certificado de protheus.lojasmaia.com.br é autoassinado por uma CA
 // interna da própria TOTVS (não uma CA pública) -- fetch() rejeitaria com
@@ -745,6 +746,24 @@ async function backfillClientCodesNaTrava(supabase: SupabaseAdmin, codes: Set<st
   return { checked, upserted, errors };
 }
 
+// Até 19/10/2026 só olhava service_requests/pedidos_encomenda -- nunca
+// totvs_orders, que é a fonte de quem COMPROU (candidato real de NPS
+// "pós-compra"/"pós-entrega", ver nps2Meses.ts/entregaNps.ts). Achado do
+// Victor nessa data, desconfiando do "73% sem telefone" que esse NPS vinha
+// reportando: testado direto contra a API do Protheus (SearchQuery) com 8
+// clientes marcados como "sem telefone" -- 8 de 8 TINHAM telefone
+// cadastrado lá. Causa raiz não era falta de dado no Protheus, era esse
+// backfill nunca ter ido atrás desses códigos (service_requests/
+// pedidos_encomenda não cobrem quem comprou mas nunca abriu chamado nem
+// fez encomenda) -- sobrava só o backfill reativo de nps2Meses.ts/
+// entregaNps.ts, de 20 códigos por rodada do /api/sync e só pros 50
+// candidatos já selecionados naquela rodada, incapaz de dar conta de um
+// buraco de ~850 clientes só na janela de 7 dias da Compra. `.select()`
+// sem `.range()` bastava pra service_requests/pedidos_encomenda (volume
+// baixo o bastante pra nunca passar do limite padrão de 1000 linhas do
+// PostgREST), mas totvs_orders tem ~7.600 pedidos/mês -- paginar de
+// verdade (fetchAllPagesParallel) é obrigatório aqui, senão a maioria dos
+// códigos do mês some silenciosamente cortada no limite de 1000.
 async function backfillMissingClients(supabase: SupabaseAdmin): Promise<SyncResult> {
   const since = isoDate(new Date(Date.now() - BACKFILL_LOOKBACK_DAYS * DAY_MS));
 
@@ -765,6 +784,20 @@ async function backfillMissingClients(supabase: SupabaseAdmin): Promise<SyncResu
     .gte("created_at", since);
   for (const r of pedidoRows ?? []) {
     const code = (r.cliente_codigo as string | null)?.trim();
+    if (code) codes.add(code);
+  }
+  const orderRows = await fetchAllPagesParallel<{ client_id: string | null }>(
+    (from, to) =>
+      supabase
+        .from("totvs_orders")
+        .select("client_id", { count: "exact" })
+        .not("client_id", "is", null)
+        .gte("issue_date", since)
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ client_id: string | null }>>
+  );
+  for (const r of orderRows) {
+    const code = r.client_id?.trim();
     if (code) codes.add(code);
   }
 
