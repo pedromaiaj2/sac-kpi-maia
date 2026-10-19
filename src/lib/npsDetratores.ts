@@ -349,6 +349,12 @@ export type NpsResposta = {
   // totvs_orders.client_cpf_cnpj.
   clientCpf: string | null;
   clientPhone: string | null;
+  // Só preenchido pra "compra"/"entrega"/"venda" (vem de totvs_orders.seller_name
+  // -- quem vendeu aquele pedido) -- pedido do Victor 19/10/2026 pro card
+  // "Pós-venda" mostrar a qual vendedor cada avaliação se refere. null nas
+  // outras fontes (sac/montagem/assistência técnica não têm vendedor
+  // associado ao dado que já buscam).
+  sellerName: string | null;
 };
 
 // Lista TODAS as respostas de UMA fase (não só detratores, diferente de
@@ -385,6 +391,7 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
         clientName: contact?.name ?? null,
         clientCpf: null,
         clientPhone: contact?.phone ?? null,
+        sellerName: null,
       };
     });
   }
@@ -417,16 +424,19 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
         clientName: sr?.client_name ?? null,
         clientCpf: sr?.client_cpf ?? null,
         clientPhone: sr?.client_phone ?? null,
+        sellerName: null,
       };
     });
   }
 
   // "compra", "entrega" e "venda" -- mesma forma (por pedido de venda, não
-  // por chamado), só a tabela muda.
+  // por chamado), só a tabela muda. seller_name vem junto (quem vendeu o
+  // pedido) -- usado pelo card "Pós-venda" pra mostrar a qual vendedor
+  // cada avaliação se refere.
   const table = origem === "compra" ? "compra_nps" : origem === "entrega" ? "entrega_nps" : "venda_nps";
   const { data, error } = await admin
     .from(table)
-    .select("order_id, client_id, score, respondido_em, totvs_orders(client_name, client_cpf_cnpj)")
+    .select("order_id, client_id, score, respondido_em, totvs_orders(client_name, client_cpf_cnpj, seller_name)")
     .not("score", "is", null)
     .order("respondido_em", { ascending: false })
     .limit(limit);
@@ -437,7 +447,10 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
     client_id: string;
     score: number;
     respondido_em: string;
-    totvs_orders: { client_name: string | null; client_cpf_cnpj: string | null } | { client_name: string | null; client_cpf_cnpj: string | null }[] | null;
+    totvs_orders:
+      | { client_name: string | null; client_cpf_cnpj: string | null; seller_name: string | null }
+      | { client_name: string | null; client_cpf_cnpj: string | null; seller_name: string | null }[]
+      | null;
   };
   const rows = (data ?? []) as unknown as Row[];
   // Telefone só de reforço (nem sempre tem CPF sincronizado) -- mesmo join
@@ -458,6 +471,7 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
       clientName: order?.client_name ?? null,
       clientCpf: order?.client_cpf_cnpj ?? null,
       clientPhone: phoneByClientId.get(r.client_id) ?? null,
+      sellerName: order?.seller_name ?? null,
     };
   });
 }

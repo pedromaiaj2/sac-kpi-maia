@@ -113,6 +113,11 @@ export function NpsRespostasModal({ origem, onClose }: { origem: NpsDetratorOrig
                       {" · "}
                       {formatDateTimeBr(r.respondidoEm)}
                     </p>
+                    {r.sellerName ? (
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                        Vendedor: {r.sellerName}
+                      </p>
+                    ) : null}
                   </div>
                   <span className="text-sm font-semibold shrink-0" style={{ color: scoreColor(r.score) }}>
                     {NPS_SCORE_LABELS[r.score] ?? r.score}
