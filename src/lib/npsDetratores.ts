@@ -36,11 +36,12 @@ export const NPS_GHL_TAG: Partial<Record<NpsDetratorOrigem, string>> = {
   assistencia_tecnica: "gatilho-nps-assistencia",
   entrega: "gatilho-nps-entrega",
   compra: "gatilho-nps-compra",
-  // Precisa de um Workflow novo no GHL (trigger "Contact Tag" = esta tag +
-  // template de WhatsApp perguntando sobre o atendimento na loja), igual
-  // aos outros 4 -- sem isso aplicar a tag não dispara mensagem nenhuma
-  // (ver achado de "NPS Compra" em Draft, 19/10/2026).
-  venda: "gatilho-nps-venda",
+  // "nps-atendimento-loja", não "gatilho-nps-*" como os outros 4 -- o
+  // Workflow "NPS Atendimento Loja" já foi criado no GHL (19/10/2026) com
+  // esse nome de tag no trigger "Contact Tag"; o código precisa bater
+  // exatamente com o que já existe lá, não o padrão de nomenclatura dos
+  // outros.
+  venda: "nps-atendimento-loja",
 };
 
 // Padrão de resposta via WhatsApp List Message -- mesmo mecanismo do NPS
