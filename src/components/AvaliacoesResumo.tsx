@@ -14,7 +14,7 @@ import { NpsRespostasModal } from "./NpsRespostasModal";
 // uma abaixo).
 type MetaRange = { min: number; max: number | null };
 
-const METAS: Record<"sac" | "entrega" | "montagem" | "assistencia_tecnica" | "compra", MetaRange> = {
+const METAS: Record<"sac" | "entrega" | "montagem" | "assistencia_tecnica" | "compra" | "venda", MetaRange> = {
   // Canal de contenção de atrito -- meta definida, não faixa.
   sac: { min: 65, max: null },
   // Logística (atraso/avaria de transporte) costuma puxar a nota pra
@@ -29,6 +29,12 @@ const METAS: Record<"sac" | "entrega" | "montagem" | "assistencia_tecnica" | "co
   // NPS relacional (produto + marca depois de usar) -- tende a se
   // estabilizar no topo se o produto for bom.
   compra: { min: 70, max: null },
+  // Atendimento presencial, primeiro contato (antes de entrega/montagem) --
+  // tende a nota alta com bom vendedor, mas ainda sem o vínculo de
+  // produto/entrega que puxa "compra" pro topo. Ajustável depois de ver os
+  // números reais (meta provisória, sem referência de mercado específica
+  // levantada ainda).
+  venda: { min: 70, max: 85 },
 };
 
 function metaLabel(meta: MetaRange): string {
@@ -109,7 +115,7 @@ export function AvaliacoesResumo({
   npsDetratores,
 }: {
   npsSummary: NpsSummary;
-  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica" | "entrega" | "compra", NpsFaseResumo>;
+  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica" | "entrega" | "compra" | "venda", NpsFaseResumo>;
   npsDetratores: NpsDetrator[];
 }) {
   const [showDetratores, setShowDetratores] = useState(false);
@@ -121,13 +127,20 @@ export function AvaliacoesResumo({
         <h2 className="text-base font-semibold tracking-wide mb-4" style={{ color: "var(--text-primary)" }}>
           NPS por fase
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <FaseCard
             label="Atendimento (SAC)"
             npsIndex={npsSummary.npsIndex}
             responseCount={npsSummary.responseCount}
             meta={METAS.sac}
             onClick={() => setOpenOrigem("sac")}
+          />
+          <FaseCard
+            label="Pós-venda (atendimento em loja)"
+            npsIndex={resumoFasesAdicionais.venda.npsIndex}
+            responseCount={resumoFasesAdicionais.venda.responseCount}
+            meta={METAS.venda}
+            onClick={() => setOpenOrigem("venda")}
           />
           <FaseCard
             label="Pós-entrega"

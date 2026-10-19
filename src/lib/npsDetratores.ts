@@ -10,7 +10,9 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 // clássico de mercado) -- revertido pra ficar consistente com o mecanismo
 // do SAC (WhatsApp List Message, resposta = "N - Label" ecoada de volta),
 // não um número livre digitado.
-export const NPS_DETRATOR_ORIGENS = ["sac", "montagem", "assistencia_tecnica", "entrega", "compra"] as const;
+// "venda" (Pós-venda, atendimento em loja) adicionada em 19/10/2026 -- ver
+// vendaNps.ts.
+export const NPS_DETRATOR_ORIGENS = ["sac", "montagem", "assistencia_tecnica", "entrega", "compra", "venda"] as const;
 export type NpsDetratorOrigem = (typeof NPS_DETRATOR_ORIGENS)[number];
 
 export const NPS_DETRATOR_ORIGEM_LABELS: Record<NpsDetratorOrigem, string> = {
@@ -19,6 +21,7 @@ export const NPS_DETRATOR_ORIGEM_LABELS: Record<NpsDetratorOrigem, string> = {
   assistencia_tecnica: "Pós-assistência técnica",
   entrega: "Pós-entrega",
   compra: "20 dias pós-recebimento",
+  venda: "Pós-venda (atendimento em loja)",
 };
 
 // Tag do GHL que dispara o Workflow de cada pesquisa -- pedido do Victor
@@ -33,6 +36,11 @@ export const NPS_GHL_TAG: Partial<Record<NpsDetratorOrigem, string>> = {
   assistencia_tecnica: "gatilho-nps-assistencia",
   entrega: "gatilho-nps-entrega",
   compra: "gatilho-nps-compra",
+  // Precisa de um Workflow novo no GHL (trigger "Contact Tag" = esta tag +
+  // template de WhatsApp perguntando sobre o atendimento na loja), igual
+  // aos outros 4 -- sem isso aplicar a tag não dispara mensagem nenhuma
+  // (ver achado de "NPS Compra" em Draft, 19/10/2026).
+  venda: "gatilho-nps-venda",
 };
 
 // Padrão de resposta via WhatsApp List Message -- mesmo mecanismo do NPS
@@ -111,6 +119,7 @@ export async function listNpsDetratores(opts: { todoHistorico?: boolean } = {}):
     { data: reqRows, error: reqError },
     { data: compraRows, error: compraError },
     { data: entregaRows, error: entregaError },
+    { data: vendaRows, error: vendaError },
     { data: statusRows, error: statusError },
   ] = await Promise.all([
     admin
@@ -144,10 +153,21 @@ export async function listNpsDetratores(opts: { todoHistorico?: boolean } = {}):
       .lte("score", 2)
       .gte("respondido_em", sinceIso)
       .order("respondido_em", { ascending: false }),
+    // "Pós-venda" (vendaNps.ts) -- mesma forma de "entrega"/"compra" acima
+    // (por PEDIDO de venda, não por chamado), tabela própria desde
+    // 19/10/2026.
+    admin
+      .from("venda_nps")
+      .select("order_id, client_id, score, respondido_em, totvs_orders(client_name)")
+      .not("score", "is", null)
+      .lte("score", 2)
+      .gte("respondido_em", sinceIso)
+      .order("respondido_em", { ascending: false }),
     admin.from("nps_detrator_status").select("origem, origem_id, status, motivo, atualizado_em"),
   ]);
   if (sacError) throw new Error(sacError.message);
   if (entregaError) throw new Error(entregaError.message);
+  if (vendaError) throw new Error(vendaError.message);
   if (reqError) throw new Error(reqError.message);
   if (compraError) throw new Error(compraError.message);
   if (statusError) throw new Error(statusError.message);
@@ -288,7 +308,33 @@ export async function listNpsDetratores(opts: { todoHistorico?: boolean } = {}):
     };
   });
 
-  return [...sac, ...req, ...compra, ...entrega].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
+  // "Pós-venda" (venda_nps) -- mesma forma de "entrega"/"compra" acima (por
+  // PEDIDO de venda, telefone via totvs_clientes).
+  type VendaRow = CompraRow;
+  const vendaClientIds = [...new Set(((vendaRows ?? []) as VendaRow[]).map((r) => r.client_id))];
+  const phoneByClientIdVenda = new Map<string, string | null>();
+  if (vendaClientIds.length > 0) {
+    const { data: clienteRows, error: clientesError } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", vendaClientIds);
+    if (clientesError) throw new Error(clientesError.message);
+    for (const c of clienteRows ?? []) phoneByClientIdVenda.set(c.protheus_code as string, c.phone1 as string | null);
+  }
+  const venda: NpsDetrator[] = ((vendaRows ?? []) as VendaRow[]).map((r) => {
+    const order = Array.isArray(r.totvs_orders) ? r.totvs_orders[0] : r.totvs_orders;
+    const resolved = resolveStatus("venda", r.order_id);
+    return {
+      origem: "venda" as const,
+      origemId: r.order_id,
+      score: r.score,
+      escala: "1-5" as const,
+      respondidoEm: r.respondido_em,
+      clientName: order?.client_name ?? null,
+      clientPhone: phoneByClientIdVenda.get(r.client_id) ?? null,
+      motivoSugerido: null,
+      ...resolved,
+    };
+  });
+
+  return [...sac, ...req, ...compra, ...entrega, ...venda].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
 }
 
 export type NpsResposta = {
@@ -374,9 +420,9 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
     });
   }
 
-  // "compra" e "entrega" -- mesma forma (por pedido de venda, não por
-  // chamado), só a tabela muda.
-  const table = origem === "compra" ? "compra_nps" : "entrega_nps";
+  // "compra", "entrega" e "venda" -- mesma forma (por pedido de venda, não
+  // por chamado), só a tabela muda.
+  const table = origem === "compra" ? "compra_nps" : origem === "entrega" ? "entrega_nps" : "venda_nps";
   const { data, error } = await admin
     .from(table)
     .select("order_id, client_id, score, respondido_em, totvs_orders(client_name, client_cpf_cnpj)")
@@ -424,19 +470,21 @@ export type NpsFaseResumo = { npsIndex: number | null; responseCount: number };
 // npsIndex:null quando não tem nenhuma resposta ainda (vira "—" na tela) --
 // não precisa de código novo quando montagem/assistência técnica
 // começarem a responder de verdade, já calcula sozinho.
-export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" | "assistencia_tecnica" | "entrega", NpsFaseResumo>> {
+export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" | "assistencia_tecnica" | "entrega" | "venda", NpsFaseResumo>> {
   const admin = getSupabaseAdmin();
-  // "entrega" vem de uma tabela separada (entrega_nps, ver entregaNps.ts)
-  // desde 22/09/2026 -- por PEDIDO de venda, não por chamado de
-  // assistência (service_request_nps). Consulta própria aqui em vez de
-  // importar getEntregaNpsResumo de entregaNps.ts pra não criar
-  // dependência circular (aquele arquivo já importa NPS_GHL_TAG daqui).
-  const [{ data, error }, { data: entregaData, error: entregaError }] = await Promise.all([
+  // "entrega"/"venda" vêm de tabela separada cada uma (entrega_nps/
+  // venda_nps, ver entregaNps.ts/vendaNps.ts) -- por PEDIDO de venda, não
+  // por chamado de assistência (service_request_nps). Consulta própria
+  // aqui em vez de importar de lá pra não criar dependência circular
+  // (aqueles arquivos já importam NPS_GHL_TAG daqui).
+  const [{ data, error }, { data: entregaData, error: entregaError }, { data: vendaData, error: vendaError }] = await Promise.all([
     admin.from("service_request_nps").select("tipo, score").not("score", "is", null),
     admin.from("entrega_nps").select("score").not("score", "is", null),
+    admin.from("venda_nps").select("score").not("score", "is", null),
   ]);
   if (error) throw new Error(error.message);
   if (entregaError) throw new Error(entregaError.message);
+  if (vendaError) throw new Error(vendaError.message);
 
   // Classificação NPS adaptada pra escala 1-5 (mesmo critério de
   // buildNpsSummary, kpi.ts/SAC, desde 22/09/2026): promotor 4-5, detrator
@@ -456,6 +504,7 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
     montagem: resumoFor("montagem"),
     assistencia_tecnica: resumoFor("assistencia_tecnica"),
     entrega: npsFromScores((entregaData ?? []).map((r) => r.score as number)),
+    venda: npsFromScores((vendaData ?? []).map((r) => r.score as number)),
   };
 }
 

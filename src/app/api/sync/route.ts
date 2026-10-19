@@ -7,6 +7,7 @@ import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "@/lib/servi
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "@/lib/npsDetratores";
 import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/nps2Meses";
 import { enrollPendingEntregaNps, detectPendingEntregaNpsResponses } from "@/lib/entregaNps";
+import { enrollPendingVendaNps, detectPendingVendaNpsResponses } from "@/lib/vendaNps";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -395,6 +396,13 @@ async function runSync() {
   errors.push(...entregaNpsErrors);
   const entregaNpsAnswered = await detectPendingEntregaNpsResponses();
 
+  // NPS "Pós-venda" -- pedido do Victor 19/10/2026: atendimento EM LOJA,
+  // disparado assim que a venda é registrada no Protheus, sem depender de
+  // entrega/montagem/assistência nenhuma -- ver vendaNps.ts.
+  const { enrolled: vendaNpsEnrolled, semTelefone: vendaNpsSemTelefone, errors: vendaNpsErrors } = await enrollPendingVendaNps();
+  errors.push(...vendaNpsErrors);
+  const vendaNpsAnswered = await detectPendingVendaNpsResponses();
+
   const ok = errors.length === 0;
   await recordSyncRun(
     "ghl",
@@ -414,6 +422,9 @@ async function runSync() {
       entregaNpsEnrolled,
       entregaNpsSemTelefone,
       entregaNpsAnswered,
+      vendaNpsEnrolled,
+      vendaNpsSemTelefone,
+      vendaNpsAnswered,
     },
     errors
   );
@@ -434,6 +445,9 @@ async function runSync() {
     entregaNpsEnrolled,
     entregaNpsSemTelefone,
     entregaNpsAnswered,
+    vendaNpsEnrolled,
+    vendaNpsSemTelefone,
+    vendaNpsAnswered,
     errors,
   });
 }
