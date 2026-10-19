@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { ModalLogistica } from "./ModalLogistica";
 import { Recolhivel } from "./Recolhivel";
 import {
+  formatarDocumento,
   grupoDaCarga,
   MINUTOS_SEM_BAIXA_ALERTA,
   regioesVisiveis,
@@ -270,6 +271,17 @@ const ROTULO_NOTA: Record<string, { rotulo: string; cor: string }> = {
   "4": { rotulo: "Cancelada", cor: COR.voltou },
 };
 
+// CPF/CNPJ embaixo do nome do cliente (Victor 19/10/2026).
+function Documento({ doc }: { doc: string | null | undefined }) {
+  const texto = formatarDocumento(doc);
+  if (!texto) return null;
+  return (
+    <span className="block font-normal tabular-nums" style={{ color: "var(--text-muted)" }}>
+      {texto}
+    </span>
+  );
+}
+
 function NotasCarga({ c, onFechar }: { c: CargaRota; onFechar: () => void }) {
   return (
     <ModalLogistica
@@ -304,6 +316,7 @@ function NotasCarga({ c, onFechar }: { c: CargaRota; onFechar: () => void }) {
                 <td className="px-3 py-2.5 tabular-nums">{n.hora ?? "—"}</td>
                 <td className="px-3 py-2.5 font-medium min-w-[160px]" style={{ color: "var(--text-primary)" }}>
                   {n.cliente ?? "—"}
+                  <Documento doc={n.cpf} />
                 </td>
                 <td className="px-3 py-2.5 min-w-[120px]" style={{ color: "var(--text-secondary)" }}>
                   {n.bairro ?? "—"}
@@ -479,6 +492,7 @@ function NotasDoDia({
                   <td className="px-3 py-2.5 tabular-nums">{n.hora ?? "—"}</td>
                   <td className="px-3 py-2.5 font-medium min-w-[160px]" style={{ color: "var(--text-primary)" }}>
                     {n.cliente ?? "—"}
+                    <Documento doc={n.cpf} />
                   </td>
                   <td className="px-3 py-2.5 min-w-[110px]" style={{ color: "var(--text-secondary)" }}>
                     {n.bairro ?? "—"}

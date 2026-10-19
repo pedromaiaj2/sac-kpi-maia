@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { grupoDaCarga, minutosDesde, regioesVisiveis, resumirRotas, situacaoBaixa, type CargaRota } from "./rotasDoDiaCore";
+import { grupoDaCarga, minutosDesde, regioesVisiveis, resumirRotas, situacaoBaixa, type CargaRota, formatarDocumento } from "./rotasDoDiaCore";
 
 function carga(over: Partial<CargaRota>): CargaRota {
   return {
@@ -62,5 +62,14 @@ describe("situacaoBaixa", () => {
   it("encerrada ou sem pendência nunca está parada", () => {
     expect(situacaoBaixa({ ...base, statusCodigo: "6" }, "2026-10-17", "15:00").parada).toBe(false);
     expect(situacaoBaixa({ ...base, pendentes: 0 }, "2026-10-17", "15:00").parada).toBe(false);
+  });
+});
+
+describe("formatarDocumento", () => {
+  it("CPF, CNPJ e vazio", () => {
+    expect(formatarDocumento("09787952450")).toBe("097.879.524-50");
+    expect(formatarDocumento("12345678000199")).toBe("12.345.678/0001-99");
+    expect(formatarDocumento(null)).toBeNull();
+    expect(formatarDocumento("123")).toBe("123");
   });
 });
