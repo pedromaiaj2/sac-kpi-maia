@@ -226,9 +226,21 @@ export function PainelLogistica({
     // Rotas de hoje no topo e os indicadores do período abaixo, com os
     // filtros (17/10/2026). Menu lateral e tema vêm de AppShell (kpis/layout).
     <main className="flex-1 min-w-0 w-full max-w-[1440px] mx-auto px-4 sm:px-8 pt-6 pb-16 flex flex-col gap-8">
-      {rotas && <RotasDoDia rotas={rotas} agora={horaRecife(new Date())} dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null} atrasado={dadosAtrasados} historico={rotasHistorico} />}
+      {/* Faixa levemente esverdeada separa o "hoje" (mural ao vivo) dos
+          indicadores do período abaixo da linha (Victor 19/10/2026). */}
+      {rotas && (
+        <div
+          className="rounded-3xl p-4 sm:p-6 -mx-1 sm:-mx-2"
+          style={{
+            background: "color-mix(in srgb, var(--brand-green) 6%, var(--canvas))",
+            border: "1px solid color-mix(in srgb, var(--brand-green) 18%, transparent)",
+          }}
+        >
+          <RotasDoDia rotas={rotas} agora={horaRecife(new Date())} dadosDe={ultimoSync ? horaRecife(new Date(ultimoSync)) : null} atrasado={dadosAtrasados} historico={rotasHistorico} />
+        </div>
+      )}
 
-      <div className="flex flex-col gap-4 pt-2">
+      <div className="flex flex-col gap-4 pt-8 border-t" style={{ borderColor: "var(--border)" }}>
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
           <ThHint hint="Cargas despachadas pelo CD, notas e produtos por Strada e caminhão, motoristas próprios e terceirizados e o Índice de Volta de cada um (só o que aconteceu com a nota na rua). As assistências técnicas ligadas a cada motorista aparecem à parte, sem entrar no índice. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV). O código 000058 (LOJAS MAIA TREINAMENTO) é o motorista em treinamento e entra nos números como qualquer outro.">
             Indicadores do período
