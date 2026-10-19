@@ -1362,6 +1362,10 @@ async function syncOpenCargas(supabase: SupabaseAdmin, janela: JanelaCargas = JA
 
   const seen = new Set<string>();
   const cargas: OpenCargaCandidate[] = [];
+  for (const carga of await cargasNovasDoDia(supabase, dia(-1), dia(1), errors)) {
+    seen.add(carga);
+    cargas.push({ carga });
+  }
   for (const r of (rows ?? []) as { carga: string; updated_at: string }[]) {
     if (seen.has(r.carga)) continue;
     seen.add(r.carga);
@@ -1395,6 +1399,43 @@ async function syncOpenCargas(supabase: SupabaseAdmin, janela: JanelaCargas = JA
   }
 
   return { checked, upserted, errors };
+}
+
+// Carga que o CD monta durante o dia (Victor 19/10/2026: o mural de hoje foi
+// de 99 a 112 de manhã e ficava até 30 min atrás do Protheus) só entrava no
+// banco quando a paginação geral do sync completo passava por ela, e às
+// vezes pela metade. A listagem por previsão (deliveryDateFrom/To) traz o
+// código de todas as cargas de ontem a amanhã em poucas páginas; as que o
+// banco ainda não tem vão na frente da fila do load=. Uma chamada por vez.
+const DESCOBERTA_MAX_PAGINAS = 10;
+
+async function cargasNovasDoDia(supabase: SupabaseAdmin, de: string, ate: string, errors: string[]): Promise<string[]> {
+  const naApi = new Set<string>();
+  let page = 1;
+  let totalPages = 1;
+  do {
+    let json: TotvsDeliveryListResponse;
+    try {
+      json = await fetchTotvs<TotvsDeliveryListResponse>(
+        `${BASE_URL}/rest/ai/deliveries?deliveryDateFrom=${de}&deliveryDateTo=${ate}&page=${page}&size=50`
+      );
+    } catch (err) {
+      errors.push(`cargas novas ${de}..${ate} página ${page}: ${(err as Error).message}`);
+      break;
+    }
+    for (const d of json.data ?? []) for (const c of d.cargas ?? []) if (c.carga) naApi.add(c.carga);
+    totalPages = json.totalPages ?? 1;
+    page++;
+  } while (page <= totalPages && page <= DESCOBERTA_MAX_PAGINAS);
+  if (naApi.size === 0) return [];
+
+  const { data, error } = await supabase.from("totvs_delivery_cargas").select("carga").in("carga", [...naApi]);
+  if (error) {
+    errors.push(`cargas novas: ${error.message}`);
+    return [];
+  }
+  const noBanco = new Set((data ?? []).map((r: { carga: string }) => r.carga));
+  return [...naApi].filter((c) => !noBanco.has(c)).sort();
 }
 
 // A consulta load=<carga> traz todos os pedidos da carga, e cada um foi
