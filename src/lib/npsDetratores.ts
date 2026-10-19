@@ -462,7 +462,14 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
   });
 }
 
-export type NpsFaseResumo = { npsIndex: number | null; responseCount: number };
+// sentCount/responseRatePct adicionados em 19/10/2026 -- pedido do Victor:
+// "em cada card do resumo de avaliações, apareça não só as respostas mas
+// qual o percentual de respostas e quantas foram enviadas". responseCount
+// sozinho não dizia se uma taxa de resposta baixa era "pouca gente
+// respondeu" ou "quase não enviamos nada ainda" -- achado real da sessão
+// (NPS Compra em Draft no GHL por 3 semanas, enviando "sucesso" sem
+// mandar mensagem nenhuma) mostrou que essa distinção importa de verdade.
+export type NpsFaseResumo = { npsIndex: number | null; responseCount: number; sentCount: number; responseRatePct: number | null };
 
 // Resumo (NPS clássico: %promotores - %detratores) pras fases que ainda não
 // têm uma função de summary própria feito nem_summary.ts tem pro SAC --
@@ -478,34 +485,63 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
   // por chamado de assistência (service_request_nps). Consulta própria
   // aqui em vez de importar de lá pra não criar dependência circular
   // (aqueles arquivos já importam NPS_GHL_TAG daqui).
-  const [{ data, error }, { data: entregaData, error: entregaError }, { data: vendaData, error: vendaError }] = await Promise.all([
+  //
+  // Score continua filtrado (`.not("score", "is", null)`) -- só quem
+  // respondeu, poucas centenas no máximo, sem risco de estourar o limite
+  // padrão de 1000 linhas do PostgREST. sentCount (TOTAL enviado, pode
+  // passar de 1000 em entrega/venda) vem de queries à parte com `count:
+  // "exact", head: true` -- head não baixa linha nenhuma, só o total, e
+  // por isso nunca trunca (achado 19/10/2026, mesmo gotcha já corrigido em
+  // backfillMissingClients/totvsSync.ts: um `.select()` sem `.range()` em
+  // tabela grande corta silenciosamente em 1000).
+  const [
+    { data, error },
+    { data: entregaData, error: entregaError },
+    { data: vendaData, error: vendaError },
+    { count: montagemSent, error: montagemSentError },
+    { count: assistSent, error: assistSentError },
+    { count: entregaSent, error: entregaSentError },
+    { count: vendaSent, error: vendaSentError },
+  ] = await Promise.all([
     admin.from("service_request_nps").select("tipo, score").not("score", "is", null),
     admin.from("entrega_nps").select("score").not("score", "is", null),
     admin.from("venda_nps").select("score").not("score", "is", null),
+    admin.from("service_request_nps").select("request_id", { count: "exact", head: true }).eq("tipo", "montagem"),
+    admin.from("service_request_nps").select("request_id", { count: "exact", head: true }).eq("tipo", "assistencia_tecnica"),
+    admin.from("entrega_nps").select("order_id", { count: "exact", head: true }),
+    admin.from("venda_nps").select("order_id", { count: "exact", head: true }),
   ]);
   if (error) throw new Error(error.message);
   if (entregaError) throw new Error(entregaError.message);
   if (vendaError) throw new Error(vendaError.message);
+  if (montagemSentError) throw new Error(montagemSentError.message);
+  if (assistSentError) throw new Error(assistSentError.message);
+  if (entregaSentError) throw new Error(entregaSentError.message);
+  if (vendaSentError) throw new Error(vendaSentError.message);
 
   // Classificação NPS adaptada pra escala 1-5 (mesmo critério de
   // buildNpsSummary, kpi.ts/SAC, desde 22/09/2026): promotor 4-5, detrator
   // 1-2, sem o "6" do meio que a escala 0-10 original teria como corte.
-  function npsFromScores(scores: number[]): NpsFaseResumo {
-    if (scores.length === 0) return { npsIndex: null, responseCount: 0 };
+  function npsFromScores(scores: number[], sentCount: number): NpsFaseResumo {
+    const responseRatePct = sentCount > 0 ? Math.round((scores.length / sentCount) * 100) : null;
+    if (scores.length === 0) return { npsIndex: null, responseCount: 0, sentCount, responseRatePct };
     const promoters = scores.filter((s) => s >= 4).length;
     const detractors = scores.filter((s) => s <= 2).length;
     const npsIndex = Math.round(((promoters - detractors) / scores.length) * 100);
-    return { npsIndex, responseCount: scores.length };
+    return { npsIndex, responseCount: scores.length, sentCount, responseRatePct };
   }
-  function resumoFor(tipo: "montagem" | "assistencia_tecnica"): NpsFaseResumo {
-    return npsFromScores((data ?? []).filter((r) => r.tipo === tipo).map((r) => r.score as number));
+  function resumoFor(tipo: "montagem" | "assistencia_tecnica", sentCount: number): NpsFaseResumo {
+    return npsFromScores(
+      (data ?? []).filter((r) => r.tipo === tipo).map((r) => r.score as number),
+      sentCount
+    );
   }
 
   return {
-    montagem: resumoFor("montagem"),
-    assistencia_tecnica: resumoFor("assistencia_tecnica"),
-    entrega: npsFromScores((entregaData ?? []).map((r) => r.score as number)),
-    venda: npsFromScores((vendaData ?? []).map((r) => r.score as number)),
+    montagem: resumoFor("montagem", montagemSent ?? 0),
+    assistencia_tecnica: resumoFor("assistencia_tecnica", assistSent ?? 0),
+    entrega: npsFromScores((entregaData ?? []).map((r) => r.score as number), entregaSent ?? 0),
+    venda: npsFromScores((vendaData ?? []).map((r) => r.score as number), vendaSent ?? 0),
   };
 }
 

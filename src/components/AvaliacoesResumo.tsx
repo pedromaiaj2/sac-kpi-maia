@@ -70,16 +70,32 @@ function metaColor(npsIndex: number | null, meta: MetaRange): string {
 // demanda no clique, não precarrega nada aqui). Continua clicável mesmo
 // com responseCount 0 -- é o próprio modal que mostra "nenhuma resposta
 // ainda" nesse caso, sem precisar de um estado disabled separado.
+// Linha de cobertura (enviadas/respostas/%) adicionada em 19/10/2026 --
+// pedido do Victor: "não só as respostas mas qual o percentual de
+// respostas e quantas foram enviadas". responseCount sozinho escondia a
+// diferença entre "pouca gente respondeu" e "quase não enviamos nada" --
+// foi exatamente esse o sintoma que mascarou o NPS Compra em Draft no GHL
+// por 3 semanas (enviando "com sucesso" sem mandar mensagem nenhuma).
+function coberturaLabel(responseCount: number, sentCount: number, responseRatePct: number | null): string {
+  if (sentCount === 0) return "nada enviado ainda";
+  const pct = responseRatePct !== null ? ` · ${responseRatePct}%` : "";
+  return `${responseCount} de ${sentCount} enviada${sentCount === 1 ? "" : "s"}${pct}`;
+}
+
 function FaseCard({
   label,
   npsIndex,
   responseCount,
+  sentCount,
+  responseRatePct,
   meta,
   onClick,
 }: {
   label: string;
   npsIndex: number | null;
   responseCount: number;
+  sentCount: number;
+  responseRatePct: number | null;
   meta: MetaRange;
   onClick: () => void;
 }) {
@@ -96,8 +112,8 @@ function FaseCard({
       <span className="text-5xl font-bold tracking-tight tabular-nums leading-none py-2" style={{ color: metaColor(npsIndex, meta) }}>
         {npsIndex ?? "—"}
       </span>
-      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {responseCount > 0 ? `${responseCount} resposta${responseCount > 1 ? "s" : ""}` : "sem respostas ainda"}
+      <span className="text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
+        {coberturaLabel(responseCount, sentCount, responseRatePct)}
       </span>
       <span
         className="text-[11px] rounded-full px-2.5 py-0.5"
@@ -132,6 +148,8 @@ export function AvaliacoesResumo({
             label="Atendimento (SAC)"
             npsIndex={npsSummary.npsIndex}
             responseCount={npsSummary.responseCount}
+            sentCount={npsSummary.eligibleCount}
+            responseRatePct={npsSummary.responseRatePct}
             meta={METAS.sac}
             onClick={() => setOpenOrigem("sac")}
           />
@@ -139,6 +157,8 @@ export function AvaliacoesResumo({
             label="Pós-venda (atendimento em loja)"
             npsIndex={resumoFasesAdicionais.venda.npsIndex}
             responseCount={resumoFasesAdicionais.venda.responseCount}
+            sentCount={resumoFasesAdicionais.venda.sentCount}
+            responseRatePct={resumoFasesAdicionais.venda.responseRatePct}
             meta={METAS.venda}
             onClick={() => setOpenOrigem("venda")}
           />
@@ -146,6 +166,8 @@ export function AvaliacoesResumo({
             label="Pós-entrega"
             npsIndex={resumoFasesAdicionais.entrega.npsIndex}
             responseCount={resumoFasesAdicionais.entrega.responseCount}
+            sentCount={resumoFasesAdicionais.entrega.sentCount}
+            responseRatePct={resumoFasesAdicionais.entrega.responseRatePct}
             meta={METAS.entrega}
             onClick={() => setOpenOrigem("entrega")}
           />
@@ -153,6 +175,8 @@ export function AvaliacoesResumo({
             label="Pós-montagem"
             npsIndex={resumoFasesAdicionais.montagem.npsIndex}
             responseCount={resumoFasesAdicionais.montagem.responseCount}
+            sentCount={resumoFasesAdicionais.montagem.sentCount}
+            responseRatePct={resumoFasesAdicionais.montagem.responseRatePct}
             meta={METAS.montagem}
             onClick={() => setOpenOrigem("montagem")}
           />
@@ -160,6 +184,8 @@ export function AvaliacoesResumo({
             label="Pós-assistência técnica"
             npsIndex={resumoFasesAdicionais.assistencia_tecnica.npsIndex}
             responseCount={resumoFasesAdicionais.assistencia_tecnica.responseCount}
+            sentCount={resumoFasesAdicionais.assistencia_tecnica.sentCount}
+            responseRatePct={resumoFasesAdicionais.assistencia_tecnica.responseRatePct}
             meta={METAS.assistencia_tecnica}
             onClick={() => setOpenOrigem("assistencia_tecnica")}
           />
@@ -167,6 +193,8 @@ export function AvaliacoesResumo({
             label="20 dias pós-recebimento"
             npsIndex={resumoFasesAdicionais.compra.npsIndex}
             responseCount={resumoFasesAdicionais.compra.responseCount}
+            sentCount={resumoFasesAdicionais.compra.sentCount}
+            responseRatePct={resumoFasesAdicionais.compra.responseRatePct}
             meta={METAS.compra}
             onClick={() => setOpenOrigem("compra")}
           />

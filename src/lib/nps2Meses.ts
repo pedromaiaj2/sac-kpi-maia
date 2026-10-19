@@ -217,15 +217,29 @@ export async function detectPendingCompraNpsResponses(): Promise<number> {
 // formato de getNpsResumoPorFaseAdicional (npsDetratores.ts), função
 // própria porque compra_nps é tabela separada (sem chamado de assistência
 // por trás).
+// sentCount vem de uma query à parte com `count: "exact", head: true` --
+// compra_nps já passa de 1000 linhas fácil (volume bem maior que as
+// outras fases), um `.select()` normal sem `.range()` cortaria o total
+// em silêncio no limite padrão do PostgREST (mesmo gotcha corrigido em
+// totvsSync.ts/backfillMissingClients, 19/10/2026).
 export async function getCompraNpsResumo(): Promise<NpsFaseResumo> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("compra_nps").select("score").not("score", "is", null);
+  const [
+    { data, error },
+    { count: sentCount, error: sentError },
+  ] = await Promise.all([
+    admin.from("compra_nps").select("score").not("score", "is", null),
+    admin.from("compra_nps").select("order_id", { count: "exact", head: true }),
+  ]);
   if (error) throw new Error(error.message);
+  if (sentError) throw new Error(sentError.message);
 
   const scores = (data ?? []).map((r) => r.score as number);
-  if (scores.length === 0) return { npsIndex: null, responseCount: 0 };
+  const sent = sentCount ?? 0;
+  const responseRatePct = sent > 0 ? Math.round((scores.length / sent) * 100) : null;
+  if (scores.length === 0) return { npsIndex: null, responseCount: 0, sentCount: sent, responseRatePct };
   const promoters = scores.filter((s) => s >= 4).length;
   const detractors = scores.filter((s) => s <= 2).length;
   const npsIndex = Math.round(((promoters - detractors) / scores.length) * 100);
-  return { npsIndex, responseCount: scores.length };
+  return { npsIndex, responseCount: scores.length, sentCount: sent, responseRatePct };
 }
