@@ -6,6 +6,8 @@ export type NotaRota = {
   notaFiscal: string | null;
   pedido: string | null;
   cliente: string | null;
+  // CPF/CNPJ só com dígitos, como vem do Protheus (0189)
+  cpf?: string | null;
   bairro: string | null;
   // "1" entregue, "2" parcial, "3" não entregue, "4" cancelada; null = sem resultado ainda
   status: string | null;
@@ -81,6 +83,15 @@ export function resumirRotas(cargas: CargaRota[]): ResumoRotas {
     pendentes,
     andamento: notas > 0 ? (notas - pendentes) / notas : null,
   };
+}
+
+// CPF (11 dígitos) ou CNPJ (14) com pontuação; outro formato fica como veio.
+export function formatarDocumento(doc: string | null | undefined): string | null {
+  if (!doc) return null;
+  const d = doc.replace(/\D/g, "");
+  if (d.length === 11) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+  if (d.length === 14) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+  return doc;
 }
 
 // Regiões sem a etiqueta "Sem Regiao" do Protheus.
