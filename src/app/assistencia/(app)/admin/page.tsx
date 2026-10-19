@@ -41,6 +41,7 @@ const SYNC_JOB_LABELS: Record<SyncJob, string> = {
   "ai-classify": "Classificação por IA (categoria/produto/loja do SAC)",
   "reconcile-tags": "Reconciliação de tags do GHL (rede de segurança do webhook)",
   "sac-cronograma-check": "Alerta de atraso — Cronograma do SAC",
+  "reprocess-compra-nps": "Reprocessamento NPS Compra (backlog perdido com o Workflow em Draft)",
 };
 
 // Sem casa decimal nem "há 0h" logo depois de rodar -- minuto é preciso o

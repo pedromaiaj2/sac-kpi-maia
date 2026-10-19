@@ -6,7 +6,15 @@
 import { getSupabaseAdmin } from "./supabaseAdmin.ts";
 import { notifyAdmin } from "./notifications.ts";
 
-export type SyncJob = "totvs" | "totvs-cargas" | "ghl" | "backup" | "ai-classify" | "reconcile-tags" | "sac-cronograma-check";
+export type SyncJob =
+  | "totvs"
+  | "totvs-cargas"
+  | "ghl"
+  | "backup"
+  | "ai-classify"
+  | "reconcile-tags"
+  | "sac-cronograma-check"
+  | "reprocess-compra-nps";
 
 const JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS",
@@ -16,6 +24,9 @@ const JOB_LABELS: Record<SyncJob, string> = {
   "ai-classify": "Classificação por IA (SAC)",
   "reconcile-tags": "Reconciliação de tags do GHL",
   "sac-cronograma-check": "Alerta de atraso — Cronograma do SAC",
+  // Reprocessamento único (19/10/2026) do backlog do NPS Compra perdido
+  // enquanto o Workflow estava em Draft -- ver api/admin/reprocess-compra-nps.
+  "reprocess-compra-nps": "Reprocessamento NPS Compra (backlog Draft)",
 };
 
 // Só observabilidade -- uma falha ao gravar o histórico nunca pode derrubar
