@@ -202,6 +202,16 @@ export default async function EncomendasQueuePage({
               Pedidos a fornecedores
             </Link>
           ) : null}
+          {/* Suprimentos (produtos de limpeza/consumo da loja -> CD) é um
+              módulo separado de Encomendas, mas Rafael (CD) processa os dois
+              e só enxerga essa tela (sem AssistenciaNav, que é só pra quem
+              loga com conta Supabase Auth admin/assistência/sac) -- sem esse
+              link ele não tinha como chegar na fila nova. */}
+          {actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia" ? (
+            <Link href="/assistencia/suprimentos/fila" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+              Suprimentos
+            </Link>
+          ) : null}
           {isRafael && actor.role === "cd" ? (
             <form action={switchRafaelToFabrica}>
               <button type="submit" className="text-sm underline" style={{ color: "var(--brand-green)" }}>

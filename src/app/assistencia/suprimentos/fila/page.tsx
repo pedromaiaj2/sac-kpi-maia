@@ -68,6 +68,11 @@ export default async function SuprimentosFilaPage({
               </Link>
             ) : null}
             {actor.role === "cd" ? <NotificationBell fetchAction={listFabricaOuCdNotificationsAction} storageKey="cd" /> : null}
+            {actor.role === "cd" ? (
+              <Link href="/assistencia/encomendas/fila" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+                Encomendas
+              </Link>
+            ) : null}
             <form action={signOutAction}>
               <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
                 Sair
