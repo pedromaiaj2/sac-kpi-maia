@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { registrarStatusDetrator, isNpsDetratorStatus, listNpsRespostasPorFase, type NpsDetratorOrigem, type NpsResposta } from "@/lib/npsDetratores";
+import { getVendaSellerRanking, type VendedorRankingEntry } from "@/lib/vendaNps";
 
 // Avaliações do Google -- puxadas manualmente uma vez por semana (ver
 // src/lib/googleReviews.ts). O painel de KPIs do SAC usa login próprio
@@ -74,4 +75,11 @@ export async function setNpsDetratorStatusAction(origem: NpsDetratorOrigem, orig
 export async function listNpsRespostasPorFaseAction(origem: NpsDetratorOrigem): Promise<NpsResposta[]> {
   await requireDashboardAuth();
   return listNpsRespostasPorFase(origem);
+}
+
+// Botão "Ranking de vendedores" dentro do card "Pós-venda (atendimento em
+// loja)" -- pedido do Victor 19/10/2026. Mesmo login do resto desta tela.
+export async function getVendaSellerRankingAction(): Promise<VendedorRankingEntry[]> {
+  await requireDashboardAuth();
+  return getVendaSellerRanking();
 }

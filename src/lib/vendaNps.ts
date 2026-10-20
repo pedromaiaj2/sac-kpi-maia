@@ -125,3 +125,56 @@ export async function detectPendingVendaNpsResponses(): Promise<number> {
   }
   return answered;
 }
+
+export type VendedorRankingEntry = {
+  sellerName: string;
+  responseCount: number;
+  npsIndex: number;
+  avgScore: number;
+};
+
+type VendaScoreRow = {
+  score: number;
+  totvs_orders: { seller_name: string | null } | { seller_name: string | null }[] | null;
+};
+
+// Ranking de vendedores pelo NPS Pós-venda -- pedido do Victor 19/10/2026,
+// botão dentro do card "Pós-venda (atendimento em loja)". Agrupa por
+// seller_name (totvs_orders, mesmo join de listNpsRespostasPorFase em
+// npsDetratores.ts) -- sem mínimo de respostas pra entrar na lista
+// (diferente do ranking de evolução do Google, GoogleReviewsSection.tsx),
+// porque aqui é pouca gente por vendedor desde o início; responseCount vai
+// junto em cada linha pra quem olha julgar sozinho a confiabilidade da
+// nota com poucas respostas.
+export async function getVendaSellerRanking(): Promise<VendedorRankingEntry[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("venda_nps")
+    .select("score, totvs_orders(seller_name)")
+    .not("score", "is", null)
+    .returns<VendaScoreRow[]>();
+  if (error) throw new Error(error.message);
+
+  const scoresBySeller = new Map<string, number[]>();
+  for (const row of data ?? []) {
+    const order = Array.isArray(row.totvs_orders) ? row.totvs_orders[0] : row.totvs_orders;
+    const sellerName = order?.seller_name?.trim();
+    if (!sellerName) continue;
+    const scores = scoresBySeller.get(sellerName) ?? [];
+    scores.push(row.score);
+    scoresBySeller.set(sellerName, scores);
+  }
+
+  const entries: VendedorRankingEntry[] = [...scoresBySeller.entries()].map(([sellerName, scores]) => {
+    const promoters = scores.filter((s) => s >= 4).length;
+    const detractors = scores.filter((s) => s <= 2).length;
+    const npsIndex = Math.round(((promoters - detractors) / scores.length) * 100);
+    const avgScore = Math.round((scores.reduce((sum, s) => sum + s, 0) / scores.length) * 10) / 10;
+    return { sellerName, responseCount: scores.length, npsIndex, avgScore };
+  });
+
+  // Maior NPS primeiro; empate desempata por quem tem mais respostas (nota
+  // mais confiável) -- mesmo critério do ranking de avaliações do Google.
+  entries.sort((a, b) => b.npsIndex - a.npsIndex || b.responseCount - a.responseCount);
+  return entries;
+}
