@@ -27,6 +27,7 @@ const BASE_TABS = [
   // qualquer uma das 4.
   { label: "Controle Assistência", href: "/assistencia/cadastros", matches: ["/assistencia/cadastros", "/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
+  { label: "Suprimentos", href: "/assistencia/suprimentos/fila" },
   // "Cargas" e "Prazos de produtos" inativadas (tiradas de exibição) --
   // pedido do Victor 28/09/2026. As rotas continuam existindo, só não têm
   // mais link nesse menu (mesmo pra SacTabs.tsx e MobileNav.tsx).

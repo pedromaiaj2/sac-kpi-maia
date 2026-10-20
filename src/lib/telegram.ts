@@ -153,6 +153,21 @@ export function notifyTelegramNewEncomenda(params: {
   return sendTelegramMessage(lines.join("\n"));
 }
 
+export function notifyTelegramNewSuprimento(params: {
+  pedidoNumber: number;
+  storeName: string;
+  requestedByName: string;
+  items: string[];
+}): Promise<void> {
+  const lines = [
+    `🧴 Novo pedido de suprimento #${params.pedidoNumber}`,
+    `Loja: ${params.storeName}`,
+    `Solicitado por: ${params.requestedByName}`,
+    `Ite${params.items.length > 1 ? "ns" : "m"}: ${params.items.join(", ")}`,
+  ];
+  return sendTelegramMessage(lines.join("\n"));
+}
+
 // "Só status-chave" (pedido do Victor 04/09/2026, pra não virar ruído):
 // concluída, cancelada, remarcar, aguardando aprovação da loja. Passos
 // intermediários (em contato, em andamento, assumir chamado) não disparam

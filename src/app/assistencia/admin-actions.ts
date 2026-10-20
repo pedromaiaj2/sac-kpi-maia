@@ -12,6 +12,7 @@ import { resolveDriverName } from "@/lib/payments";
 import { resolveTecnicoName } from "@/lib/tecnicos";
 import { resolveFinanceiroName } from "@/lib/financeiros";
 import { upsertProdutoEncomenda, setProdutoEncomendaAtivo } from "@/lib/pedidosEncomenda";
+import { upsertSuprimentoProduto, setSuprimentoProdutoAtivo } from "@/lib/suprimentos";
 import {
   addCdOperador as addCdOperadorLib,
   setCdOperadorPin as setCdOperadorPinLib,
@@ -299,6 +300,34 @@ export async function toggleProdutoEncomendaAtivo(id: string, ativo: boolean): P
   const profile = await getProfile();
   requireRole(profile, "admin");
   await setProdutoEncomendaAtivo(id, ativo);
+  revalidatePath("/assistencia/admin");
+}
+
+// Catálogo de Suprimentos (produtos de limpeza, copos etc. que a loja pede
+// pro CD) -- mesmo padrão de addProdutoEncomenda acima.
+export async function addSuprimentoProdutoAction(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const nome = String(formData.get("nome") ?? "").trim();
+  if (!nome) return { error: "Informe o nome do produto." };
+  const categoria = String(formData.get("categoria") ?? "").trim() || null;
+  const unidade = String(formData.get("unidade") ?? "").trim() || null;
+
+  try {
+    await upsertSuprimentoProduto(nome, categoria, unidade);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível salvar o produto." };
+  }
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
+}
+
+export async function toggleSuprimentoProdutoAtivoAction(id: string, ativo: boolean): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  await setSuprimentoProdutoAtivo(id, ativo);
   revalidatePath("/assistencia/admin");
 }
 

@@ -210,6 +210,28 @@ export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
   recebido_cd: "var(--status-good)",
 };
 
+// Suprimentos (loja -> CD/Rafael): requisição interna de consumo, sem
+// fábrica/NF-e -- ver src/lib/suprimentos.ts.
+export const SUPRIMENTO_PEDIDO_STATUS_LABELS: Record<string, string> = {
+  solicitado: "Solicitado",
+  aprovado: "Aprovado",
+  comprado: "Comprado",
+  enviado: "Enviado pra loja",
+  recebido: "Recebido na loja",
+  rejeitado: "Rejeitado",
+  cancelado: "Cancelado",
+};
+
+export const SUPRIMENTO_PEDIDO_STATUS_COLORS: Record<string, string> = {
+  solicitado: "var(--status-warning)",
+  aprovado: "var(--series-5)",
+  comprado: "var(--brand-orange)",
+  enviado: "var(--status-serious)",
+  recebido: "var(--status-good)",
+  rejeitado: "var(--status-critical)",
+  cancelado: "var(--text-muted)",
+};
+
 export const PEDIDO_FORNECEDOR_STATUS_LABELS: Record<string, string> = {
   pedido_feito: "Pedido feito",
   recebido: "Recebido",

@@ -113,6 +113,12 @@ export default async function EncomendasCaixaPage({
           >
             + Novo pedido
           </Link>
+          <Link
+            href="/assistencia/suprimentos/solicitar"
+            className="text-sm px-4 py-2.5 rounded-lg font-medium whitespace-nowrap border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
+          >
+            + Suprimentos
+          </Link>
           {/* Caixa não renderiza LojaTabs (só gerente, ver abaixo) -- botão
               avulso pra ele também chegar em Estornos (pedido do Victor
               23/09/2026, revisado no mesmo dia: "o botão 'estornos' tem

@@ -6,6 +6,7 @@ import { listTecnicosWithPinStatus } from "@/lib/tecnicos";
 import { listFinanceirosWithPinStatus } from "@/lib/financeiros";
 import { listSuppliers } from "@/lib/partOrders";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
+import { listSuprimentoProdutos } from "@/lib/suprimentos";
 import { listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
 import { findInternalFabrica } from "@/lib/fabricas";
 import { listCaixasWithPinStatus } from "@/lib/caixas";
@@ -21,6 +22,7 @@ import { TecnicoPinField } from "@/components/assistencia/TecnicoPinField";
 import { FinanceiroPinField } from "@/components/assistencia/FinanceiroPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
 import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomendaAdmin";
+import { SuprimentoProdutoAdmin } from "@/components/assistencia/SuprimentoProdutoAdmin";
 import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
 import { CdOperadorPinField } from "@/components/assistencia/CdOperadorPinField";
 import { FabricaOperadorPinField } from "@/components/assistencia/FabricaOperadorPinField";
@@ -87,6 +89,7 @@ export default async function AdminPage() {
     tecnicos,
     suppliers,
     produtosEncomenda,
+    suprimentoProdutos,
     caixas,
     cdOperadores,
     fabricaOperadores,
@@ -105,6 +108,7 @@ export default async function AdminPage() {
     listTecnicosWithPinStatus(),
     listSuppliers(),
     listProdutosEncomenda(),
+    listSuprimentoProdutos(),
     listCaixasWithPinStatus(),
     listCdOperadoresWithPinStatus(),
     listFabricaOperadoresWithPinStatus(),
@@ -262,6 +266,13 @@ export default async function AdminPage() {
           Produtos disponíveis pra caixa escolher em <span className="font-mono">/assistencia/encomendas/solicitar</span>.
         </p>
         <ProdutoEncomendaAdmin produtos={produtosEncomenda} />
+      </AdminSection>
+
+      <AdminSection title="Catálogo de produtos — Suprimentos" count={suprimentoProdutos.length}>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Produtos disponíveis pra loja escolher em <span className="font-mono">/assistencia/suprimentos/solicitar</span>.
+        </p>
+        <SuprimentoProdutoAdmin produtos={suprimentoProdutos} />
       </AdminSection>
 
       <AdminSection title="Caixas — Encomendas" count={caixas.length}>
