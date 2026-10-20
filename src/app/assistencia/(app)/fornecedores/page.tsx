@@ -112,31 +112,40 @@ export default async function FornecedoresPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por peça, produto ou nota fiscal…"
-          className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm flex-1 min-w-[240px]"
+          className="rounded-lg px-3 py-2 text-sm flex-1 min-w-[240px]"
+          style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
         />
-        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
+        <button
+          type="submit"
+          className="text-sm px-3 py-2 rounded-lg"
+          style={{ border: "1px solid var(--border)", color: "var(--text-primary)" }}
+        >
           Buscar
         </button>
       </form>
 
       {returns.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
-          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma remessa encontrada.</p>
+        <div className="rounded-2xl shadow-lg shadow-black/20 p-6 text-center" style={{ background: "var(--surface-1)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhuma remessa encontrada.
+          </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+        <div className="rounded-2xl shadow-lg shadow-black/20 overflow-hidden" style={{ background: "var(--surface-1)" }}>
+          <div className="divide-y divide-[var(--border)]">
             {returns.map((r) => {
               const overdue = r.status !== "finalizado" && isOverdue(r.expectedReturnAt);
               return (
                 <Link
                   key={r.id}
                   href={`/assistencia/fornecedores/${r.id}`}
-                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-[var(--surface-2)] transition-colors duration-150"
                 >
                   <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{r.ticketNumber}</span>
+                      <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                        #{r.ticketNumber}
+                      </span>
                       <StatusBadge status={r.status} />
                       {overdue ? (
                         <span
@@ -146,15 +155,21 @@ export default async function FornecedoresPage({
                           Atrasado
                         </span>
                       ) : null}
-                      <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{r.partName}</span>
-                      {r.supplier ? <span className="text-xs text-gray-400 dark:text-gray-500">{r.supplier}</span> : null}
+                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                        {r.partName}
+                      </span>
+                      {r.supplier ? (
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          {r.supplier}
+                        </span>
+                      ) : null}
                     </div>
-                    <p className="text-sm truncate text-gray-500 dark:text-gray-400">
+                    <p className="text-sm truncate" style={{ color: "var(--text-muted)" }}>
                       {r.product ?? "Sem produto"}
                       {r.invoiceNumber ? ` · NF ${r.invoiceNumber}` : ""}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1 text-xs text-gray-400 dark:text-gray-500">
+                  <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
                     <span>Faturado: {formatBRL(r.invoiceValue)}</span>
                     {r.status !== "finalizado" ? <span>{daysSince(r.createdAt)} dias</span> : null}
                   </div>

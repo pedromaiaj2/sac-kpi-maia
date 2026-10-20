@@ -46,7 +46,7 @@ function EntregaFlatRow({ r, selected, onToggleSelected }: { r: ServiceRequestSu
       // Concluída e cancelada ficam levemente apagadas -- mesmo tratamento
       // de TodayRow (EntregasKanbanHoje.tsx), pedido do Victor 10/09/2026
       // estendido pra essa lista também.
-      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
+      className={`hover:bg-[var(--surface-2)] transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
     >
       {/* Checkbox de seleção em bloco (ver toggleSelected/EntregasFlatList
           abaixo) -- para propagação, senão marcar pra imprimir também
@@ -56,7 +56,7 @@ function EntregaFlatRow({ r, selected, onToggleSelected }: { r: ServiceRequestSu
         <input type="checkbox" checked={selected} onChange={onToggleSelected} className="rounded" aria-label={`Selecionar #${r.ticketNumber}`} />
       </td>
       <td className="px-4 py-3 align-top whitespace-nowrap">
-        <div className="font-mono text-xs text-gray-400 dark:text-gray-500">#{r.ticketNumber}</div>
+        <div className="font-mono text-xs text-[var(--text-muted)]">#{r.ticketNumber}</div>
         <span
           className="inline-flex mt-1 items-center rounded-full px-1.5 py-0.5 text-xs font-semibold text-white whitespace-nowrap"
           style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "#9CA3AF" }}
@@ -68,7 +68,7 @@ function EntregaFlatRow({ r, selected, onToggleSelected }: { r: ServiceRequestSu
             tem status + urgente. Tipo/data um pouco maiores (text-[10px] ->
             text-xs) -- pedido do Victor 03/09/2026, mesma revisão. */}
         {r.scheduledDate ? (
-          <div className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap mt-1">
+          <div className="text-xs text-[var(--text-muted)] whitespace-nowrap mt-1">
             📅 {new Date(`${r.scheduledDate}T00:00:00`).toLocaleDateString("pt-BR")}
             {r.scheduledTime ? ` 🕐 ${r.scheduledTime.slice(0, 5)}` : ""}
           </div>
@@ -76,21 +76,21 @@ function EntregaFlatRow({ r, selected, onToggleSelected }: { r: ServiceRequestSu
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5">
-          <span className="font-medium text-gray-800 dark:text-gray-100 truncate">{r.clientName ?? "Sem nome de cliente"}</span>
+          <span className="font-medium text-[var(--text-primary)] truncate">{r.clientName ?? "Sem nome de cliente"}</span>
           <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
         </div>
-        <div className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+        <div className="text-xs text-[var(--text-muted)] font-mono">
           {r.clientPhone ?? "—"}
           {r.clientNeighborhood ? ` · ${r.clientNeighborhood}` : ""}
         </div>
       </td>
-      <td className="px-4 py-3 align-top text-gray-600 dark:text-gray-300 max-w-[260px] truncate" title={r.items.map((i) => i.product).join(", ")}>
+      <td className="px-4 py-3 align-top text-[var(--text-secondary)] max-w-[260px] truncate" title={r.items.map((i) => i.product).join(", ")}>
         {r.items.map((i) => i.product).join(", ") || "—"}
       </td>
-      <td className="px-4 py-3 align-top text-gray-600 dark:text-gray-300 whitespace-nowrap">
+      <td className="px-4 py-3 align-top text-[var(--text-secondary)] whitespace-nowrap">
         <div>{rotaLabel}</div>
-        <div className="text-xs text-gray-400 dark:text-gray-500">{r.driverName ? `🚚 ${r.driverName}` : "Sem motorista"}</div>
-        <div className="text-xs text-gray-400 dark:text-gray-500">Responsável: {r.assignedToName ?? "—"}</div>
+        <div className="text-xs text-[var(--text-muted)]">{r.driverName ? `🚚 ${r.driverName}` : "Sem motorista"}</div>
+        <div className="text-xs text-[var(--text-muted)]">Responsável: {r.assignedToName ?? "—"}</div>
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -138,18 +138,18 @@ export function EntregasFlatList({ items }: { items: ServiceRequestSummary[] }) 
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="flex items-center gap-1.5 text-xs self-start text-gray-600 dark:text-gray-300">
+      <label className="flex items-center gap-1.5 text-xs self-start text-[var(--text-secondary)]">
         <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
         Selecionar todas
       </label>
 
-      <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
+      <div className="rounded-2xl shadow-lg shadow-black/20 overflow-hidden overflow-x-auto" style={{ background: "var(--surface-1)" }}>
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
+            <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
               <th className="pl-4 pr-2 py-2.5"></th>
               {["ID / Tipo", "Cliente", "Produto", "Rota / Motorista", "Situação", ""].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] whitespace-nowrap">
                   {h}
                 </th>
               ))}

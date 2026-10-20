@@ -121,13 +121,22 @@ export default async function PecasQueuePage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por cliente, produto, peça ou código…"
-          className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm flex-1 min-w-[240px]"
+          className="rounded-lg px-3 py-2 text-sm flex-1 min-w-[240px]"
+          style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
         />
-        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
+        <button
+          type="submit"
+          className="text-sm px-3 py-2 rounded-lg"
+          style={{ border: "1px solid var(--border)", color: "var(--text-primary)" }}
+        >
           Buscar
         </button>
         {q ? (
-          <Link href={buildHref({ status: filterStatus, supplier, atraso: filterAtraso })} className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+          <Link
+            href={buildHref({ status: filterStatus, supplier, atraso: filterAtraso })}
+            className="text-xs underline"
+            style={{ color: "var(--text-muted)" }}
+          >
             Limpar busca
           </Link>
         ) : null}

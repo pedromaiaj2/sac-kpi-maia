@@ -686,8 +686,8 @@ export default async function AssistenciaQueuePage({
       {!showPecas && visitasAtrasadasCount > 0 && !filterAtrasado ? (
         <Link
           href={buildHref({ q, store, assembler: effectiveAssembler, alvo: filterAlvo, atrasado: "1" })}
-          className="flex items-center gap-2 rounded-xl border px-4 py-3 font-semibold text-sm text-gray-800 dark:text-gray-100 transition-colors duration-150 hover:bg-white dark:hover:bg-gray-700"
-          style={{ background: "color-mix(in srgb, var(--status-critical) 8%, var(--surface-1))", borderColor: "var(--status-critical)" }}
+          className="flex items-center gap-2 rounded-xl border px-4 py-3 font-semibold text-sm transition-colors duration-150 hover:bg-[var(--surface-2)]"
+          style={{ background: "color-mix(in srgb, var(--status-critical) 8%, var(--surface-1))", borderColor: "var(--status-critical)", color: "var(--text-primary)" }}
         >
           <span className="text-lg" aria-hidden="true">
             ⚠️
@@ -703,9 +703,10 @@ export default async function AssistenciaQueuePage({
       {/* Todos os filtros agrupados num retângulo só -- pedido do Victor
           03/09/2026: "agrupe esses filtros e coloque só uma linha como
           margem no retângulo" (antes eram blocos soltos, um embaixo do
-          outro, sem nenhuma moldura em comum). Só borda fina (sem fundo
-          nem sombra extra) -- é margem, não mais um card cheio. */}
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-gray-600 p-4">
+          outro, sem nenhuma moldura em comum). Visual atualizado 20/10/2026
+          pro mesmo card da Logística (RotasDoDia.tsx) -- sem borda, raio
+          maior, sombra em vez da margem fina de antes. */}
+      <div className="flex flex-col gap-3 rounded-2xl shadow-lg shadow-black/20 p-4" style={{ background: "var(--surface-1)" }}>
       {/* Linha 1 do guia de padronização: filtros rápidos por status, com
           contador -- pedido do Victor 25/08/2026 ("guia de padronização"):
           "Botões estilo Pill/Badge para filtro rápido com contadores
@@ -853,7 +854,9 @@ export default async function AssistenciaQueuePage({
           ao cliente final". */}
       {!showPecas ? (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-400 dark:text-gray-500">Tipo de solicitação:</span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Tipo de solicitação:
+          </span>
           {ALVO_FILTERS.map((f) => {
             const selected = (f.value ?? undefined) === filterAlvo;
             return (
@@ -861,9 +864,9 @@ export default async function AssistenciaQueuePage({
                 key={f.label}
                 href={buildHref({ status: filterStatus, q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: f.value ?? undefined })}
                 className={`text-sm font-medium px-3.5 py-1.5 rounded-full whitespace-nowrap transition-colors duration-150 ${
-                  selected ? "text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
+                  selected ? "text-white" : "hover:bg-[var(--surface-2)]"
                 }`}
-                style={selected ? { background: "var(--brand-green)" } : undefined}
+                style={selected ? { background: "var(--brand-green)" } : { background: "var(--surface-1)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
               >
                 {f.label}
               </Link>
@@ -872,7 +875,7 @@ export default async function AssistenciaQueuePage({
         </div>
       ) : null}
 
-      <p className="text-xs text-gray-400 dark:text-gray-500">
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
         {total} solicitaç{total === 1 ? "ão" : "ões"} encontrada{total === 1 ? "" : "s"}
         {totalPages > 1 ? ` · página ${currentPage} de ${totalPages}` : ""}
       </p>
@@ -970,7 +973,7 @@ export default async function AssistenciaQueuePage({
             lupa". `pointer-events-none` no ícone -- sem isso o clique nele
             não cai no input logo atrás. */}
         <div className="relative flex-1 min-w-[240px]">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500" aria-hidden="true">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-muted)" }} aria-hidden="true">
             🔍
           </span>
           <input
@@ -978,25 +981,28 @@ export default async function AssistenciaQueuePage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Buscar por nº do chamado, cliente, produto, CPF ou telefone…"
-            className="rounded-lg border border-gray-200 dark:border-gray-600 pl-8 pr-3 py-2 text-sm w-full text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
+            className="rounded-lg pl-8 pr-3 py-2 text-sm w-full transition-colors duration-150 focus:outline-none"
+            style={{ border: "1px solid var(--border)", color: "var(--text-primary)", background: "var(--surface-1)" }}
           />
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+        <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
           De
           <input
             type="date"
             name="from"
             defaultValue={dateFrom ?? ""}
-            className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
+            className="rounded-lg px-2 py-2 text-sm transition-colors duration-150 focus:outline-none"
+            style={{ border: "1px solid var(--border)", color: "var(--text-primary)", background: "var(--surface-1)" }}
           />
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+        <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
           Até
           <input
             type="date"
             name="to"
             defaultValue={dateTo ?? ""}
-            className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
+            className="rounded-lg px-2 py-2 text-sm transition-colors duration-150 focus:outline-none"
+            style={{ border: "1px solid var(--border)", color: "var(--text-primary)", background: "var(--surface-1)" }}
           />
         </label>
         {/* Secundário (outline) -- Guia de Componentes Maia (Design
@@ -1004,7 +1010,8 @@ export default async function AssistenciaQueuePage({
             primário. */}
         <button
           type="submit"
-          className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
+          className="text-sm px-4 py-2 rounded-lg font-medium transition-colors duration-150"
+          style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
         >
           Buscar
         </button>
@@ -1024,7 +1031,8 @@ export default async function AssistenciaQueuePage({
               semrota: filterSemRota ? "1" : undefined,
               contato: filterContato ? "1" : undefined,
             })}
-            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+            className="text-xs font-medium transition-colors duration-150"
+            style={{ color: "var(--text-muted)" }}
           >
             Limpar busca/data
           </Link>
@@ -1034,8 +1042,10 @@ export default async function AssistenciaQueuePage({
       {/* fecha o retângulo de filtros aberto acima */}
 
       {requests.length === 0 && !showEntregaBoard ? (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
-          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma solicitação encontrada.</p>
+        <div className="rounded-2xl shadow-lg shadow-black/20 p-6 text-center" style={{ background: "var(--surface-1)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhuma solicitação encontrada.
+          </p>
         </div>
       ) : showPecas ? (
         // Lista única -- pedido do Victor 03/09/2026 (ver hasActiveEntregaFilter/
@@ -1119,14 +1129,19 @@ export default async function AssistenciaQueuePage({
                 // um bloco cheio (cinza pra semana, verde sólido pro dia).
                 <details key={week.weekKey} className="group/week flex flex-col gap-2">
                   <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                    <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
+                    <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90" style={{ color: "var(--text-muted)" }} aria-hidden="true">
                       ▶
                     </span>
-                    <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 whitespace-nowrap">{week.label}</span>
-                    <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                    <span className="text-sm font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {week.label}
+                    </span>
+                    <span
+                      className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full text-[11px] font-semibold"
+                      style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}
+                    >
                       {weekTotal}
                     </span>
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+                    <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
                   </summary>
                   <div className="flex flex-col gap-2 pl-4">
                     {week.days.map((group) => (
@@ -1137,21 +1152,31 @@ export default async function AssistenciaQueuePage({
                       // padrão -- achado do Victor 24/08/2026: "toda vez que
                       // eu entrar em qualquer tela, as demandas agrupadas
                       // precisam aparecer recolhidas". <details> nativo, sem
-                      // JS extra; sem `open` já nasce fechado.
-                      <details key={group.key} className="group rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
-                        <summary className="px-4 py-2.5 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                      // JS extra; sem `open` já nasce fechado. Visual do
+                      // card atualizado 20/10/2026 pro mesmo cartão de rota
+                      // da Logística (RotasDoDia.tsx/CartaoCarga).
+                      <details key={group.key} className="group rounded-2xl shadow-lg shadow-black/20 overflow-hidden" style={{ background: "var(--surface-1)" }}>
+                        <summary
+                          className="px-4 py-2.5 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-[var(--surface-2)] transition-colors duration-150"
+                        >
                           <span
-                            className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400 dark:text-gray-500"
+                            className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90"
+                            style={{ color: "var(--text-muted)" }}
                             aria-hidden="true"
                           >
                             ▶
                           </span>
-                          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">{group.label}</span>
-                          <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                          <span className="text-sm font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                            {group.label}
+                          </span>
+                          <span
+                            className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full text-[11px] font-semibold"
+                            style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}
+                          >
                             {group.items.length}
                           </span>
                         </summary>
-                        <div className="border-t border-gray-100 dark:border-gray-700">
+                        <div style={{ borderTop: "1px solid var(--border)" }}>
                           <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={false} printable={false} showStaleBadge />
                         </div>
                       </details>
@@ -1178,18 +1203,20 @@ export default async function AssistenciaQueuePage({
           {currentPage > 1 ? (
             <Link
               href={buildHref({ status: filterStatus, q, page: currentPage - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, atendente: filterAtendente, sched: schedParam, alvo: filterAlvo, city: filterCity })}
-              className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
+              className="text-sm px-4 py-2 rounded-lg font-medium transition-colors duration-150"
+              style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
             >
               ← Mês mais recente
             </Link>
           ) : null}
-          <span className="text-sm text-gray-400 dark:text-gray-500">
+          <span className="text-sm" style={{ color: "var(--text-muted)" }}>
             Página {currentPage} de {totalPages}
           </span>
           {currentPage < totalPages ? (
             <Link
               href={buildHref({ status: filterStatus, q, page: currentPage + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, atendente: filterAtendente, sched: schedParam, alvo: filterAlvo, city: filterCity })}
-              className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
+              className="text-sm px-4 py-2 rounded-lg font-medium transition-colors duration-150"
+              style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
             >
               Mês mais antigo →
             </Link>

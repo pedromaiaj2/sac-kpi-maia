@@ -407,16 +407,22 @@ export default async function CadastrosPage({
               <Link
                 key={r.solicitante}
                 href={buildHref({ filtro, status, loja, solicitante: ativo ? undefined : r.solicitante, q, from, to })}
-                className="shrink-0 rounded-xl border p-3 flex flex-col gap-1.5 min-w-[160px] transition-colors duration-150"
+                className="shrink-0 rounded-2xl border p-3 flex flex-col gap-1.5 min-w-[160px] transition-colors duration-150 shadow-md"
                 style={{ borderColor: ativo ? "var(--brand-green)" : "var(--border)", background: ativo ? "var(--brand-green-soft)" : "var(--surface-1)" }}
               >
                 <span className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
                   Equipe {r.solicitante}
                 </span>
-                <div className="flex items-center gap-2 text-xs flex-wrap">
-                  <span style={{ color: "var(--text-muted)" }}>{r.programado} em processo</span>
-                  <span style={{ color: "var(--status-good)" }}>{r.concluido} concluído</span>
-                  <span style={{ color: "var(--status-critical)" }}>{r.cancelado} não concl.</span>
+                <div className="flex items-center gap-2 text-xs flex-wrap tabular-nums">
+                  <span className="font-bold" style={{ color: "var(--text-muted)" }}>
+                    {r.programado} em processo
+                  </span>
+                  <span className="font-bold" style={{ color: "var(--status-good)" }}>
+                    {r.concluido} concluído
+                  </span>
+                  <span className="font-bold" style={{ color: "var(--status-critical)" }}>
+                    {r.cancelado} não concl.
+                  </span>
                 </div>
               </Link>
             );
@@ -429,13 +435,13 @@ export default async function CadastrosPage({
       </p>
 
       {items.length === 0 ? (
-        <div className="rounded-xl border p-6 text-center" style={{ borderColor: "var(--border)" }}>
+        <div className="rounded-2xl shadow-lg shadow-black/20 p-6 text-center" style={{ background: "var(--surface-1)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhum registro encontrado.
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+        <div className="rounded-2xl shadow-lg shadow-black/20 overflow-x-auto" style={{ background: "var(--surface-1)" }}>
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>

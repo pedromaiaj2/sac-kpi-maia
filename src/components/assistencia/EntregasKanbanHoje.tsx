@@ -231,7 +231,7 @@ function RouteSummaryCard({ column, selected, onToggle }: { column: KanbanColumn
     <button
       type="button"
       onClick={onToggle}
-      className="text-left w-full rounded-xl border p-4 flex flex-col gap-3 cursor-pointer transition-colors"
+      className="text-left w-full rounded-2xl border p-4 flex flex-col gap-3 cursor-pointer transition-colors shadow-md"
       style={{
         borderColor: selected ? "var(--brand-green)" : "var(--border)",
         borderLeft: `3px solid ${column.borderColor}`,
@@ -248,7 +248,7 @@ function RouteSummaryCard({ column, selected, onToggle }: { column: KanbanColumn
         {/* Letras brancas no escuro -- pedido do Victor 03/09/2026: "preciso
             que as letras do botão das rotas sejam brancas" (esse card é um
             <button>, o nome da rota é o texto principal dele). */}
-        <span className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
+        <span className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>
           {selected ? (
             <span
               className="inline-flex items-center justify-center h-4 w-4 rounded-full text-white text-[10px] font-bold shrink-0"
@@ -260,11 +260,11 @@ function RouteSummaryCard({ column, selected, onToggle }: { column: KanbanColumn
           ) : null}
           {column.rotaLabel}
         </span>
-        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400 shrink-0">
+        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-[var(--surface-2)] text-[11px] font-semibold text-[var(--text-muted)] shrink-0">
           {column.items.length}
         </span>
       </div>
-      <span className="text-xs text-gray-500 dark:text-gray-400">{column.driverName ? `🚚 ${column.driverName}` : "Sem motorista"}</span>
+      <span className="text-xs text-[var(--text-muted)]">{column.driverName ? `🚚 ${column.driverName}` : "Sem motorista"}</span>
       <div className="flex items-center gap-1.5 flex-wrap">
         <CountBadge label="programado" count={counts.programado} tone="neutral" />
         <CountBadge label="concluído" count={counts.concluido} tone="good" />
@@ -305,7 +305,7 @@ function TodayRow({ row, selected, onToggleSelected }: { row: FlatRow; selected:
   return (
     <tr
       onClick={() => router.push(`/assistencia/${r.id}`)}
-      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
+      className={`hover:bg-[var(--surface-2)] transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
     >
       <td className="pl-4 pr-2 py-3 align-top" onClick={(e) => e.stopPropagation()}>
         <input
@@ -317,7 +317,7 @@ function TodayRow({ row, selected, onToggleSelected }: { row: FlatRow; selected:
         />
       </td>
       <td className="px-4 py-3 align-top whitespace-nowrap">
-        <div className="font-mono text-xs text-gray-400 dark:text-gray-500">#{r.ticketNumber}</div>
+        <div className="font-mono text-xs text-[var(--text-muted)]">#{r.ticketNumber}</div>
         <span
           className="inline-flex mt-1 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white whitespace-nowrap"
           style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "#9CA3AF" }}
@@ -327,26 +327,26 @@ function TodayRow({ row, selected, onToggleSelected }: { row: FlatRow; selected:
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5">
-          <span className="font-medium text-gray-800 dark:text-gray-100 truncate">{r.clientName ?? "Sem nome de cliente"}</span>
+          <span className="font-medium text-[var(--text-primary)] truncate">{r.clientName ?? "Sem nome de cliente"}</span>
           <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
         </div>
         {/* Telefone + bairro -- mesma dupla que o card antigo mostrava
             (bairro tinha sumido na reformulação de 01/09/2026, restaurado
             aqui: continua sendo dado que a rota/motorista precisa). */}
-        <div className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+        <div className="text-xs text-[var(--text-muted)] font-mono">
           {r.clientPhone ?? "—"}
           {r.clientNeighborhood ? ` · ${r.clientNeighborhood}` : ""}
         </div>
       </td>
-      <td className="px-4 py-3 align-top text-gray-600 dark:text-gray-300 max-w-[260px] truncate" title={r.items.map((i) => i.product).join(", ")}>
+      <td className="px-4 py-3 align-top text-[var(--text-secondary)] max-w-[260px] truncate" title={r.items.map((i) => i.product).join(", ")}>
         {r.items.map((i) => i.product).join(", ") || "—"}
       </td>
-      <td className="px-4 py-3 align-top text-gray-600 dark:text-gray-300 whitespace-nowrap">
+      <td className="px-4 py-3 align-top text-[var(--text-secondary)] whitespace-nowrap">
         <div>{row.rotaLabel}</div>
-        <div className="text-xs text-gray-400 dark:text-gray-500">{row.driverName ? `🚚 ${row.driverName}` : "Sem motorista"}</div>
+        <div className="text-xs text-[var(--text-muted)]">{row.driverName ? `🚚 ${row.driverName}` : "Sem motorista"}</div>
         {/* Responsável -- pedido do Victor 02/09/2026: "que apareça quem é
             o responsável por aquela demanda já na lista". */}
-        <div className="text-xs text-gray-400 dark:text-gray-500">Responsável: {r.assignedToName ?? "—"}</div>
+        <div className="text-xs text-[var(--text-muted)]">Responsável: {r.assignedToName ?? "—"}</div>
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -354,7 +354,7 @@ function TodayRow({ row, selected, onToggleSelected }: { row: FlatRow; selected:
           {r.status === "remarcar" ? <RemarcarContactBadge contactedAt={r.remarcarContactedAt} /> : null}
           {/* Horário agendado -- também tinha sumido na reformulação,
               restaurado (o card antigo mostrava "🕐 HH:MM"). */}
-          {r.scheduledTime ? <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">🕐 {r.scheduledTime.slice(0, 5)}</span> : null}
+          {r.scheduledTime ? <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">🕐 {r.scheduledTime.slice(0, 5)}</span> : null}
           {r.urgent ? (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap text-white" style={{ background: "var(--status-critical)" }}>
               URGENTE
@@ -567,7 +567,7 @@ export function EntregasKanbanHoje({
               em vários lugares do sistema (trilho cinza, pílula branca no
               selecionado). routeDates é sempre -7..-1 seguido de +1..+7
               (ver acima) -- corta certinho no meio, 7 em cada grupo. */}
-          <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-stretch">
+          <div className="inline-flex items-center gap-0.5 rounded-lg bg-[var(--surface-2)] p-1 self-stretch">
             {(
               [
                 ["proximas", "Próximas"],
@@ -579,7 +579,7 @@ export function EntregasKanbanHoje({
                 type="button"
                 onClick={() => setDateGroup(value)}
                 className={`flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
-                  dateGroup === value ? "" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  dateGroup === value ? "" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 }`}
                 // Preenchido de verde claro quando selecionado -- pedido do
                 // Victor 14/09/2026, corrigindo o cinza/branco genérico do
@@ -748,7 +748,7 @@ export function EntregasKanbanHoje({
           incluir os 7 dias ANTERIORES também, não só os seguintes (ver
           routeDates acima). */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start flex-wrap">
+        <div className="inline-flex items-center gap-0.5 rounded-lg bg-[var(--surface-2)] p-1 self-start flex-wrap">
           {/* Selecionado só "levemente diferente" dos outros da mesma
               fileira -- pedido do Victor 03/09/2026: "o que estiver
               selecionado... estejam numa cor levemente diferente das
@@ -767,15 +767,15 @@ export function EntregasKanbanHoje({
               onClick={() => setTab(t)}
               className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
                 tab === t
-                  ? "bg-white dark:bg-gray-600 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  ? "bg-[var(--surface-1)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               }`}
               style={tab === t ? { color: STATUS_TAB_COLORS[t] } : undefined}
             >
               {STATUS_TAB_LABELS[t]}
               {t !== "todos" ? (
                 <span
-                  className={`ml-1 text-xs font-mono ${tab === t ? "" : "text-gray-400 dark:text-gray-500"}`}
+                  className={`ml-1 text-xs font-mono ${tab === t ? "" : "text-[var(--text-muted)]"}`}
                   style={tab === t ? { color: `color-mix(in srgb, ${STATUS_TAB_COLORS[t]} 65%, var(--text-muted))` } : undefined}
                 >
                   ({counts[t]})
@@ -909,7 +909,7 @@ export function EntregasKanbanHoje({
       </div>
 
       {visibleRows.length > 0 ? (
-        <label className="flex items-center gap-1.5 text-xs self-start text-gray-600 dark:text-gray-300">
+        <label className="flex items-center gap-1.5 text-xs self-start text-[var(--text-secondary)]">
           <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
           Selecionar todas
         </label>
@@ -918,13 +918,13 @@ export function EntregasKanbanHoje({
       {/* Tabela Grid Horizontal Limpa -- Guia de Componentes Maia (Design
           System, 01/09/2026): fim das caixas de texto espremidas do
           Kanban antigo. */}
-      <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
+      <div className="rounded-2xl shadow-lg shadow-black/20 overflow-hidden overflow-x-auto" style={{ background: "var(--surface-1)" }}>
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
+            <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
               <th className="pl-4 pr-2 py-2.5"></th>
               {["ID / Tipo", "Cliente", "Produto", "Rota / Motorista", "Situação", ""].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -933,7 +933,7 @@ export function EntregasKanbanHoje({
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {visibleRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">
                   Nada em &quot;{STATUS_TAB_LABELS[tab]}&quot; aqui.
                 </td>
               </tr>

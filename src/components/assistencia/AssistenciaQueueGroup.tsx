@@ -157,7 +157,7 @@ function EntregaCardRow({
       // de TodayRow (EntregasKanbanHoje.tsx), pedido do Victor 10/09/2026:
       // "todas as solicitações que foram canceladas... deve aparecer mais
       // apagado, como fica as solicitações concluidas de entregas hoje".
-      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
+      className={`hover:bg-[var(--surface-2)] transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
       style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
     >
       {hasLeftColumn ? (
@@ -178,7 +178,7 @@ function EntregaCardRow({
                   onClick={onMoveUp}
                   disabled={i === 0 || saving}
                   aria-label="Mover pra cima"
-                  className="text-xs leading-none px-1 disabled:opacity-25 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="text-xs leading-none px-1 disabled:opacity-25 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 >
                   ▲
                 </button>
@@ -186,7 +186,7 @@ function EntregaCardRow({
                   onClick={onMoveDown}
                   disabled={i === orderLength - 1 || saving}
                   aria-label="Mover pra baixo"
-                  className="text-xs leading-none px-1 disabled:opacity-25 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="text-xs leading-none px-1 disabled:opacity-25 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 >
                   ▼
                 </button>
@@ -199,7 +199,7 @@ function EntregaCardRow({
       {/* Coluna 1: ID / Tipo */}
       <td className={`${hasLeftColumn ? "pl-2" : "pl-4"} pr-3 py-3 align-top whitespace-nowrap`}>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{r.ticketNumber}</span>
+          <span className="text-xs font-mono text-[var(--text-muted)]">#{r.ticketNumber}</span>
           <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
         </div>
         <span
@@ -226,13 +226,13 @@ function EntregaCardRow({
           alerta, nunca decoração). */}
       <td className="px-3 py-3 align-top whitespace-nowrap">
         {effectiveDate ? (
-          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+          <span className="text-sm font-semibold text-[var(--text-primary)]">
             {formatDateOnly(effectiveDate)}
             {effectiveDate === r.scheduledDate && r.scheduledTime ? ` · ${r.scheduledTime.slice(0, 5)}` : ""}
             {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
           </span>
         ) : (
-          <span className="text-sm text-gray-400 dark:text-gray-500">Sem data</span>
+          <span className="text-sm text-[var(--text-muted)]">Sem data</span>
         )}
         {r.urgent ? (
           <div className="mt-1">
@@ -251,8 +251,8 @@ function EntregaCardRow({
           telefone/bairro/CPF cada um na própria linha, pedido do
           Victor). */}
       <td className="px-3 py-3 align-top max-w-[220px]">
-        <div className="text-sm font-bold uppercase truncate text-gray-800 dark:text-gray-100">{r.clientName ?? "Sem nome de cliente"}</div>
-        <div className="text-xs text-gray-400 dark:text-gray-500 truncate">
+        <div className="text-sm font-bold uppercase truncate text-[var(--text-primary)]">{r.clientName ?? "Sem nome de cliente"}</div>
+        <div className="text-xs text-[var(--text-muted)] truncate">
           {r.clientCpf ?? "CPF não informado"}
           {r.clientNeighborhood ? ` · ${r.clientNeighborhood}` : ""}
         </div>
@@ -271,7 +271,7 @@ function EntregaCardRow({
 
       {/* Coluna 4: Produto / Especificação -- texto corrido, uma linha só,
           truncado com tooltip pro texto inteiro. */}
-      <td className="px-3 py-3 align-top text-gray-600 dark:text-gray-300 max-w-[280px] truncate" title={productSummary}>
+      <td className="px-3 py-3 align-top text-[var(--text-secondary)] max-w-[280px] truncate" title={productSummary}>
         {productSummary}
       </td>
 
@@ -279,7 +279,7 @@ function EntregaCardRow({
           motorista. "Responsável" -- pedido do Victor 02/09/2026: "que
           apareça quem é o responsável por aquela demanda já na lista, sem
           precisar entrar na demanda". */}
-      <td className="px-3 py-3 align-top text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+      <td className="px-3 py-3 align-top text-xs text-[var(--text-muted)] whitespace-nowrap">
         <div className="truncate">{r.storeName}</div>
         <div className="truncate">Atendente: {r.requestedByName ?? "—"}</div>
         <div className="truncate">Responsável: {r.assignedToName ?? "—"}</div>
@@ -368,7 +368,7 @@ function VisitaCardRow({
                 onClick={onMoveUp}
                 disabled={i === 0 || saving}
                 aria-label="Mover pra cima"
-                className="text-sm leading-none px-1 disabled:opacity-25 text-gray-600 dark:text-gray-300"
+                className="text-sm leading-none px-1 disabled:opacity-25 text-[var(--text-secondary)]"
               >
                 ▲
               </button>
@@ -376,7 +376,7 @@ function VisitaCardRow({
                 onClick={onMoveDown}
                 disabled={i === orderLength - 1 || saving}
                 aria-label="Mover pra baixo"
-                className="text-sm leading-none px-1 disabled:opacity-25 text-gray-600 dark:text-gray-300"
+                className="text-sm leading-none px-1 disabled:opacity-25 text-[var(--text-secondary)]"
               >
                 ▼
               </button>
@@ -392,7 +392,7 @@ function VisitaCardRow({
               <StatusBadge status={r.status} />
               <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
             </div>
-            <span className="text-sm font-medium whitespace-nowrap text-gray-800 dark:text-gray-100">
+            <span className="text-sm font-medium whitespace-nowrap text-[var(--text-primary)]">
               {REQUEST_TYPE_LABELS[r.type] ?? r.type}
             </span>
             {r.comboMontagemDesmontagem ? (
@@ -428,16 +428,16 @@ function VisitaCardRow({
           <div className="w-full sm:w-[28%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
             {/* Caixa alta -- mesmo pedido/motivo de EntregaCardRow (ver
                 acima), guia de padronização 25/08/2026. */}
-            <span className="text-sm font-bold truncate uppercase text-gray-800 dark:text-gray-100">
+            <span className="text-sm font-bold truncate uppercase text-[var(--text-primary)]">
               {r.clientName ?? "Sem nome de cliente"}
             </span>
-            <span className="text-xs font-semibold truncate text-gray-600 dark:text-gray-300">
+            <span className="text-xs font-semibold truncate text-[var(--text-secondary)]">
               {r.clientPhone ?? "—"}
             </span>
-            <span className="text-sm font-bold truncate text-gray-600 dark:text-gray-300">
+            <span className="text-sm font-bold truncate text-[var(--text-secondary)]">
               📍 {r.clientNeighborhood ?? "—"}
             </span>
-            <span className="text-xs truncate text-gray-400 dark:text-gray-500">
+            <span className="text-xs truncate text-[var(--text-muted)]">
               🏬 {r.storeName}
             </span>
           </div>
@@ -455,7 +455,7 @@ function VisitaCardRow({
               demanda já na lista, sem precisar entrar na demanda". */}
           <div className="w-full sm:w-[16%] shrink-0 flex flex-col items-start justify-center gap-1 min-w-0 sm:pr-3">
             {r.assemblerName ? (
-              <span className="text-sm font-semibold truncate text-gray-800 dark:text-gray-100">
+              <span className="text-sm font-semibold truncate text-[var(--text-primary)]">
                 🔧 {r.assemblerName}
               </span>
             ) : (
@@ -466,13 +466,13 @@ function VisitaCardRow({
                 ⚠️ Sem Montador
               </span>
             )}
-            <span className="text-xs truncate text-gray-400 dark:text-gray-500">
+            <span className="text-xs truncate text-[var(--text-muted)]">
               Responsável: {r.assignedToName ?? "—"}
             </span>
           </div>
 
           {/* Coluna 4 (17%): datas de abertura e previsão */}
-          <div className="w-full sm:w-[17%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3 text-gray-400 dark:text-gray-500">
+          <div className="w-full sm:w-[17%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3 text-[var(--text-muted)]">
             <span className="whitespace-nowrap">Aberta {new Date(r.createdAt).toLocaleDateString("pt-BR")}</span>
             {effectiveDate ? (
               <span className="whitespace-nowrap">
@@ -694,7 +694,7 @@ export function AssistenciaQueueGroup({
     <div className="flex flex-col gap-2">
       {printable ? (
         <div className="flex items-center gap-3 flex-wrap px-4 pt-2">
-          <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+          <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
             <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
             Selecionar todas
           </label>
@@ -749,14 +749,14 @@ export function AssistenciaQueueGroup({
         // por grupo (cada grupo já é um dia+rota, ver EntregasGroupsList),
         // mesmo padrão de cabeçalho repetido por instância que
         // DeliveryItemsTable.tsx já usa.
-        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
+        <div className="rounded-2xl shadow-lg shadow-black/20 overflow-hidden overflow-x-auto" style={{ background: "var(--surface-1)" }}>
           <table className="w-full border-collapse text-sm" style={{ minWidth: "980px" }}>
             <thead>
-              <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
+              <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
                 {(printable || reorderable ? [""] : ([] as string[]))
                   .concat(["ID / Tipo", "Data / Período", "Cliente", "Produto", "Logística", ""])
                   .map((h, idx) => (
-                    <th key={idx} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                    <th key={idx} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] whitespace-nowrap">
                       {h}
                     </th>
                   ))}
@@ -824,7 +824,7 @@ export function AssistenciaQueueGroup({
                   if (el) nodeRefs.current.set(r.id, el);
                   else nodeRefs.current.delete(r.id);
                 }}
-                className="flex flex-col gap-2 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+                className="flex flex-col gap-2 p-4 hover:bg-[var(--surface-2)] transition-colors duration-150"
                 style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
               >
                 {/* Aba Visitas -- tabela de colunas fixas (ver
