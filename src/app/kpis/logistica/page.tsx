@@ -89,10 +89,11 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
     getLastSuccessfulRunAt("totvs").catch(() => null),
     getLastSuccessfulRunAt("totvs-cargas").catch(() => null),
   ]).then(([completo, cargas]) => maisRecente(completo, cargas));
-  // Dia sem carga (domingo): o mural mostra o último dia de operação.
+  // Dia sem carga (domingo): o mural mostra o último dia de operação. Carga
+  // de dia anterior ainda em rota não conta como carga do dia.
   const rotasPromise = getRotasDoDia(hojeRecife())
     .then(async (r) =>
-      r.cargas.length === 0 && r.ultimoDiaComCargas
+      r.cargas.every((c) => c.dia < r.dia) && r.ultimoDiaComCargas
         ? { rotas: await getRotasDoDia(r.ultimoDiaComCargas), historico: true }
         : { rotas: r, historico: false },
     )

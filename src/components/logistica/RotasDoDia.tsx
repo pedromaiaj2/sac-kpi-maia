@@ -264,6 +264,52 @@ function Grupo({
   );
 }
 
+// Cargas de dias anteriores que continuam Em Rota no Protheus (0186): falta a
+// baixa de alguma nota ou o encerramento da carga. Ficam fora dos números de
+// hoje, num bloco próprio no fim do mural (Victor 20/10/2026).
+function PendentesAnteriores({
+  cargas,
+  dia,
+  agora,
+  onAbrir,
+}: {
+  cargas: CargaRota[];
+  dia: string;
+  agora: string;
+  onAbrir: (c: CargaRota) => void;
+}) {
+  const semBaixa = cargas.reduce((t, c) => t + c.pendentes, 0);
+  return (
+    <Recolhivel
+      id="rotas-pendentes-anteriores"
+      variante="simples"
+      tituloClassName="text-lg font-semibold"
+      titulo={
+        <span className="inline-flex items-center gap-2">
+          <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "var(--status-warning)" }} />
+          Pendentes de dias anteriores
+        </span>
+      }
+      extra={
+        <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
+          {cargas.length} carga{cargas.length === 1 ? "" : "s"} · {fmt(semBaixa)} nota{semBaixa === 1 ? "" : "s"} sem baixa
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Continuam Em Rota no Protheus: falta a baixa dessas notas ou o encerramento da carga. Não entram nos números de hoje.
+        </p>
+        <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {cargas.map((c) => (
+            <CartaoCarga key={c.carga} c={c} grupo={grupoDaCarga(c)} dia={dia} agora={agora} onAbrir={() => onAbrir(c)} />
+          ))}
+        </ul>
+      </div>
+    </Recolhivel>
+  );
+}
+
 const ROTULO_NOTA: Record<string, { rotulo: string; cor: string }> = {
   "1": { rotulo: "Entregue", cor: COR.entregue },
   "2": { rotulo: "Parcial", cor: COR.parcial },
@@ -671,7 +717,9 @@ export function RotasDoDia({
 }) {
   const [aberta, setAberta] = useState<CargaRota | null>(null);
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
-  const porGrupo = (g: GrupoRota) => rotas.cargas.filter((c) => grupoDaCarga(c) === g);
+  const doDia = rotas.cargas.filter((c) => c.dia >= rotas.dia);
+  const anteriores = rotas.cargas.filter((c) => c.dia < rotas.dia);
+  const porGrupo = (g: GrupoRota) => doDia.filter((c) => grupoDaCarga(c) === g);
   const proprias = porGrupo("Próprio");
   const terceiras = porGrupo("Terceirizado");
   const noCd = porGrupo("No CD");
@@ -679,7 +727,7 @@ export function RotasDoDia({
   const r = resumirRotas(naRua);
   const notasCd = noCd.reduce((t, c) => t + c.notas, 0);
   const totalNotas = r.notas + notasCd;
-  const volumes = rotas.cargas.reduce(
+  const volumes = doDia.reduce(
     (t, c) => ({ P: t.P + c.volumes.P, M: t.M + c.volumes.M, G: t.G + c.volumes.G, N: t.N + c.volumes.naoClassificado }),
     { P: 0, M: 0, G: 0, N: 0 },
   );
@@ -724,7 +772,7 @@ export function RotasDoDia({
         </span>
       </header>
 
-      {rotas.cargas.length === 0 ? (
+      {doDia.length === 0 ? (
         <p className="text-sm rounded-2xl p-6" style={{ color: "var(--text-muted)", background: "var(--surface-1)" }}>
           Nenhuma carga com previsão para hoje.
         </p>
@@ -770,7 +818,7 @@ export function RotasDoDia({
                 {volumes.N > 0 ? ` · ${fmt(volumes.N)} sem porte` : ""}
               </span>
             </Destaque>
-            <Destaque rotulo="Cargas" valor={fmt(rotas.cargas.length)} onAbrir={() => setDetalhe({ tipo: "cargas" })}>
+            <Destaque rotulo="Cargas" valor={fmt(doDia.length)} onAbrir={() => setDetalhe({ tipo: "cargas" })}>
               <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 {r.emRota} em rota · {noCd.length} no CD
               </span>
@@ -808,10 +856,13 @@ export function RotasDoDia({
           )}
         </>
       )}
+      {anteriores.length > 0 && (
+        <PendentesAnteriores cargas={anteriores} dia={rotas.dia} agora={agoraEfetivo} onAbrir={setAberta} />
+      )}
       {aberta && <NotasCarga c={aberta} onFechar={() => setAberta(null)} />}
       {detalhe?.tipo === "notas" && (
         <NotasDoDia
-          cargas={rotas.cargas}
+          cargas={doDia}
           grupoInicial={detalhe.grupo}
           situacaoInicial={detalhe.situacao}
           onFechar={() => setDetalhe(null)}
@@ -821,10 +872,10 @@ export function RotasDoDia({
           }}
         />
       )}
-      {detalhe?.tipo === "produtos" && <ProdutosDoDia cargas={rotas.cargas} onFechar={() => setDetalhe(null)} />}
+      {detalhe?.tipo === "produtos" && <ProdutosDoDia cargas={doDia} onFechar={() => setDetalhe(null)} />}
       {detalhe?.tipo === "cargas" && (
         <CargasDoDia
-          cargas={rotas.cargas}
+          cargas={doDia}
           dia={rotas.dia}
           agora={agoraEfetivo}
           onFechar={() => setDetalhe(null)}
