@@ -127,7 +127,11 @@ export async function detectPendingEntregaNpsResponses(): Promise<number> {
     .from("entrega_nps")
     .select("order_id, ghl_contact_id, enviado_em")
     .is("respondido_em", null)
-    .limit(100);
+    // As mais recentes primeiro (ver vendaNps.ts): sem ordem, as 100 primeiras
+    // pendentes eram sempre as mesmas e as novas não eram lidas.
+    .gte("enviado_em", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+    .order("enviado_em", { ascending: false })
+    .limit(200);
   if (!pending || pending.length === 0) return 0;
 
   let answered = 0;

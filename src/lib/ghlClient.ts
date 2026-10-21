@@ -14,6 +14,11 @@ export type GhlMessage = {
   userId?: string;
 };
 
+// Subconta do GHL onde a chamada acontece. Sem informar, é a do SAC
+// (GHL_API_TOKEN/GHL_LOCATION_ID); o NPS de atendimento em loja sai pela
+// Lojas Maia desde 21/10/2026 (ver vendaNps.ts).
+export type GhlConta = { token: string | undefined; locationId: string | undefined };
+
 function ghlHeaders(token: string | undefined = process.env.GHL_API_TOKEN) {
   return {
     Authorization: `Bearer ${token}`,
@@ -49,11 +54,11 @@ export function isHumanReply(m: GhlMessage): boolean {
 // GHL). "Upsert" pelo telefone: acha o contato existente ou cria um novo,
 // sempre devolvendo o ghlContactId -- é o mesmo contato que já pode existir
 // de uma conversa antiga do SAC, então não duplica.
-export async function upsertGhlContact(phone: string, name: string | null): Promise<string | null> {
+export async function upsertGhlContact(phone: string, name: string | null, conta?: GhlConta): Promise<string | null> {
   const res = await fetch(`${BASE_URL}/contacts/upsert`, {
     method: "POST",
-    headers: { ...ghlHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ locationId: process.env.GHL_LOCATION_ID, phone, name: name ?? undefined }),
+    headers: { ...ghlHeaders(conta?.token), "Content-Type": "application/json" },
+    body: JSON.stringify({ locationId: conta ? conta.locationId : process.env.GHL_LOCATION_ID, phone, name: name ?? undefined }),
   });
   if (!res.ok) return null;
   const data = await res.json();
@@ -78,9 +83,10 @@ export async function addContactToWorkflow(ghlContactId: string, workflowId: str
 // foi parar -- a matrícula no workflow não devolve isso, só o fetchGhlMessages
 // (que já existe) precisa de um conversationId. Pega a mais recente do
 // contato (é sempre a mesma conversa de WhatsApp que o SAC já usa).
-export async function findGhlConversationId(ghlContactId: string): Promise<string | null> {
-  const params = new URLSearchParams({ locationId: process.env.GHL_LOCATION_ID ?? "", contactId: ghlContactId, limit: "1" });
-  const res = await fetch(`${BASE_URL}/conversations/search?${params}`, { headers: ghlHeaders() });
+export async function findGhlConversationId(ghlContactId: string, conta?: GhlConta): Promise<string | null> {
+  const locationId = (conta ? conta.locationId : process.env.GHL_LOCATION_ID) ?? "";
+  const params = new URLSearchParams({ locationId, contactId: ghlContactId, limit: "1" });
+  const res = await fetch(`${BASE_URL}/conversations/search?${params}`, { headers: ghlHeaders(conta?.token) });
   if (!res.ok) return null;
   const data = await res.json();
   return data.conversations?.[0]?.id ?? null;
@@ -94,10 +100,10 @@ export async function findGhlConversationId(ghlContactId: string): Promise<strin
 // do lado de lá. Não usa a matrícula direta em workflow (addContactToWorkflow
 // abaixo) de propósito -- os workflows dessas pesquisas foram desenhados
 // pra reagir à tag, não pra receber matrícula direta.
-export async function addContactTag(ghlContactId: string, tag: string): Promise<boolean> {
+export async function addContactTag(ghlContactId: string, tag: string, conta?: GhlConta): Promise<boolean> {
   const res = await fetch(`${BASE_URL}/contacts/${ghlContactId}/tags`, {
     method: "POST",
-    headers: { ...ghlHeaders(), "Content-Type": "application/json" },
+    headers: { ...ghlHeaders(conta?.token), "Content-Type": "application/json" },
     body: JSON.stringify({ tags: [tag] }),
   });
   return res.ok;

@@ -1,7 +1,7 @@
 import type { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchInBatches } from "./supabaseBatch";
 import { isPlaceholderPhone, firstPhone } from "./serviceRequests";
-import { upsertGhlContact, addContactTag } from "./ghlClient";
+import { upsertGhlContact, addContactTag, type GhlConta } from "./ghlClient";
 import { backfillClientCodes } from "./totvsSync";
 
 // Envio das pesquisas de NPS por pedido (venda, entrega, compra) -- achado
@@ -43,7 +43,17 @@ export async function telefonesDosClientes(admin: Admin, codigos: string[]): Pro
 // errors fica pro que impede a pesquisa de andar (banco, consultas).
 export async function enviarNpsPorPedido(
   admin: Admin,
-  opts: { tabela: TabelaNpsPedido; tag: string; rotulo: string; candidatos: CandidatoNps[]; maxEnvios: number; maxBackfill: number }
+  opts: {
+    tabela: TabelaNpsPedido;
+    tag: string;
+    rotulo: string;
+    candidatos: CandidatoNps[];
+    maxEnvios: number;
+    maxBackfill: number;
+    // Sem conta, sai pelo SAC. Com conta, a linha grava ghl_location_id
+    // (só venda_nps tem a coluna) pra resposta ser lida na mesma subconta.
+    conta?: GhlConta;
+  }
 ): Promise<ResultadoEnvioNps> {
   const errors: string[] = [];
   const avisos: string[] = [];
@@ -61,7 +71,7 @@ export async function enviarNpsPorPedido(
       continue;
     }
 
-    const contactId = await upsertGhlContact(firstPhone(phone), candidate.client_name);
+    const contactId = await upsertGhlContact(firstPhone(phone), candidate.client_name, opts.conta);
     if (!contactId) {
       avisos.push(`${opts.rotulo} ${candidate.id}: não achou/criou contato no GHL`);
       continue;
@@ -69,7 +79,12 @@ export async function enviarNpsPorPedido(
     const { data: reservada, error: reservaError } = await admin
       .from(opts.tabela)
       .upsert(
-        { order_id: candidate.id, client_id: candidate.client_id, ghl_contact_id: contactId },
+        {
+          order_id: candidate.id,
+          client_id: candidate.client_id,
+          ghl_contact_id: contactId,
+          ...(opts.conta ? { ghl_location_id: opts.conta.locationId } : {}),
+        },
         { onConflict: "order_id", ignoreDuplicates: true }
       )
       .select("order_id");
@@ -78,7 +93,7 @@ export async function enviarNpsPorPedido(
       continue;
     }
     if (!reservada || reservada.length === 0) continue;
-    if (!(await addContactTag(contactId, opts.tag))) {
+    if (!(await addContactTag(contactId, opts.tag, opts.conta))) {
       avisos.push(`${opts.rotulo} ${candidate.id}: falha ao aplicar a tag no GHL`);
       await admin.from(opts.tabela).delete().eq("order_id", candidate.id);
       continue;
