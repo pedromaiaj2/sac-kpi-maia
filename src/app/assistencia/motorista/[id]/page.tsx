@@ -8,7 +8,6 @@ import { DeliveryStatusBadge } from "@/components/assistencia/DeliveryStatusBadg
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { MotoristaPhotoUpload } from "@/components/assistencia/MotoristaPhotoUpload";
 import { MotoristaRequestActions } from "@/components/assistencia/MotoristaRequestActions";
-import { RatingQrCode } from "@/components/assistencia/RatingQrCode";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { telHref, whatsappHref } from "@/lib/phone";
@@ -65,10 +64,6 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
   const invoicePhoto = photos.find((p) => p.isInvoice) ?? null;
   const otherPhotos = photos.filter((p) => !p.isProof && !p.isInvoice);
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
-  // Motorista não tem caso "mostruário" (sempre tem cliente de verdade na
-  // outra ponta), diferente do montador -- QR aparece sempre que concluído
-  // e ainda sem nota.
-  const needsClientRatingQr = request.status === "concluida" && request.deliveryRating === null;
   const deadline = request.approvedDeadline ?? request.requestedDeadline;
   const mapsQuery = [request.clientAddress, request.clientAddressNumber, request.clientNeighborhood].filter(Boolean).join(", ");
 
@@ -263,16 +258,6 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
               Ações
             </h3>
             <MotoristaRequestActions requestId={request.id} pickupCompleted={request.pickupCompleted} requestType={request.type} />
-          </div>
-        ) : needsClientRatingQr ? (
-          <div
-            className="rounded-lg p-4 flex flex-col gap-3"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              Avaliação do cliente
-            </h3>
-            <RatingQrCode requestId={request.id} />
           </div>
         ) : null}
       </div>
