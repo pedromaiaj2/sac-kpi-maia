@@ -20,7 +20,10 @@ const BASE_URL = "https://services.leadconnectorhq.com";
 // workflow_dispatch habilitado (disparo manual), então esse teto é só
 // segurança pra um disparo manual não coincidir com o agendado e repetir o
 // trabalho (request ao GHL + leituras no Supabase) sem necessidade.
-const MIN_INTERVAL_MINUTES = 60;
+// 25 min desde 21/10/2026: o cron da VPS (~/bin/ghl-sync-cron.sh) chama a
+// cada 30 min pro NPS de venda sair perto da venda; a trava cobre a
+// sobreposição.
+const MIN_INTERVAL_MINUTES = 25;
 // Uma rodada passa de 5 min com as pesquisas de NPS (ver --max-time 290 em
 // sync-cron.yml); 30 min de TTL cobre a mais longa e libera sozinha se o
 // processo morrer no meio.
