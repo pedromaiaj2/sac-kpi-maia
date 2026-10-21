@@ -18,7 +18,10 @@ import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 // cliente que a Compra tem (pergunta diferente, sobre uma entrega
 // específica, não sobre a experiência geral -- um cliente com 2 entregas
 // na mesma semana pode legitimamente receber as duas pesquisas).
-const MAX_ENROLL_PER_RUN = 50;
+// 150 por rodada desde 21/10/2026 (pedido do Victor: API oficial do
+// WhatsApp, sem risco de bloqueio por volume; o que limita é o nível de
+// mensagens/24h da conta na Meta). Era 50.
+const MAX_ENROLL_PER_RUN = 150;
 // Teto próprio pro backfill de cadastro (menor que MAX_ENROLL_PER_RUN) --
 // cada código faltante custa uma chamada de verdade ao Protheus (SearchQuery),
 // e /api/sync já reúne as 4 pesquisas de NPS numa chamada só, com um

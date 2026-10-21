@@ -11,7 +11,10 @@ import { enviarNpsPorPedido, pedidosComNps } from "./npsEnvio";
 // em si (totvs_orders.issue_date), sem precisar cruzar com
 // totvs_delivery_cargas (não depende de entrega nenhuma ter acontecido --
 // é sobre o vendedor/a loja, não sobre o produto/a logística).
-const MAX_ENROLL_PER_RUN = 50;
+// 150 por rodada desde 21/10/2026 (pedido do Victor: API oficial do
+// WhatsApp, sem risco de bloqueio por volume; o que limita é o nível de
+// mensagens/24h da conta na Meta). Era 50.
+const MAX_ENROLL_PER_RUN = 150;
 // Mesmo racional de entregaNps.ts/nps2Meses.ts: cada código faltante de
 // totvs_clientes é uma chamada de verdade ao Protheus, e esta função
 // compete pelo mesmo orçamento de tempo do /api/sync que as outras 3
