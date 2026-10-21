@@ -14,6 +14,7 @@ import {
 } from "@/lib/assistenciaLabels";
 import { ConferenteField } from "./ConferenteField";
 import { ChecklistEntregaFields } from "./ChecklistEntregaFields";
+import { DeliveryTimeRestrictionField } from "./DeliveryTimeRestrictionField";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -364,15 +365,12 @@ export function EditRequestForm({
       </Field>
 
       {showAuthorizedBy ? (
-        <Field label="Restrição de horário do cliente">
-          <input
-            name="client_time_restriction"
-            defaultValue={request.clientTimeRestriction ?? ""}
-            placeholder="Ex: só de manhã, ou das 14h às 17h"
-            className="rounded border px-3 py-2"
-            style={inputStyle}
-          />
-        </Field>
+        <DeliveryTimeRestrictionField
+          defaultMode={request.timeRestrictionMode}
+          defaultShift={request.shift ?? ""}
+          defaultFrom={request.timeRestrictionFrom?.slice(0, 5) ?? ""}
+          defaultTo={request.timeRestrictionTo?.slice(0, 5) ?? ""}
+        />
       ) : null}
 
       <Field label="Observações">

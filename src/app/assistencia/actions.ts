@@ -52,7 +52,14 @@ import { LOJA_GERENTE_COOKIE_NAME } from "@/lib/lojaAuth";
 import { verifyPin } from "@/lib/pinAuth";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
-import { ADDRESS_NUMBER_REQUIRED_TYPES, listDayLoad, listEntregaDayLoad, listRequestsScheduledOn, type DayLoadItem } from "@/lib/serviceRequests";
+import {
+  ADDRESS_NUMBER_REQUIRED_TYPES,
+  listDayLoad,
+  listEntregaDayLoad,
+  listRequestsScheduledOn,
+  parseDeliveryTimeRestriction,
+  type DayLoadItem,
+} from "@/lib/serviceRequests";
 import { groupByRota, pinSemRotaFirst, ENTREGA_TYPES, type QueueGroup } from "@/lib/entregaQueueGrouping";
 
 const REQUEST_TYPES = [
@@ -2257,11 +2264,20 @@ export async function updateRequestDetails(
   const checklist = readChecklistFields(formData, type);
   if ("error" in checklist) return checklist;
 
+  // Restrição de horário estruturada (0193) -- só pra ENTREGA, obrigatória.
+  // Não-entrega nem mostra o campo no formulário (ver showAuthorizedBy em
+  // EditRequestForm.tsx), então nem precisa validar.
+  const timeRestriction = isDelivery
+    ? parseDeliveryTimeRestriction(formData)
+    : { mode: null, shift: null, timeFrom: null, timeTo: null, clientTimeRestriction: null };
+  if ("error" in timeRestriction) return timeRestriction;
+
   const { error } = await admin
     .from("service_requests")
     .update({
       type,
       ...(driverNameForError !== undefined ? { driver_name: driverNameForError } : {}),
+      ...(isDelivery ? { shift: timeRestriction.shift } : {}),
       store_id: storeId,
       order_code: emptyToNull(formData.get("order_code")),
       client_name: clientName,
@@ -2281,7 +2297,10 @@ export async function updateRequestDetails(
       pickup_destination: pickupDestination,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
-      client_time_restriction: emptyToNull(formData.get("client_time_restriction")),
+      client_time_restriction: timeRestriction.clientTimeRestriction,
+      time_restriction_mode: timeRestriction.mode,
+      time_restriction_from: timeRestriction.timeFrom,
+      time_restriction_to: timeRestriction.timeTo,
       notes: emptyToNull(formData.get("notes")),
       seller_name: emptyToNull(formData.get("seller_name")),
       invoice_number: emptyToNull(formData.get("invoice_number")),
@@ -2437,18 +2456,30 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     }
   }
 
+  // Restrição de horário estruturada (0193) -- só pra ENTREGA, obrigatória.
+  // Visita (o outro tipo que passa por essa action) continua usando o campo
+  // "shift" simples de sempre, sem restrição nenhuma aqui.
+  const timeRestriction = isDelivery
+    ? parseDeliveryTimeRestriction(formData)
+    : { mode: null, shift: null, timeFrom: null, timeTo: null, clientTimeRestriction: null };
+  if ("error" in timeRestriction) return timeRestriction;
+
   const scheduledDateInput = String(formData.get("scheduled_date") ?? "").trim();
   // Id da atribuição, não a rota crua -- pedido do Victor 24/08/2026 (rota
   // extra genérica de João Pessoa): duas extras do mesmo dia podem ter o
   // mesmo valor de `rota` ("extra"), só o `id` diferencia qual delas foi
   // escolhida no formulário (ver NovaEntregaAssistenciaForm.tsx).
   const rotaAssignmentIdInput = String(formData.get("rotaAssignmentId") ?? "").trim();
-  // Retirada na loja ou no CD (migration 0152): não sai em rota, então ignora a rota escolhida.
   const retiradaEmRaw = formData.get("retirada_em");
   const retiradaEm = isDelivery && (retiradaEmRaw === "loja" || retiradaEmRaw === "cd") ? retiradaEmRaw : null;
   let rotaValue: string | null = null;
   let driverNameForRota: string | null = null;
-  if (isDelivery && !retiradaEm && scheduledDateInput && rotaAssignmentIdInput) {
+  // Retirada na loja/CD já pode precisar de rota mesmo assim (ex.: motorista
+  // leva até lá) -- pedido do Victor 21/10/2026, corrige o travamento antigo
+  // que ignorava a rota escolhida sempre que não era entrega no endereço do
+  // cliente (migration 0152 original presumia errado que retirada nunca
+  // precisava de rota).
+  if (isDelivery && scheduledDateInput && rotaAssignmentIdInput) {
     const availableRotas = await getAvailableRotasForDate(scheduledDateInput);
     const match = availableRotas.find((r) => r.id === rotaAssignmentIdInput);
     if (!match) {
@@ -2627,13 +2658,15 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       causa_raiz_detalhe: causaRaizDetalhe,
       seller_name: sellerNameForError,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
-      // Restrição de horário/turno do cliente pra receber (pedido do Victor
-      // 19/08/2026) -- só faz sentido pra tipo de entrega, mas não custa
-      // salvar o texto se vier preenchido de qualquer forma.
-      client_time_restriction: isDelivery ? emptyToNull(formData.get("client_time_restriction")) : null,
+      // Restrição de horário estruturada (0193) -- obrigatória só pra
+      // entrega; client_time_restriction vira texto derivado automático.
+      client_time_restriction: timeRestriction.clientTimeRestriction,
+      time_restriction_mode: timeRestriction.mode,
+      time_restriction_from: timeRestriction.timeFrom,
+      time_restriction_to: timeRestriction.timeTo,
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
       scheduled_time: emptyToNull(formData.get("scheduled_time")),
-      shift: shift || null,
+      shift: isDelivery ? timeRestriction.shift : shift || null,
       urgent,
       assembler_name: assemblerName,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
@@ -2891,6 +2924,12 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     }
   }
 
+  // Restrição de horário estruturada (0193) -- só pra ENTREGA, obrigatória.
+  const timeRestriction = isDeliveryTypeCreate
+    ? parseDeliveryTimeRestriction(formData)
+    : { mode: null, shift: null, timeFrom: null, timeTo: null, clientTimeRestriction: null };
+  if ("error" in timeRestriction) return timeRestriction;
+
   // Destino do produto recolhido -- pedido do Victor 30/09/2026, só
   // obrigatório pros 2 tipos que recolhem PRODUTO de verdade do cliente
   // (ver PICKUP_DESTINATION_TYPES em SacCreateRequestForm.tsx). Quando é
@@ -2918,12 +2957,13 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   // junto da rota escolhida (mesmo pedido: "a rota e o motorista são
   // ligados um ao outro") -- null se aquela rota/data ainda não tem
   // motorista definido no painel "Motorista do dia".
-  // Retirada na loja ou no CD (migration 0152): não sai em rota, então ignora a rota escolhida.
   const retiradaEmRaw = formData.get("retirada_em");
   const retiradaEm = isDeliveryTypeCreate && (retiradaEmRaw === "loja" || retiradaEmRaw === "cd") ? retiradaEmRaw : null;
   let rotaValue: string | null = null;
   let driverNameForRota: string | null = null;
-  if (!retiradaEm && scheduledDate && rotaAssignmentIdInput) {
+  // Retirada na loja/CD já pode precisar de rota mesmo assim -- ver mesmo
+  // comentário no outro fluxo de criação, acima nesse arquivo.
+  if (scheduledDate && rotaAssignmentIdInput) {
     const availableRotas = await getAvailableRotasForDate(scheduledDate);
     const match = availableRotas.find((r) => r.id === rotaAssignmentIdInput);
     if (!match) {
@@ -3073,17 +3113,19 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       reason: reason,
       authorized_by: emptyToNull(authorizedBy),
       restriction_note: emptyToNull(formData.get("restriction_note")),
-      // Restrição de horário/turno do cliente pra receber (pedido do Victor
-      // 19/08/2026: "só pode receber de manhã ou só a tarde e só recebe das
-      // 14h as 17h, algo assim") -- só faz sentido pra tipo de entrega.
-      client_time_restriction: isDeliveryTypeCreate ? emptyToNull(formData.get("client_time_restriction")) : null,
+      // Restrição de horário estruturada (0193) -- obrigatória só pra
+      // entrega; client_time_restriction vira texto derivado automático.
+      client_time_restriction: timeRestriction.clientTimeRestriction,
+      time_restriction_mode: timeRestriction.mode,
+      time_restriction_from: timeRestriction.timeFrom,
+      time_restriction_to: timeRestriction.timeTo,
       driver_name: driverName,
       scheduled_date: scheduledDate || null,
       scheduled_time: scheduledTime || null,
       rota: rotaValue,
       retirada_em: retiradaEm,
       rota_exception_note: rotaExceptionNote,
-      shift: shift || null,
+      shift: isDeliveryTypeCreate ? timeRestriction.shift : shift || null,
       urgent,
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
       causa_raiz: causaRaiz,

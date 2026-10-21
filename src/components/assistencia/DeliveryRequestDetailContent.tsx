@@ -310,6 +310,7 @@ export function DeliveryRequestDetailContent({
                 rota={request.rota}
                 rotaExceptionNote={request.rotaExceptionNote}
                 showRota
+                showShift={false}
                 editButtonVariant="button"
               />
             ) : (

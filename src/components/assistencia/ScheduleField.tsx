@@ -45,6 +45,7 @@ export function ScheduleField({
   rota,
   rotaExceptionNote,
   showRota,
+  showShift = true,
   editButtonVariant = "link",
 }: {
   requestId: string;
@@ -63,6 +64,11 @@ export function ScheduleField({
   // montagem, desmontagem, vistoria e troca de peça são visita de montador
   // e não têm rota nenhuma (ver isDeliveryType em RequestDetailContent).
   showRota: boolean;
+  // Turno (manhã/tarde/dia) é conceito de agendamento de VISITA -- pedido do
+  // Victor 21/10/2026: "não precisa dessa parte de turno" pra Entrega, só pra
+  // Visitas/Agenda. Default `true` (comportamento de sempre) -- quem chama
+  // pra Entrega passa `false` explicitamente (ver DeliveryRequestDetailContent.tsx).
+  showShift?: boolean;
   // "link" (padrão) -- texto discreto sublinhado, do jeito que sempre foi,
   // pensado pra caber numa linha de tabela densa (AssistenciaQueueGroup,
   // DriverRouteGroup, NotificacoesList). "button" -- Guia de Componentes
@@ -165,7 +171,7 @@ export function ScheduleField({
           {showRota ? <RotaBadge rota={rota} /> : null}
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
             {scheduledDate
-              ? `${formatDateOnly(scheduledDate)}${formatTimeOnly(scheduledTime) ? ` às ${formatTimeOnly(scheduledTime)}` : ""}${shift ? ` · ${SHIFT_LABELS[shift]}` : ""}`
+              ? `${formatDateOnly(scheduledDate)}${formatTimeOnly(scheduledTime) ? ` às ${formatTimeOnly(scheduledTime)}` : ""}${showShift && shift ? ` · ${SHIFT_LABELS[shift]}` : ""}`
               : "Não agendada"}
           </span>
           {urgent ? (
@@ -219,19 +225,21 @@ export function ScheduleField({
           className="rounded border px-2 py-1 text-sm"
           style={{ borderColor: "var(--border)" }}
         />
-        <select
-          value={selectedShift}
-          onChange={(e) => setSelectedShift(e.target.value)}
-          className="rounded border px-2 py-1 text-sm"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <option value="">Sem turno</option>
-          {SHIFTS.map((s) => (
-            <option key={s} value={s}>
-              {SHIFT_LABELS[s]}
-            </option>
-          ))}
-        </select>
+        {showShift ? (
+          <select
+            value={selectedShift}
+            onChange={(e) => setSelectedShift(e.target.value)}
+            className="rounded border px-2 py-1 text-sm"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <option value="">Sem turno</option>
+            {SHIFTS.map((s) => (
+              <option key={s} value={s}>
+                {SHIFT_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <label className="flex items-center gap-1.5 text-sm" style={{ color: "var(--text-primary)" }}>
           <input
             type="checkbox"

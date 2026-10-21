@@ -13,7 +13,7 @@ import {
 } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS, CHECKLIST_REQUIRED_TYPES } from "@/lib/assistenciaLabels";
-import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
@@ -21,6 +21,7 @@ import { useFormDraft } from "./useFormDraft";
 import { useFormPrefill } from "./useFormPrefill";
 import { ConferenteField } from "./ConferenteField";
 import { ChecklistEntregaFields } from "./ChecklistEntregaFields";
+import { DeliveryTimeRestrictionField } from "./DeliveryTimeRestrictionField";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -717,14 +718,7 @@ export function NovaEntregaAssistenciaForm({
           />
         </Field>
 
-        <Field label="Restrição de horário do cliente">
-          <input
-            name="client_time_restriction"
-            placeholder="Ex: só de manhã, ou das 14h às 17h"
-            className="rounded border px-3 py-2"
-            style={inputStyle}
-          />
-        </Field>
+        <DeliveryTimeRestrictionField />
 
         <Field label="Quem errou (controle interno) *">
           <select
@@ -844,16 +838,6 @@ export function NovaEntregaAssistenciaForm({
           <Field label="Hora">
             <input name="scheduled_time" type="time" className="rounded border px-3 py-2" style={inputStyle} />
           </Field>
-          <Field label="Turno">
-            <select name="shift" defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
-              <option value="">Sem turno</option>
-              {SHIFTS.map((s) => (
-                <option key={s} value={s}>
-                  {SHIFT_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </Field>
           {/* Independente do turno desde 27/08/2026 (pedido do Victor) --
               pode vir junto de qualquer período, ou sozinho. */}
           <label className="flex items-center gap-2 text-sm self-end pb-2" style={{ color: "var(--text-primary)" }}>
@@ -920,11 +904,7 @@ export function NovaEntregaAssistenciaForm({
           <select
             name="retirada_em"
             value={retiradaEm}
-            onChange={(e) => {
-              const value = e.target.value as "" | "loja" | "cd";
-              setRetiradaEm(value);
-              if (value) setSelectedRotaId("");
-            }}
+            onChange={(e) => setRetiradaEm(e.target.value as "" | "loja" | "cd")}
             className="rounded border px-3 py-2"
             style={inputStyle}
           >
@@ -934,12 +914,18 @@ export function NovaEntregaAssistenciaForm({
           </select>
         </Field>
 
+        {/* Rota continua escolhível mesmo com retirada em loja/CD -- pedido
+            do Victor 21/10/2026: mesmo quando o cliente retira, o pedido
+            pode precisar ir de rota até lá (ex.: motorista Junior leva até
+            o CD/loja), então travar o campo pra qualquer retirada estava
+            errado -- travava "sempre que não é endereço do cliente", não só
+            quando realmente não precisa de rota nenhuma. */}
         <Field label="Rota">
           <select
             name="rotaAssignmentId"
             value={selectedRotaId}
             onChange={(e) => setSelectedRotaId(e.target.value)}
-            disabled={retiradaEm !== "" || !scheduledDate || effectiveLoadingRotas}
+            disabled={!scheduledDate || effectiveLoadingRotas}
             className="rounded border px-3 py-2 disabled:opacity-60"
             style={inputStyle}
           >

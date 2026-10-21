@@ -16,17 +16,17 @@ import {
   REQUEST_TYPE_LABELS,
   CAUSA_RAIZ_OPTIONS,
   CAUSA_RAIZ_LABELS,
-  SHIFT_LABELS,
   PICKUP_DESTINATION_OPTIONS,
   PICKUP_DESTINATION_LABELS,
   CHECKLIST_REQUIRED_TYPES,
 } from "@/lib/assistenciaLabels";
-import { ADDRESS_NUMBER_REQUIRED_TYPES, SHIFTS, type Store } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
 import { ConferenteField } from "./ConferenteField";
 import { ChecklistEntregaFields } from "./ChecklistEntregaFields";
+import { DeliveryTimeRestrictionField } from "./DeliveryTimeRestrictionField";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -738,20 +738,6 @@ export function SacCreateRequestForm({
                     style={inputStyle}
                   />
                 </Field>
-                {/* Independente do checkbox "Urgente" acima (Seção 1) --
-                    pedido do Victor 27/08/2026: "quando coloco que precisa
-                    ser no periodo da tarde, ele nao me da a opção de
-                    colocar como urgencia tambem". */}
-                <Field label="Período (opcional)">
-                  <select name="shift" defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
-                    <option value="">Sem turno</option>
-                    {SHIFTS.map((s) => (
-                      <option key={s} value={s}>
-                        {SHIFT_LABELS[s]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
               </div>
 
               {/* Cidade primeiro, rota depois -- pedido do Victor
@@ -783,11 +769,7 @@ export function SacCreateRequestForm({
                 <select
                   name="retirada_em"
                   value={retiradaEm}
-                  onChange={(e) => {
-                    const value = e.target.value as "" | "loja" | "cd";
-                    setRetiradaEm(value);
-                    if (value) setSelectedRotaId("");
-                  }}
+                  onChange={(e) => setRetiradaEm(e.target.value as "" | "loja" | "cd")}
                   className="rounded border px-3 py-2"
                   style={inputStyle}
                 >
@@ -797,12 +779,14 @@ export function SacCreateRequestForm({
                 </select>
               </Field>
 
+              {/* Rota continua escolhível mesmo com retirada em loja/CD --
+                  ver mesmo comentário em NovaEntregaAssistenciaForm.tsx. */}
               <Field label="Rota">
                 <select
                   name="rotaAssignmentId"
                   value={selectedRotaId}
                   onChange={(e) => setSelectedRotaId(e.target.value)}
-                  disabled={retiradaEm !== "" || !scheduledDate || effectiveLoadingRotas}
+                  disabled={!scheduledDate || effectiveLoadingRotas}
                   className="rounded border px-3 py-2 disabled:opacity-60"
                   style={inputStyle}
                 >
@@ -1004,16 +988,7 @@ export function SacCreateRequestForm({
           </Field>
         ) : null}
 
-        {isDelivery ? (
-          <Field label="Restrição de horário do cliente">
-            <input
-              name="client_time_restriction"
-              placeholder="Ex: só de manhã, ou das 14h às 17h"
-              className="rounded border px-3 py-2"
-              style={inputStyle}
-            />
-          </Field>
-        ) : null}
+        {isDelivery ? <DeliveryTimeRestrictionField /> : null}
 
         {/* Última pergunta, obrigatória -- pedido do Victor 30/09/2026: "o
             produto recolhido irá para onde: Estoque CD, Avaria CD, LOJA".

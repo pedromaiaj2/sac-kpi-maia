@@ -52,6 +52,73 @@ export function isShift(value: string | undefined | null): value is Shift {
   return !!value && (SHIFTS as string[]).includes(value);
 }
 
+// Restrição de horário de ENTREGA (0193) -- pedido do Victor 21/10/2026:
+// trocar o texto livre opcional por 3 opções mutuamente exclusivas e
+// obrigatórias pra quem cria/edita uma entrega. "Turno" reaproveita a coluna
+// `shift` (a aba Entregas não mostra mais o seletor de Turno genérico do
+// Agendamento -- ver ScheduleField.tsx showShift -- então essa coluna fica
+// livre pra representar a restrição aqui). client_time_restriction (0093)
+// continua existindo só como texto derivado automaticamente, pra não
+// precisar atualizar todo lugar que já lê ele pra exibir (DespachoCard,
+// DriverRouteGroup, notificações de motorista/técnico etc.).
+function shiftRestrictionLabel(shift: Shift): string {
+  if (shift === "manha") return "Só pela manhã";
+  if (shift === "tarde") return "Só à tarde";
+  return "Só durante o dia";
+}
+
+function formatTimeHM(value: string): string {
+  return value.slice(0, 5);
+}
+
+export type ParsedTimeRestriction = {
+  mode: TimeRestrictionMode;
+  shift: Shift | null;
+  timeFrom: string | null;
+  timeTo: string | null;
+  clientTimeRestriction: string | null;
+};
+
+// Só chamar quando a solicitação for de ENTREGA (isDelivery) -- pra
+// Visita/Agenda esse campo nem aparece no formulário. Retorna `{ error }`
+// quando a obrigatoriedade não foi cumprida, senão os valores já prontos
+// pra gravar nas colunas (inclusive o texto derivado de client_time_restriction,
+// que substitui o que a pessoa digitava à mão antes).
+export function parseDeliveryTimeRestriction(formData: FormData): { error: string } | ParsedTimeRestriction {
+  const mode = String(formData.get("time_restriction_mode") ?? "").trim();
+  if (mode !== "sem_restricao" && mode !== "turno" && mode !== "hora") {
+    return { error: "Selecione a restrição de horário da entrega (sem restrição, turno ou horário específico)." };
+  }
+
+  if (mode === "sem_restricao") {
+    return { mode, shift: null, timeFrom: null, timeTo: null, clientTimeRestriction: null };
+  }
+
+  if (mode === "turno") {
+    const shift = String(formData.get("time_restriction_shift") ?? "").trim();
+    if (!isShift(shift)) {
+      return { error: "Selecione qual turno é a restrição (manhã, tarde ou dia)." };
+    }
+    return { mode, shift, timeFrom: null, timeTo: null, clientTimeRestriction: shiftRestrictionLabel(shift) };
+  }
+
+  const timeFrom = String(formData.get("time_restriction_from") ?? "").trim();
+  const timeTo = String(formData.get("time_restriction_to") ?? "").trim();
+  if (!timeFrom || !timeTo) {
+    return { error: "Informe o intervalo de horário da restrição (de/até)." };
+  }
+  if (timeFrom >= timeTo) {
+    return { error: "O horário final da restrição precisa ser depois do inicial." };
+  }
+  return {
+    mode,
+    shift: null,
+    timeFrom,
+    timeTo,
+    clientTimeRestriction: `Das ${formatTimeHM(timeFrom)} às ${formatTimeHM(timeTo)}`,
+  };
+}
+
 // Chamado de "Mostruário" -- a loja monta/desmonta um item de exposição
 // própria, sem cliente real (client_name vira "Mostruário — <Loja>",
 // endereço/telefone ficam null por design). Mesmo critério usado em
@@ -676,7 +743,16 @@ export type ServiceRequestDetail = ServiceRequestSummary & {
   // existe, o botão "Nova troca" some daqui e passa a valer no filho).
   parentExchange: LinkedExchangeRef | null;
   childExchange: LinkedExchangeRef | null;
+  // Restrição de horário estruturada (0193) -- só relevante pra editar uma
+  // ENTREGA (ver DeliveryTimeRestrictionField.tsx). Telas de exibição não
+  // precisam disso: continuam lendo clientTimeRestriction (texto derivado
+  // automaticamente a partir destes 3 campos).
+  timeRestrictionMode: TimeRestrictionMode | null;
+  timeRestrictionFrom: string | null;
+  timeRestrictionTo: string | null;
 };
+
+export type TimeRestrictionMode = "sem_restricao" | "turno" | "hora";
 
 export type LinkedExchangeRef = { id: string; ticketNumber: number; status: RequestStatus };
 
@@ -712,6 +788,9 @@ type DetailRow = SummaryRow & {
   authorized_by: string | null;
   parent_request_id: string | null;
   pickup_destination: string | null;
+  time_restriction_mode: TimeRestrictionMode | null;
+  time_restriction_from: string | null;
+  time_restriction_to: string | null;
 };
 
 type EventRow = {
@@ -737,7 +816,7 @@ const DETAIL_COLUMNS =
   // ao dar suporte pra editar causa raiz depois de criado (ver
   // EditRequestForm.tsx): sem essa coluna, o texto de "Outro" digitado na
   // criação nunca aparecia de volta no formulário de correção.
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, pickup_destination, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, checklist_estoque, checklist_separado, checklist_placa, checklist_localizacao, checklist_completo, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, pickup_destination, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, time_restriction_mode, time_restriction_from, time_restriction_to, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, checklist_estoque, checklist_separado, checklist_placa, checklist_localizacao, checklist_completo, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 export async function getRequestDetail(
   id: string
@@ -803,6 +882,9 @@ export async function getRequestDetail(
     resolutionRating: row.resolution_rating,
     parentExchange,
     childExchange,
+    timeRestrictionMode: row.time_restriction_mode,
+    timeRestrictionFrom: row.time_restriction_from,
+    timeRestrictionTo: row.time_restriction_to,
   };
 
   return { request, events };
