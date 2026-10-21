@@ -26,7 +26,10 @@ import { NPS_GHL_TAG, NPS_1_5_PATTERN, type NpsFaseResumo } from "./npsDetratore
 // compra toda semana) e um teto por rodada (MAX_ENROLL_PER_RUN abaixo),
 // pra não fazer o /api/sync demorar mais do que já demora (ver o histórico
 // de timeout do Nginx, corrigido 08/09/2026 -- não é pra repetir).
-const MAX_ENROLL_PER_RUN = 50;
+// 150 por rodada desde 21/10/2026 (pedido do Victor: API oficial do
+// WhatsApp, sem risco de bloqueio por volume; o que limita é o nível de
+// mensagens/24h da conta na Meta). Era 50.
+const MAX_ENROLL_PER_RUN = 150;
 // Teto próprio pro backfill de cadastro, menor que MAX_ENROLL_PER_RUN --
 // mesmo racional de entregaNps.ts: cada código faltante é uma chamada de
 // verdade ao Protheus, e essa função já compete pelo mesmo orçamento de

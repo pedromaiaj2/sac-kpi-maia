@@ -24,10 +24,10 @@ const BASE_URL = "https://services.leadconnectorhq.com";
 // cada 30 min pro NPS de venda sair perto da venda; a trava cobre a
 // sobreposição.
 const MIN_INTERVAL_MINUTES = 25;
-// Uma rodada passa de 5 min com as pesquisas de NPS (ver --max-time 290 em
-// sync-cron.yml); 30 min de TTL cobre a mais longa e libera sozinha se o
+// Uma rodada leva ~9 min com 50 envios por pesquisa e pode triplicar com
+// 150 (21/10/2026); 60 min de TTL cobre a mais longa e libera sozinha se o
 // processo morrer no meio.
-const TRAVA_TTL_SEGUNDOS = 30 * 60;
+const TRAVA_TTL_SEGUNDOS = 60 * 60;
 
 const CHANNEL_MAP: Record<string, string> = {
   TYPE_WHATSAPP: "WhatsApp",
