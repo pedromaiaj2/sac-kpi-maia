@@ -184,11 +184,22 @@ export async function resolveAssemblerName(typedName: string): Promise<string> {
 // Estágio do pagamento de um item — só vira "pendente" (esperando liberação
 // do gerente) depois que a montagem em si foi concluída; antes disso é só
 // "a_montar", mesmo que o valor já tenha sido definido antecipadamente.
+//
+// "aguardando_aprovacao" conta como "pendente" também (achado 21/10/2026,
+// reclamação do Antonio: "não estou conseguindo ver as montagens dos
+// montadores"), não como "a_montar" -- o montador já concluiu de verdade,
+// só falta o gerente da loja confirmar (ver lojaApproveMontagemConclusion).
+// A tela de Pagamentos já tratava esse status como visível em "Todos" desde
+// 02/09/2026 (commit c0bc960, comentário em pagamentos/page.tsx), mas essa
+// função ainda classificava como "a_montar" -- isso fazia o pill "Só
+// pendentes de liberação" (e os totais/relatórios que usam essa mesma
+// função) excluir de novo exatamente os itens que aquele commit queria
+// deixar visíveis.
 export type PaymentStage = "a_montar" | "pendente" | "liberado";
 
 export function paymentStage(requestStatus: string, paymentReleased: boolean): PaymentStage {
   if (paymentReleased) return "liberado";
-  if (requestStatus !== "concluida") return "a_montar";
+  if (requestStatus !== "concluida" && requestStatus !== "aguardando_aprovacao") return "a_montar";
   return "pendente";
 }
 
