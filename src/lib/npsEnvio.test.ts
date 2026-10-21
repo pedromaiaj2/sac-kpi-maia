@@ -10,9 +10,11 @@ const { upsertGhlContact, addContactTag } = await import("./ghlClient");
 
 function adminFalso(reservas: Record<string, boolean>) {
   const apagados: string[] = [];
+  const gravadas: Record<string, unknown>[] = [];
   const admin = {
     from: () => ({
       upsert: (linha: { order_id: string }) => ({
+        _gravou: gravadas.push(linha),
         select: async () => ({ data: reservas[linha.order_id] === false ? [] : [{ order_id: linha.order_id }], error: null }),
       }),
       delete: () => ({
@@ -23,7 +25,7 @@ function adminFalso(reservas: Record<string, boolean>) {
       }),
     }),
   };
-  return { admin: admin as never, apagados };
+  return { admin: admin as never, apagados, gravadas };
 }
 
 const candidato = (id: string, client: string) => ({ id, client_id: client, client_name: `Cliente ${client}` });
@@ -82,5 +84,22 @@ describe("enviarNpsPorPedido", () => {
     expect(r.errors).toEqual([]);
     expect(r.avisos).toEqual(["venda-nps p2: falha ao aplicar a tag no GHL"]);
     expect(apagados).toEqual(["p2"]);
+  });
+
+  it("com subconta, grava ghl_location_id e usa a conta no contato e na tag", async () => {
+    const { admin, gravadas } = adminFalso({});
+    const conta = { token: "tk", locationId: "loc-lojas-maia" };
+    await enviarNpsPorPedido(admin, {
+      tabela: "venda_nps",
+      tag: "nps-pos-atendimento-loja",
+      rotulo: "venda-nps",
+      candidatos: [candidato("p2", "B")],
+      maxEnvios: 50,
+      maxBackfill: 20,
+      conta,
+    });
+    expect(gravadas[0]).toMatchObject({ order_id: "p2", ghl_location_id: "loc-lojas-maia" });
+    expect(upsertGhlContact).toHaveBeenLastCalledWith("83999990001", "Cliente B", conta);
+    expect(addContactTag).toHaveBeenLastCalledWith("contato-83999990001", "nps-pos-atendimento-loja", conta);
   });
 });

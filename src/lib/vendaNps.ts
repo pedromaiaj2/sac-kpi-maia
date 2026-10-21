@@ -1,7 +1,8 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
-import { findGhlConversationId, fetchGhlMessages } from "./ghlClient";
+import { findGhlConversationId, fetchGhlMessages, type GhlConta } from "./ghlClient";
+import { SUBCONTAS } from "./ghlSubcontas";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 
@@ -48,6 +49,26 @@ export function priorizarVendas<T extends OrdemVenda>(vendas: T[], ultimoDiaDaJa
   return [...vendas.filter((v) => v.issue_date <= ultimoDiaDaJanela), ...vendas.filter((v) => v.issue_date > ultimoDiaDaJanela)];
 }
 
+// Subconta do disparo (Victor 21/10/2026: "fosse feito pelo numero da Lojas
+// Maia e nao do sac, pois está congestionando o sac"). VENDA_NPS_SUBCONTA=
+// lojas_maia liga; sem a variável continua pelo SAC. Na Lojas Maia o
+// Workflow "NPS Pós Atendimento Loja" reage a outra tag.
+const TAG_LOJAS_MAIA = "nps-pos-atendimento-loja";
+
+function contaLojasMaia(): GhlConta {
+  return { token: process.env[SUBCONTAS.lojas_maia.tokenEnv], locationId: SUBCONTAS.lojas_maia.locationId };
+}
+
+function disparoVenda(): { conta?: GhlConta; tag: string } {
+  return process.env.VENDA_NPS_SUBCONTA === "lojas_maia" ? { conta: contaLojasMaia(), tag: TAG_LOJAS_MAIA } : { tag: NPS_GHL_TAG.venda! };
+}
+
+// Respostas: as mais recentes primeiro e só dos últimos 7 dias -- sem ordem,
+// as 100 primeiras pendentes eram sempre as mesmas (quem nunca responde) e
+// as novas não eram lidas.
+const RESPOSTA_JANELA_DIAS = 7;
+const RESPOSTA_MAX_POR_RODADA = 200;
+
 export async function enrollPendingVendaNps(): Promise<ResultadoEnvioNps> {
   const admin = getSupabaseAdmin();
 
@@ -89,9 +110,11 @@ export async function enrollPendingVendaNps(): Promise<ResultadoEnvioNps> {
 
   // 3. Telefone -- mesmo gap/mesmo backfill reativo de entregaNps.ts/
   // nps2Meses.ts (totvs_orders não tem telefone, só o cadastro).
+  const disparo = disparoVenda();
   return enviarNpsPorPedido(admin, {
     tabela: "venda_nps",
-    tag: NPS_GHL_TAG.venda!,
+    tag: disparo.tag,
+    conta: disparo.conta,
     rotulo: "venda-nps",
     candidatos: eligible,
     maxEnvios: MAX_ENROLL_PER_RUN,
@@ -103,16 +126,20 @@ export async function detectPendingVendaNpsResponses(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: pending } = await admin
     .from("venda_nps")
-    .select("order_id, ghl_contact_id, enviado_em")
+    .select("order_id, ghl_contact_id, enviado_em, ghl_location_id")
     .is("respondido_em", null)
-    .limit(100);
+    .gte("enviado_em", new Date(Date.now() - RESPOSTA_JANELA_DIAS * 24 * 60 * 60 * 1000).toISOString())
+    .order("enviado_em", { ascending: false })
+    .limit(RESPOSTA_MAX_POR_RODADA);
   if (!pending || pending.length === 0) return 0;
 
   let answered = 0;
   for (const row of pending) {
-    const conversationId = await findGhlConversationId(row.ghl_contact_id);
+    // Linha sem ghl_location_id foi enviada pelo SAC (antes de 21/10/2026).
+    const conta = row.ghl_location_id === SUBCONTAS.lojas_maia.locationId ? contaLojasMaia() : undefined;
+    const conversationId = await findGhlConversationId(row.ghl_contact_id, conta);
     if (!conversationId) continue;
-    const msgs = await fetchGhlMessages(conversationId);
+    const msgs = await fetchGhlMessages(conversationId, conta?.token);
     if (!msgs) continue;
     const sentAtMs = new Date(row.enviado_em).getTime();
     const reply = msgs.find(
