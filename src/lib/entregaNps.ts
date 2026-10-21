@@ -4,7 +4,7 @@ import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
 import { findGhlConversationId, fetchGhlMessages } from "./ghlClient";
 import { fetchInBatches } from "./supabaseBatch";
-import { enviarNpsPorPedido, pedidosComNps } from "./npsEnvio";
+import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 
 // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: pergunta sobre a
@@ -44,7 +44,7 @@ function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-export async function enrollPendingEntregaNps(): Promise<{ enrolled: number; semTelefone: number; errors: string[] }> {
+export async function enrollPendingEntregaNps(): Promise<ResultadoEnvioNps> {
   const admin = getSupabaseAdmin();
 
   // 1. Cargas entregues (de verdade, não "Cancelada"/"Em rota") na janela
@@ -60,8 +60,8 @@ export async function enrollPendingEntregaNps(): Promise<{ enrolled: number; sem
     .lte("dt_retorno", toDate)
     .in("status_entrega", RESOLVIDO_LABELS)
     .returns<CargaRow[]>();
-  if (cargasError) return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps cargas: ${cargasError.message}`] };
-  if (!cargas || cargas.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
+  if (cargasError) return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps cargas: ${cargasError.message}`], avisos: [] };
+  if (!cargas || cargas.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
   // 2. Cruza com o pedido de venda -- mesmo join (invoice+serie, sem
   // branch/filial) já descoberto e usado em recompra.ts/nps2Meses.ts.
@@ -80,11 +80,11 @@ export async function enrollPendingEntregaNps(): Promise<{ enrolled: number; sem
       admin.from("totvs_orders").select("id, invoice, serie, client_id, client_name").in("invoice", lote)
     );
   } catch (err) {
-    return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps pedidos: ${(err as Error).message}`] };
+    return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps pedidos: ${(err as Error).message}`], avisos: [] };
   }
 
   const candidates = orderRows.filter((o) => o.invoice && o.serie && seriesByNota.get(o.invoice)?.has(o.serie) && o.client_id);
-  if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
+  if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
   // 3. Já enviado pra esse pedido? Já opt-out desse cliente (mesma lista
   // do Motor de Recompra, "legítimo interesse" pede opção de saída)?
@@ -92,14 +92,14 @@ export async function enrollPendingEntregaNps(): Promise<{ enrolled: number; sem
   try {
     alreadySent = await pedidosComNps(admin, "entrega_nps", candidates.map((c) => c.id));
   } catch (err) {
-    return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps já enviados: ${(err as Error).message}`] };
+    return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps já enviados: ${(err as Error).message}`], avisos: [] };
   }
   const naoContatar = await listClientesNaoContatar();
 
   const eligible = candidates.filter(
     (c) => !alreadySent.has(c.id) && !naoContatar.has(c.client_id as string) && !isMostruarioRequest(c.invoice, c.client_name)
   );
-  if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
+  if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
   // 4. Telefone -- totvs_orders não tem, precisa do cadastro (mesmo join
   // client_id = protheus_code do resto do projeto). `totvs_clientes` só
