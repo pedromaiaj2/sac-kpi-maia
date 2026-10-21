@@ -20,10 +20,11 @@ const BASE_URL = "https://services.leadconnectorhq.com";
 // workflow_dispatch habilitado (disparo manual), então esse teto é só
 // segurança pra um disparo manual não coincidir com o agendado e repetir o
 // trabalho (request ao GHL + leituras no Supabase) sem necessidade.
-// 25 min desde 21/10/2026: o cron da VPS (~/bin/ghl-sync-cron.sh) chama a
+// 15 min desde 21/10/2026: o cron da VPS (~/bin/ghl-sync-cron.sh) chama a
 // cada 30 min pro NPS de venda sair perto da venda; a trava cobre a
-// sobreposição.
-const MIN_INTERVAL_MINUTES = 25;
+// sobreposição. Conta a partir do FIM da última rodada (ran_at), que leva
+// ~10 min -- com 25, a chamada das :40 sempre caía ~21 min depois e pulava.
+const MIN_INTERVAL_MINUTES = 15;
 // Uma rodada leva ~9 min com 50 envios por pesquisa e pode triplicar com
 // 150 (21/10/2026); 60 min de TTL cobre a mais longa e libera sozinha se o
 // processo morrer no meio.
