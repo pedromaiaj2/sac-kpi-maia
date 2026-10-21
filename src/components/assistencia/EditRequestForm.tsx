@@ -365,6 +365,16 @@ export function EditRequestForm({
       </Field>
 
       {showAuthorizedBy ? (
+        <Field label="Retirada">
+          <select name="retirada_em" defaultValue={request.retiradaEm ?? ""} className="rounded border px-3 py-2" style={inputStyle}>
+            <option value="">Sai em rota</option>
+            <option value="loja">Cliente retira na loja</option>
+            <option value="cd">Cliente retira no CD</option>
+          </select>
+        </Field>
+      ) : null}
+
+      {showAuthorizedBy ? (
         <DeliveryTimeRestrictionField
           defaultMode={request.timeRestrictionMode}
           defaultShift={request.shift ?? ""}

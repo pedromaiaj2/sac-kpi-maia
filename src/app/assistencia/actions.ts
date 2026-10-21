@@ -2272,12 +2272,19 @@ export async function updateRequestDetails(
     : { mode: null, shift: null, timeFrom: null, timeTo: null, clientTimeRestriction: null };
   if ("error" in timeRestriction) return timeRestriction;
 
+  // Retirada em loja/CD -- pedido do Victor 21/10/2026: não dava pra mudar
+  // depois de criado (só existia no formulário de criação), então um
+  // chamado marcado errado como "retira no CD" ficava preso, sem jeito de
+  // voltar a sair em rota. Mesma regra de lá: só vale pra entrega.
+  const retiradaEmRawEdit = formData.get("retirada_em");
+  const retiradaEmEdit = isDelivery && (retiradaEmRawEdit === "loja" || retiradaEmRawEdit === "cd") ? retiradaEmRawEdit : null;
+
   const { error } = await admin
     .from("service_requests")
     .update({
       type,
       ...(driverNameForError !== undefined ? { driver_name: driverNameForError } : {}),
-      ...(isDelivery ? { shift: timeRestriction.shift } : {}),
+      ...(isDelivery ? { shift: timeRestriction.shift, retirada_em: retiradaEmEdit } : {}),
       store_id: storeId,
       order_code: emptyToNull(formData.get("order_code")),
       client_name: clientName,
