@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin.ts";
 import { recordSyncRun } from "./syncRuns.ts";
 import { compararCarga, type ApiPedido, type Divergencia, type LinhaAuditoria } from "./auditoriaCargas.ts";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination.ts";
+import { fetchInBatches } from "./supabaseBatch.ts";
 
 // O certificado de protheus.lojasmaia.com.br é autoassinado por uma CA
 // interna da própria TOTVS (não uma CA pública) -- fetch() rejeitaria com
@@ -699,8 +700,19 @@ async function backfillClientCodesNaTrava(supabase: SupabaseAdmin, codes: Set<st
   let checked = 0;
   let upserted = 0;
 
-  const { data: existing } = await supabase.from("totvs_clientes").select("protheus_code").in("protheus_code", [...codes]);
-  const existingCodes = new Set((existing ?? []).map((r) => r.protheus_code as string));
+  // Em lotes (achado do Pedro 20/10/2026): com os ~4.000 códigos de 30 dias
+  // numa URL só, o PostgREST devolvia 400, o erro era ignorado e todo código
+  // parecia faltar -- a rodada regravava os mesmos 80 que já existiam e os
+  // 3.670 que faltavam de verdade nunca chegavam.
+  let existing: { protheus_code: string }[];
+  try {
+    existing = await fetchInBatches<{ protheus_code: string }>([...codes], (lote) =>
+      supabase.from("totvs_clientes").select("protheus_code").in("protheus_code", lote)
+    );
+  } catch (err) {
+    return { checked: 0, upserted: 0, errors: [`backfill clientes existentes: ${(err as Error).message}`] };
+  }
+  const existingCodes = new Set(existing.map((r) => r.protheus_code));
   const missing = [...codes].filter((c) => !existingCodes.has(c)).slice(0, maxCodes);
 
   for (const code of missing) {
@@ -793,6 +805,8 @@ async function backfillMissingClients(supabase: SupabaseAdmin): Promise<SyncResu
         .select("client_id", { count: "exact" })
         .not("client_id", "is", null)
         .gte("issue_date", since)
+        // quem comprou por último primeiro: é quem o NPS de venda espera
+        .order("issue_date", { ascending: false })
         .order("id")
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ client_id: string | null }>>
   );

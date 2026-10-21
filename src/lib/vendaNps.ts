@@ -1,9 +1,9 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "./serviceRequests";
+import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
-import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
+import { findGhlConversationId, fetchGhlMessages } from "./ghlClient";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
-import { backfillClientCodes } from "./totvsSync";
+import { enviarNpsPorPedido, pedidosComNps } from "./npsEnvio";
 
 // NPS "Pós-venda" -- pedido do Victor 19/10/2026: avaliar o ATENDIMENTO EM
 // LOJA, disparado assim que a venda é registrada no Protheus. Mais simples
@@ -35,10 +35,10 @@ function isoDaysAgo(days: number): string {
 
 export async function enrollPendingVendaNps(): Promise<{ enrolled: number; semTelefone: number; errors: string[] }> {
   const admin = getSupabaseAdmin();
-  const errors: string[] = [];
 
   // 1. Vendas recentes -- direto em totvs_orders, sem passar por cargas
-  // (diferente de entregaNps.ts/nps2Meses.ts).
+  // (diferente de entregaNps.ts/nps2Meses.ts). A mais nova primeiro: a
+  // promessa é "assim que a venda for feita" (ver npsEnvio.ts).
   const fromDate = isoDaysAgo(TARGET_DAYS_AGO + WINDOW_DAYS);
   const toDate = isoDaysAgo(TARGET_DAYS_AGO);
   const { data: orderRows, error: ordersError } = await admin
@@ -47,56 +47,37 @@ export async function enrollPendingVendaNps(): Promise<{ enrolled: number; semTe
     .not("client_id", "is", null)
     .gte("issue_date", fromDate)
     .lte("issue_date", toDate)
+    .order("issue_date", { ascending: false })
+    .order("created_at", { ascending: false })
     .returns<OrderRow[]>();
   if (ordersError) return { enrolled: 0, semTelefone: 0, errors: [`venda-nps pedidos: ${ordersError.message}`] };
   const candidates = (orderRows ?? []).filter((o) => o.client_id);
   if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 2. Já enviado pra esse pedido? Já opt-out desse cliente?
-  const { data: already } = await admin
-    .from("venda_nps")
-    .select("order_id")
-    .in("order_id", candidates.map((c) => c.id));
-  const alreadySent = new Set((already ?? []).map((r) => r.order_id as string));
+  let alreadySent: Set<string>;
+  try {
+    alreadySent = await pedidosComNps(admin, "venda_nps", candidates.map((c) => c.id));
+  } catch (err) {
+    return { enrolled: 0, semTelefone: 0, errors: [`venda-nps já enviados: ${(err as Error).message}`] };
+  }
   const naoContatar = await listClientesNaoContatar();
 
-  const eligible = candidates
-    .filter((c) => !alreadySent.has(c.id) && !naoContatar.has(c.client_id as string) && !isMostruarioRequest(c.invoice, c.client_name))
-    .slice(0, MAX_ENROLL_PER_RUN);
+  const eligible = candidates.filter(
+    (c) => !alreadySent.has(c.id) && !naoContatar.has(c.client_id as string) && !isMostruarioRequest(c.invoice, c.client_name)
+  );
   if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 3. Telefone -- mesmo gap/mesmo backfill reativo de entregaNps.ts/
   // nps2Meses.ts (totvs_orders não tem telefone, só o cadastro).
-  const clientIds = [...new Set(eligible.map((c) => c.client_id as string))];
-  await backfillClientCodes(admin, new Set(clientIds), BACKFILL_MAX_CODES_PER_RUN);
-  const { data: clienteRows } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", clientIds);
-  const phoneByClientId = new Map((clienteRows ?? []).map((r) => [r.protheus_code as string, r.phone1 as string | null]));
-
-  let enrolled = 0;
-  let semTelefone = 0;
-  for (const candidate of eligible) {
-    const phone = phoneByClientId.get(candidate.client_id as string);
-    if (!phone || isPlaceholderPhone(phone)) {
-      semTelefone++;
-      continue;
-    }
-
-    const contactId = await upsertGhlContact(firstPhone(phone), candidate.client_name);
-    if (!contactId) {
-      errors.push(`venda-nps ${candidate.id}: não achou/criou contato no GHL`);
-      continue;
-    }
-    if (!(await addContactTag(contactId, NPS_GHL_TAG.venda!))) {
-      errors.push(`venda-nps ${candidate.id}: falha ao aplicar a tag no GHL`);
-      continue;
-    }
-    const { error: insertError } = await admin
-      .from("venda_nps")
-      .insert({ order_id: candidate.id, client_id: candidate.client_id, ghl_contact_id: contactId });
-    if (insertError) errors.push(`venda-nps ${candidate.id}: ${insertError.message}`);
-    else enrolled++;
-  }
-  return { enrolled, semTelefone, errors };
+  return enviarNpsPorPedido(admin, {
+    tabela: "venda_nps",
+    tag: NPS_GHL_TAG.venda!,
+    rotulo: "venda-nps",
+    candidatos: eligible,
+    maxEnvios: MAX_ENROLL_PER_RUN,
+    maxBackfill: BACKFILL_MAX_CODES_PER_RUN,
+  });
 }
 
 export async function detectPendingVendaNpsResponses(): Promise<number> {

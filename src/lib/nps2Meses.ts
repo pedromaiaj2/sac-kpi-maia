@@ -1,10 +1,11 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "./serviceRequests";
+import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
-import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
+import { findGhlConversationId, fetchGhlMessages } from "./ghlClient";
+import { fetchInBatches } from "./supabaseBatch";
+import { enviarNpsPorPedido, pedidosComNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN, type NpsFaseResumo } from "./npsDetratores";
-import { backfillClientCodes } from "./totvsSync";
 
 // NPS "20 dias pós-recebimento" -- pedido do Victor 09/09/2026: "Cliente so
 // pode receber uma a cada 90 dias. Gatilho é a data de entrega, e coloque 2
@@ -49,7 +50,6 @@ function isoDaysAgo(days: number): string {
 
 export async function enrollPendingCompraNps(): Promise<{ enrolled: number; semTelefone: number; errors: string[] }> {
   const admin = getSupabaseAdmin();
-  const errors: string[] = [];
 
   // 1. Cargas entregues (de verdade, não "Cancelada"/"Em rota") há ~2
   // meses -- mesmo critério de resolvido que entregasRisco.ts/recompra.ts
@@ -78,23 +78,26 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; semT
     seriesByNota.set(c.nota_fiscal, set);
   }
 
-  const { data: orderRows, error: ordersError } = await admin
-    .from("totvs_orders")
-    .select("id, invoice, serie, client_id, client_name")
-    .in("invoice", notasFiscais)
-    .returns<OrderRow[]>();
-  if (ordersError) return { enrolled: 0, semTelefone: 0, errors: [`compra-nps pedidos: ${ordersError.message}`] };
+  let orderRows: OrderRow[];
+  try {
+    orderRows = await fetchInBatches<OrderRow>(notasFiscais, (lote) =>
+      admin.from("totvs_orders").select("id, invoice, serie, client_id, client_name").in("invoice", lote)
+    );
+  } catch (err) {
+    return { enrolled: 0, semTelefone: 0, errors: [`compra-nps pedidos: ${(err as Error).message}`] };
+  }
 
-  const candidates = (orderRows ?? []).filter((o) => o.invoice && o.serie && seriesByNota.get(o.invoice)?.has(o.serie) && o.client_id);
+  const candidates = orderRows.filter((o) => o.invoice && o.serie && seriesByNota.get(o.invoice)?.has(o.serie) && o.client_id);
   if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 3. Já enviado pra esse pedido? Já opt-out desse cliente (mesma lista
   // do Motor de Recompra, "legítimo interesse" pede opção de saída)?
-  const { data: already } = await admin
-    .from("compra_nps")
-    .select("order_id")
-    .in("order_id", candidates.map((c) => c.id));
-  const alreadySent = new Set((already ?? []).map((r) => r.order_id as string));
+  let alreadySent: Set<string>;
+  try {
+    alreadySent = await pedidosComNps(admin, "compra_nps", candidates.map((c) => c.id));
+  } catch (err) {
+    return { enrolled: 0, semTelefone: 0, errors: [`compra-nps já enviados: ${(err as Error).message}`] };
+  }
   const naoContatar = await listClientesNaoContatar();
 
   let eligible = candidates.filter(
@@ -116,72 +119,37 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; semT
   // TODAS as pesquisas já mandadas desse cliente (qualquer pedido), não só
   // a desse pedido específico.
   const sinceIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: recentSends } = await admin
-    .from("compra_nps")
-    .select("client_id")
-    .in("client_id", eligible.map((c) => c.client_id as string))
-    .gte("enviado_em", sinceIso);
-  const recentlyContacted = new Set((recentSends ?? []).map((r) => r.client_id as string));
+  let recentSends: { client_id: string }[];
+  try {
+    recentSends = await fetchInBatches<{ client_id: string }>(
+      eligible.map((c) => c.client_id as string),
+      (lote) => admin.from("compra_nps").select("client_id").in("client_id", lote).gte("enviado_em", sinceIso)
+    );
+  } catch (err) {
+    return { enrolled: 0, semTelefone: 0, errors: [`compra-nps últimos 90 dias: ${(err as Error).message}`] };
+  }
+  const recentlyContacted = new Set(recentSends.map((r) => r.client_id));
   eligible = eligible.filter((c) => !recentlyContacted.has(c.client_id as string));
   if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
-  // Cortado pro teto ANTES de calcular clientIds/backfill (achado do Victor
-  // 26/09/2026) -- senão o backfill abaixo tentaria cobrir todo mundo
-  // elegível na janela (pode ser bem mais que MAX_ENROLL_PER_RUN), gastando
-  // o orçamento de chamadas ao Protheus com gente que nem vai ser
-  // processada nesta rodada mesmo.
-  eligible = eligible.slice(0, MAX_ENROLL_PER_RUN);
-
   // 6. Telefone -- totvs_orders não tem, precisa do cadastro (mesmo join
   // client_id = protheus_code que o resto do projeto já usa, ver
-  // clientes.ts). Sem telefone cadastrado, não dá pra mandar -- `totvs_clientes`
-  // só cobre uma fração de quem já comprou (mesmo gap documentado em
-  // totvsLookup.ts/findTotvsClientByCode -- 24.584 códigos distintos como
-  // comprador, só 3.760 com cadastro sincronizado, confirmado 03/09/2026),
+  // clientes.ts). `totvs_clientes` só cobre uma fração de quem já comprou
+  // (mesmo gap documentado em totvsLookup.ts/findTotvsClientByCode),
   // diferente de montagem/assistência técnica (telefone vem direto do
-  // chamado, sempre presente). Contado à parte em `semTelefone` (não é
-  // erro de execução, é um limite de dado conhecido) -- achado do Victor
-  // 24/09/2026: enrolled em 0 parecia "sem ninguém elegível" quando na
-  // verdade tinha candidato, só sem telefone.
-  const clientIds = [...new Set(eligible.map((c) => c.client_id as string))];
-  // Backfill reativo -- achado do Victor 26/09/2026: de 861 clientes reais
-  // com entrega numa janela de teste, só 38 (4,4%) estavam em
-  // totvs_clientes. Causa raiz é um bug do lado do Protheus (a listagem em
-  // massa usada pelo sync regular não traz vários clientes reais e ativos,
-  // ver backfillMissingClients/backfillClientCodes em totvsSync.ts) --
-  // SearchQuery por código individual funciona. O sync regular só reage a
-  // código citado em chamado de assistência/pedido de encomenda; aqui
-  // busca direto pelos códigos que ESTA leva de candidatos precisa, antes
-  // de checar telefone.
-  await backfillClientCodes(admin, new Set(clientIds), BACKFILL_MAX_CODES_PER_RUN);
-  const { data: clienteRows } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", clientIds);
-  const phoneByClientId = new Map((clienteRows ?? []).map((r) => [r.protheus_code as string, r.phone1 as string | null]));
-
-  let enrolled = 0;
-  let semTelefone = 0;
-  for (const candidate of eligible) {
-    const phone = phoneByClientId.get(candidate.client_id as string);
-    if (!phone || isPlaceholderPhone(phone)) {
-      semTelefone++;
-      continue;
-    }
-
-    const contactId = await upsertGhlContact(firstPhone(phone), candidate.client_name);
-    if (!contactId) {
-      errors.push(`compra-nps ${candidate.id}: não achou/criou contato no GHL`);
-      continue;
-    }
-    if (!(await addContactTag(contactId, NPS_GHL_TAG.compra!))) {
-      errors.push(`compra-nps ${candidate.id}: falha ao aplicar a tag no GHL`);
-      continue;
-    }
-    const { error: insertError } = await admin
-      .from("compra_nps")
-      .insert({ order_id: candidate.id, client_id: candidate.client_id, ghl_contact_id: contactId });
-    if (insertError) errors.push(`compra-nps ${candidate.id}: ${insertError.message}`);
-    else enrolled++;
-  }
-  return { enrolled, semTelefone, errors };
+  // chamado). Backfill reativo (achado do Victor 26/09/2026: a listagem em
+  // massa do Protheus não traz vários clientes reais, mas SearchQuery por
+  // código funciona) antes de checar telefone; quem segue sem telefone
+  // conta em `semTelefone` (limite de dado conhecido, não erro) e é pulado
+  // sem ocupar vaga (ver npsEnvio.ts).
+  return enviarNpsPorPedido(admin, {
+    tabela: "compra_nps",
+    tag: NPS_GHL_TAG.compra!,
+    rotulo: "compra-nps",
+    candidatos: eligible,
+    maxEnvios: MAX_ENROLL_PER_RUN,
+    maxBackfill: BACKFILL_MAX_CODES_PER_RUN,
+  });
 }
 
 export async function detectPendingCompraNpsResponses(): Promise<number> {
