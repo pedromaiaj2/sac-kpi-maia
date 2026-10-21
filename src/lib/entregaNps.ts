@@ -1,10 +1,11 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "./serviceRequests";
+import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
-import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
+import { findGhlConversationId, fetchGhlMessages } from "./ghlClient";
+import { fetchInBatches } from "./supabaseBatch";
+import { enviarNpsPorPedido, pedidosComNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
-import { backfillClientCodes } from "./totvsSync";
 
 // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: pergunta sobre a
 // entrega ORIGINAL da compra (o caminhão leva o móvel pela primeira vez),
@@ -42,7 +43,6 @@ function isoDaysAgo(days: number): string {
 
 export async function enrollPendingEntregaNps(): Promise<{ enrolled: number; semTelefone: number; errors: string[] }> {
   const admin = getSupabaseAdmin();
-  const errors: string[] = [];
 
   // 1. Cargas entregues (de verdade, não "Cancelada"/"Em rota") na janela
   // curta -- mesmo critério de resolvido que entregasRisco.ts/recompra.ts/
@@ -71,83 +71,51 @@ export async function enrollPendingEntregaNps(): Promise<{ enrolled: number; sem
     seriesByNota.set(c.nota_fiscal, set);
   }
 
-  const { data: orderRows, error: ordersError } = await admin
-    .from("totvs_orders")
-    .select("id, invoice, serie, client_id, client_name")
-    .in("invoice", notasFiscais)
-    .returns<OrderRow[]>();
-  if (ordersError) return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps pedidos: ${ordersError.message}`] };
+  let orderRows: OrderRow[];
+  try {
+    orderRows = await fetchInBatches<OrderRow>(notasFiscais, (lote) =>
+      admin.from("totvs_orders").select("id, invoice, serie, client_id, client_name").in("invoice", lote)
+    );
+  } catch (err) {
+    return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps pedidos: ${(err as Error).message}`] };
+  }
 
-  const candidates = (orderRows ?? []).filter((o) => o.invoice && o.serie && seriesByNota.get(o.invoice)?.has(o.serie) && o.client_id);
+  const candidates = orderRows.filter((o) => o.invoice && o.serie && seriesByNota.get(o.invoice)?.has(o.serie) && o.client_id);
   if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 3. Já enviado pra esse pedido? Já opt-out desse cliente (mesma lista
   // do Motor de Recompra, "legítimo interesse" pede opção de saída)?
-  const { data: already } = await admin
-    .from("entrega_nps")
-    .select("order_id")
-    .in("order_id", candidates.map((c) => c.id));
-  const alreadySent = new Set((already ?? []).map((r) => r.order_id as string));
+  let alreadySent: Set<string>;
+  try {
+    alreadySent = await pedidosComNps(admin, "entrega_nps", candidates.map((c) => c.id));
+  } catch (err) {
+    return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps já enviados: ${(err as Error).message}`] };
+  }
   const naoContatar = await listClientesNaoContatar();
 
-  const eligible = candidates
-    .filter((c) => !alreadySent.has(c.id) && !naoContatar.has(c.client_id as string) && !isMostruarioRequest(c.invoice, c.client_name))
-    .slice(0, MAX_ENROLL_PER_RUN);
+  const eligible = candidates.filter(
+    (c) => !alreadySent.has(c.id) && !naoContatar.has(c.client_id as string) && !isMostruarioRequest(c.invoice, c.client_name)
+  );
   if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 4. Telefone -- totvs_orders não tem, precisa do cadastro (mesmo join
   // client_id = protheus_code do resto do projeto). `totvs_clientes` só
   // cobre uma fração de quem já comprou (mesmo gap documentado em
-  // totvsLookup.ts/findTotvsClientByCode -- 24.584 códigos distintos como
-  // comprador, só 3.760 com cadastro sincronizado, confirmado 03/09/2026):
-  // diferente de montagem/assistência técnica (telefone vem direto do
-  // chamado, sempre presente), aqui a fonte é só a venda no Protheus, sem
-  // telefone próprio -- candidato elegível sem cadastro sincronizado não
-  // tem como ser contatado (ver `semTelefone` abaixo).
-  const clientIds = [...new Set(eligible.map((c) => c.client_id as string))];
-  // Backfill reativo -- achado do Victor 26/09/2026: de 861 clientes reais
-  // com entrega numa janela de teste, só 38 (4,4%) estavam em
-  // totvs_clientes. Causa raiz é um bug do lado do Protheus (a listagem em
-  // massa usada pelo sync regular não traz vários clientes reais e ativos,
-  // ver backfillMissingClients/backfillClientCodes em totvsSync.ts) --
-  // SearchQuery por código individual funciona. O sync regular só reage a
-  // código citado em chamado de assistência/pedido de encomenda; aqui
-  // busca direto pelos códigos que ESTA leva de candidatos precisa, antes
-  // de checar telefone.
-  await backfillClientCodes(admin, new Set(clientIds), BACKFILL_MAX_CODES_PER_RUN);
-  const { data: clienteRows } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", clientIds);
-  const phoneByClientId = new Map((clienteRows ?? []).map((r) => [r.protheus_code as string, r.phone1 as string | null]));
-
-  let enrolled = 0;
-  // Contado à parte (não é um "erro" de execução, é um limite de dado
-  // conhecido -- ver comentário acima) pra dar visibilidade de quantos
-  // candidatos elegíveis existem mas não têm telefone sincronizado
-  // (achado do Victor 24/09/2026: enrolled ficando em 0 parecia "não tem
-  // ninguém elegível" quando na verdade tinha, só sem telefone).
-  let semTelefone = 0;
-  for (const candidate of eligible) {
-    const phone = phoneByClientId.get(candidate.client_id as string);
-    if (!phone || isPlaceholderPhone(phone)) {
-      semTelefone++;
-      continue;
-    }
-
-    const contactId = await upsertGhlContact(firstPhone(phone), candidate.client_name);
-    if (!contactId) {
-      errors.push(`entrega-nps ${candidate.id}: não achou/criou contato no GHL`);
-      continue;
-    }
-    if (!(await addContactTag(contactId, NPS_GHL_TAG.entrega!))) {
-      errors.push(`entrega-nps ${candidate.id}: falha ao aplicar a tag no GHL`);
-      continue;
-    }
-    const { error: insertError } = await admin
-      .from("entrega_nps")
-      .insert({ order_id: candidate.id, client_id: candidate.client_id, ghl_contact_id: contactId });
-    if (insertError) errors.push(`entrega-nps ${candidate.id}: ${insertError.message}`);
-    else enrolled++;
-  }
-  return { enrolled, semTelefone, errors };
+  // totvsLookup.ts/findTotvsClientByCode): diferente de montagem/
+  // assistência técnica (telefone vem direto do chamado), aqui a fonte é
+  // só a venda no Protheus. Backfill reativo (achado do Victor 26/09/2026:
+  // a listagem em massa do Protheus não traz vários clientes reais, mas
+  // SearchQuery por código funciona) antes de checar telefone; quem segue
+  // sem telefone conta em `semTelefone` (limite de dado conhecido, não
+  // erro) e é pulado sem ocupar vaga (ver npsEnvio.ts).
+  return enviarNpsPorPedido(admin, {
+    tabela: "entrega_nps",
+    tag: NPS_GHL_TAG.entrega!,
+    rotulo: "entrega-nps",
+    candidatos: eligible,
+    maxEnvios: MAX_ENROLL_PER_RUN,
+    maxBackfill: BACKFILL_MAX_CODES_PER_RUN,
+  });
 }
 
 export async function detectPendingEntregaNpsResponses(): Promise<number> {

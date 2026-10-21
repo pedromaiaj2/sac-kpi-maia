@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
+import { comTrava } from "@/lib/travaSync";
+import { fetchInBatches } from "@/lib/supabaseBatch";
 import { fetchGhlMessages, upsertGhlContact, addContactTag, findGhlConversationId, isHumanReply } from "@/lib/ghlClient";
 import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "@/lib/serviceRequests";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "@/lib/npsDetratores";
@@ -19,6 +21,10 @@ const BASE_URL = "https://services.leadconnectorhq.com";
 // segurança pra um disparo manual não coincidir com o agendado e repetir o
 // trabalho (request ao GHL + leituras no Supabase) sem necessidade.
 const MIN_INTERVAL_MINUTES = 60;
+// Uma rodada passa de 5 min com as pesquisas de NPS (ver --max-time 290 em
+// sync-cron.yml); 30 min de TTL cobre a mais longa e libera sozinha se o
+// processo morrer no meio.
+const TRAVA_TTL_SEGUNDOS = 30 * 60;
 
 const CHANNEL_MAP: Record<string, string> = {
   TYPE_WHATSAPP: "WhatsApp",
@@ -183,11 +189,16 @@ async function enrollPendingNps(
   if (error) return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [`nps candidatos: ${error.message}`] };
   if (!candidates || candidates.length === 0) return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [] };
 
-  const { data: already } = await supabase
-    .from("service_request_nps")
-    .select("request_id")
-    .in("request_id", candidates.map((c) => c.id));
-  const alreadySent = new Set((already ?? []).map((r) => r.request_id as string));
+  let alreadySent: Set<string>;
+  try {
+    const already = await fetchInBatches<{ request_id: string }>(
+      candidates.map((c) => c.id),
+      (lote) => supabase.from("service_request_nps").select("request_id").in("request_id", lote)
+    );
+    alreadySent = new Set(already.map((r) => r.request_id));
+  } catch (err) {
+    return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [`nps já enviados: ${(err as Error).message}`] };
+  }
 
   const errors: string[] = [];
   let enrolled = 0;
@@ -218,13 +229,23 @@ async function enrollPendingNps(
       errors.push(`nps ${candidate.id}: não achou/criou contato no GHL`);
       continue;
     }
-    if (!(await addContactTag(contactId, tag))) {
-      errors.push(`nps ${candidate.id}: falha ao aplicar a tag no GHL`);
+    // Reserva antes da tag (mesmo motivo de npsEnvio.ts): só marca no GHL
+    // se a linha entrou agora.
+    const { data: reservada, error: reservaError } = await supabase
+      .from("service_request_nps")
+      .upsert({ request_id: candidate.id, tipo, ghl_contact_id: contactId }, { onConflict: "request_id", ignoreDuplicates: true })
+      .select("request_id");
+    if (reservaError) {
+      errors.push(`nps ${candidate.id}: ${reservaError.message}`);
       continue;
     }
-    const { error: insertError } = await supabase.from("service_request_nps").insert({ request_id: candidate.id, tipo, ghl_contact_id: contactId });
-    if (insertError) errors.push(`nps ${candidate.id}: ${insertError.message}`);
-    else enrolled++;
+    if (!reservada || reservada.length === 0) continue;
+    if (!(await addContactTag(contactId, tag))) {
+      errors.push(`nps ${candidate.id}: falha ao aplicar a tag no GHL`);
+      await supabase.from("service_request_nps").delete().eq("request_id", candidate.id);
+      continue;
+    }
+    enrolled++;
   }
   return { enrolled, mostruarioSkipped, semTelefone, errors };
 }
@@ -274,7 +295,10 @@ export async function GET(req: NextRequest) {
     if (lastRunAt && Date.now() - new Date(lastRunAt).getTime() < MIN_INTERVAL_MINUTES * 60 * 1000) {
       return NextResponse.json({ ok: true, skipped: true, reason: `última sincronização com sucesso há menos de ${MIN_INTERVAL_MINUTES}min`, lastRunAt });
     }
-    return await runSync();
+    const resultado = await comTrava(getSupabaseAdmin(), "ghl", "api/sync", TRAVA_TTL_SEGUNDOS, runSync);
+    // Pular não é falha: não grava sync_runs (ok=false dispararia alerta).
+    if ("skipped" in resultado) return NextResponse.json({ ok: true, ...resultado });
+    return resultado;
   } catch (err) {
     const message = (err as Error).message;
     await recordSyncRun("ghl", false, {}, [message]);
