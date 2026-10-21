@@ -181,7 +181,7 @@ type NpsCandidate = {
 // todo sem ninguém perceber).
 async function enrollPendingNps(
   supabase: ReturnType<typeof getSupabaseAdmin>
-): Promise<{ enrolled: number; mostruarioSkipped: number; semTelefone: number; errors: string[] }> {
+): Promise<{ enrolled: number; mostruarioSkipped: number; semTelefone: number; errors: string[]; avisos: string[] }> {
   const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data: candidates, error } = await supabase
     .from("service_requests")
@@ -189,8 +189,8 @@ async function enrollPendingNps(
     .eq("status", "concluida")
     .gte("completed_at", sinceIso)
     .returns<NpsCandidate[]>();
-  if (error) return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [`nps candidatos: ${error.message}`] };
-  if (!candidates || candidates.length === 0) return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [] };
+  if (error) return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [`nps candidatos: ${error.message}`], avisos: [] };
+  if (!candidates || candidates.length === 0) return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [], avisos: [] };
 
   let alreadySent: Set<string>;
   try {
@@ -200,10 +200,12 @@ async function enrollPendingNps(
     );
     alreadySent = new Set(already.map((r) => r.request_id));
   } catch (err) {
-    return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [`nps já enviados: ${(err as Error).message}`] };
+    return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [`nps já enviados: ${(err as Error).message}`], avisos: [] };
   }
 
   const errors: string[] = [];
+  // Problema de um contato só (ver npsEnvio.ts): aviso, não falha da rodada.
+  const avisos: string[] = [];
   let enrolled = 0;
   // Contados à parte pra não confundir "sem candidato elegível" com "tinha
   // candidato, mas era esperado não contatar" -- achado do Victor
@@ -229,7 +231,7 @@ async function enrollPendingNps(
     const tag = NPS_GHL_TAG[tipo]!;
     const contactId = await upsertGhlContact(firstPhone(candidate.client_phone), candidate.client_name);
     if (!contactId) {
-      errors.push(`nps ${candidate.id}: não achou/criou contato no GHL`);
+      avisos.push(`nps ${candidate.id}: não achou/criou contato no GHL`);
       continue;
     }
     // Reserva antes da tag (mesmo motivo de npsEnvio.ts): só marca no GHL
@@ -244,13 +246,13 @@ async function enrollPendingNps(
     }
     if (!reservada || reservada.length === 0) continue;
     if (!(await addContactTag(contactId, tag))) {
-      errors.push(`nps ${candidate.id}: falha ao aplicar a tag no GHL`);
+      avisos.push(`nps ${candidate.id}: falha ao aplicar a tag no GHL`);
       await supabase.from("service_request_nps").delete().eq("request_id", candidate.id);
       continue;
     }
     enrolled++;
   }
-  return { enrolled, mostruarioSkipped, semTelefone, errors };
+  return { enrolled, mostruarioSkipped, semTelefone, errors, avisos };
 }
 
 // Mesmo padrão de resposta do SAC (NPS_1_5_PATTERN, ver detectNpsScore
@@ -402,8 +404,10 @@ async function runSync() {
     mostruarioSkipped: montagemAssistNpsMostruarioSkipped,
     semTelefone: montagemAssistNpsSemTelefone,
     errors: npsEnrollErrors,
+    avisos: npsEnrollAvisos,
   } = await enrollPendingNps(supabase);
   errors.push(...npsEnrollErrors);
+  const avisos: string[] = [...npsEnrollAvisos];
   const montagemAssistNpsAnswered = await detectPendingNpsResponses(supabase);
 
   // NPS "20 dias pós-recebimento" -- pedido do Victor 09/09/2026 (janela
@@ -411,23 +415,26 @@ async function runSync() {
   // dado (totvs_orders/totvs_delivery_cargas) e destinatário (client_id,
   // não requestId) diferentes dos 3 tipos acima, por isso função própria
   // em nps2Meses.ts em vez de mais um `if` aqui.
-  const { enrolled: compraNpsEnrolled, semTelefone: compraNpsSemTelefone, errors: compraNpsErrors } = await enrollPendingCompraNps();
+  const { enrolled: compraNpsEnrolled, semTelefone: compraNpsSemTelefone, errors: compraNpsErrors, avisos: compraNpsAvisos } = await enrollPendingCompraNps();
   errors.push(...compraNpsErrors);
+  avisos.push(...compraNpsAvisos);
   const compraNpsAnswered = await detectPendingCompraNpsResponses();
 
   // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: a entrega ORIGINAL da
   // compra (não um chamado de assistência), mesma fonte de dado que
   // "Compra" acima (totvs_delivery_cargas/totvs_orders), só que com janela
   // bem mais curta (dias, não meses) -- ver entregaNps.ts.
-  const { enrolled: entregaNpsEnrolled, semTelefone: entregaNpsSemTelefone, errors: entregaNpsErrors } = await enrollPendingEntregaNps();
+  const { enrolled: entregaNpsEnrolled, semTelefone: entregaNpsSemTelefone, errors: entregaNpsErrors, avisos: entregaNpsAvisos } = await enrollPendingEntregaNps();
   errors.push(...entregaNpsErrors);
+  avisos.push(...entregaNpsAvisos);
   const entregaNpsAnswered = await detectPendingEntregaNpsResponses();
 
   // NPS "Pós-venda" -- pedido do Victor 19/10/2026: atendimento EM LOJA,
   // disparado assim que a venda é registrada no Protheus, sem depender de
   // entrega/montagem/assistência nenhuma -- ver vendaNps.ts.
-  const { enrolled: vendaNpsEnrolled, semTelefone: vendaNpsSemTelefone, errors: vendaNpsErrors } = await enrollPendingVendaNps();
+  const { enrolled: vendaNpsEnrolled, semTelefone: vendaNpsSemTelefone, errors: vendaNpsErrors, avisos: vendaNpsAvisos } = await enrollPendingVendaNps();
   errors.push(...vendaNpsErrors);
+  avisos.push(...vendaNpsAvisos);
   const vendaNpsAnswered = await detectPendingVendaNpsResponses();
 
   const ok = errors.length === 0;
@@ -452,6 +459,7 @@ async function runSync() {
       vendaNpsEnrolled,
       vendaNpsSemTelefone,
       vendaNpsAnswered,
+      avisos,
     },
     errors
   );
@@ -475,6 +483,7 @@ async function runSync() {
     vendaNpsEnrolled,
     vendaNpsSemTelefone,
     vendaNpsAnswered,
+    avisos,
     errors,
   });
 }

@@ -59,6 +59,9 @@ const PASSTHROUGH_PREFIXES = [
   // API de logística (X-API-Key própria, ver src/lib/logisticaApi.ts): sem
   // isso cairia no redirect de login do painel, como os crons acima.
   "/api/logistica/v1",
+  // NPS por vendedor pro app de vendas do Pedro (X-API-Key própria, ver
+  // api/vendas/v1/nps-vendedores/route.ts) -- mesmo motivo da linha acima.
+  "/api/vendas/v1",
   // Resumo de estornos por loja (ver route.ts) -- pedido do Gabriel/
   // financeiro 14/10/2026, só existe de verdade na instância embutida
   // (ESTORNO_EMBED), mas o passthrough fica disponível sempre, mesmo

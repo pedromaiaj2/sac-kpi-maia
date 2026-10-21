@@ -21,6 +21,7 @@ import { backfillClientCodes } from "./totvsSync";
 type Admin = ReturnType<typeof getSupabaseAdmin>;
 export type TabelaNpsPedido = "venda_nps" | "entrega_nps" | "compra_nps";
 export type CandidatoNps = { id: string; client_id: string | null; client_name: string | null };
+export type ResultadoEnvioNps = { enrolled: number; semTelefone: number; errors: string[]; avisos: string[] };
 
 export async function pedidosComNps(admin: Admin, tabela: TabelaNpsPedido, orderIds: string[]): Promise<Set<string>> {
   const rows = await fetchInBatches<{ order_id: string }>(orderIds, (lote) => admin.from(tabela).select("order_id").in("order_id", lote));
@@ -36,11 +37,16 @@ export async function telefonesDosClientes(admin: Admin, codigos: string[]): Pro
 
 // candidatos já filtrados (sem NPS, fora do não contatar) e na ordem de
 // prioridade -- o backfill de cadastro segue a mesma ordem.
+//
+// avisos x errors (Victor 21/10/2026): problema de UM contato (GHL não acha
+// o telefone, tag recusada) vai em avisos e não marca a rodada como falha;
+// errors fica pro que impede a pesquisa de andar (banco, consultas).
 export async function enviarNpsPorPedido(
   admin: Admin,
   opts: { tabela: TabelaNpsPedido; tag: string; rotulo: string; candidatos: CandidatoNps[]; maxEnvios: number; maxBackfill: number }
-): Promise<{ enrolled: number; semTelefone: number; errors: string[] }> {
+): Promise<ResultadoEnvioNps> {
   const errors: string[] = [];
+  const avisos: string[] = [];
   const clientIds = [...new Set(opts.candidatos.map((c) => c.client_id).filter((c): c is string => !!c))];
   await backfillClientCodes(admin, new Set(clientIds), opts.maxBackfill);
   const phoneByClientId = await telefonesDosClientes(admin, clientIds);
@@ -57,7 +63,7 @@ export async function enviarNpsPorPedido(
 
     const contactId = await upsertGhlContact(firstPhone(phone), candidate.client_name);
     if (!contactId) {
-      errors.push(`${opts.rotulo} ${candidate.id}: não achou/criou contato no GHL`);
+      avisos.push(`${opts.rotulo} ${candidate.id}: não achou/criou contato no GHL`);
       continue;
     }
     const { data: reservada, error: reservaError } = await admin
@@ -73,11 +79,11 @@ export async function enviarNpsPorPedido(
     }
     if (!reservada || reservada.length === 0) continue;
     if (!(await addContactTag(contactId, opts.tag))) {
-      errors.push(`${opts.rotulo} ${candidate.id}: falha ao aplicar a tag no GHL`);
+      avisos.push(`${opts.rotulo} ${candidate.id}: falha ao aplicar a tag no GHL`);
       await admin.from(opts.tabela).delete().eq("order_id", candidate.id);
       continue;
     }
     enrolled++;
   }
-  return { enrolled, semTelefone, errors };
+  return { enrolled, semTelefone, errors, avisos };
 }

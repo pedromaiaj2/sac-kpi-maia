@@ -49,7 +49,7 @@ describe("enviarNpsPorPedido", () => {
       maxEnvios: 1,
       maxBackfill: 20,
     });
-    expect(r).toEqual({ enrolled: 1, semTelefone: 1, errors: [] });
+    expect(r).toEqual({ enrolled: 1, semTelefone: 1, errors: [], avisos: [] });
     expect(addContactTag).toHaveBeenCalledTimes(1);
   });
 
@@ -79,7 +79,8 @@ describe("enviarNpsPorPedido", () => {
       maxBackfill: 20,
     });
     expect(r.enrolled).toBe(0);
-    expect(r.errors).toEqual(["venda-nps p2: falha ao aplicar a tag no GHL"]);
+    expect(r.errors).toEqual([]);
+    expect(r.avisos).toEqual(["venda-nps p2: falha ao aplicar a tag no GHL"]);
     expect(apagados).toEqual(["p2"]);
   });
 });

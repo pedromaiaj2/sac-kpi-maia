@@ -3,7 +3,7 @@ import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { findGhlConversationId, fetchGhlMessages } from "./ghlClient";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
-import { enviarNpsPorPedido, pedidosComNps } from "./npsEnvio";
+import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 
 // NPS "Pós-venda" -- pedido do Victor 19/10/2026: avaliar o ATENDIMENTO EM
 // LOJA, disparado assim que a venda é registrada no Protheus. Mais simples
@@ -30,46 +30,62 @@ const BACKFILL_MAX_CODES_PER_RUN = 20;
 const WINDOW_DAYS = 2;
 const TARGET_DAYS_AGO = 0;
 
-type OrderRow = { id: string; client_id: string | null; client_name: string | null; invoice: string | null };
+type OrderRow = { id: string; client_id: string | null; client_name: string | null; invoice: string | null; issue_date: string };
 
+// Em dia de Recife: issue_date é a data da venda lá, e em UTC o dia virava
+// às 21h e jogava a janela um dia pra frente.
 function isoDaysAgo(days: number): string {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Recife" }).format(new Date(Date.now() - days * 24 * 60 * 60 * 1000));
 }
 
-export async function enrollPendingVendaNps(): Promise<{ enrolled: number; semTelefone: number; errors: string[] }> {
+type OrdemVenda = { issue_date: string };
+
+// Quem vence a janela hoje vai na frente (Victor 21/10/2026: com as mais
+// novas primeiro, venda de 2 dias atrás podia ficar pra trás em dia de muito
+// movimento e sair da janela sem pesquisa); o resto, a mais nova primeiro --
+// a ordem que já vem da consulta.
+export function priorizarVendas<T extends OrdemVenda>(vendas: T[], ultimoDiaDaJanela: string): T[] {
+  return [...vendas.filter((v) => v.issue_date <= ultimoDiaDaJanela), ...vendas.filter((v) => v.issue_date > ultimoDiaDaJanela)];
+}
+
+export async function enrollPendingVendaNps(): Promise<ResultadoEnvioNps> {
   const admin = getSupabaseAdmin();
 
   // 1. Vendas recentes -- direto em totvs_orders, sem passar por cargas
-  // (diferente de entregaNps.ts/nps2Meses.ts). A mais nova primeiro: a
-  // promessa é "assim que a venda for feita" (ver npsEnvio.ts).
+  // (diferente de entregaNps.ts/nps2Meses.ts). A mais nova primeiro (a
+  // promessa é "assim que a venda for feita"), menos a que vence hoje (ver
+  // priorizarVendas).
   const fromDate = isoDaysAgo(TARGET_DAYS_AGO + WINDOW_DAYS);
   const toDate = isoDaysAgo(TARGET_DAYS_AGO);
   const { data: orderRows, error: ordersError } = await admin
     .from("totvs_orders")
-    .select("id, client_id, client_name, invoice")
+    .select("id, client_id, client_name, invoice, issue_date")
     .not("client_id", "is", null)
     .gte("issue_date", fromDate)
     .lte("issue_date", toDate)
     .order("issue_date", { ascending: false })
     .order("created_at", { ascending: false })
     .returns<OrderRow[]>();
-  if (ordersError) return { enrolled: 0, semTelefone: 0, errors: [`venda-nps pedidos: ${ordersError.message}`] };
+  if (ordersError) return { enrolled: 0, semTelefone: 0, errors: [`venda-nps pedidos: ${ordersError.message}`], avisos: [] };
   const candidates = (orderRows ?? []).filter((o) => o.client_id);
-  if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
+  if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
   // 2. Já enviado pra esse pedido? Já opt-out desse cliente?
   let alreadySent: Set<string>;
   try {
     alreadySent = await pedidosComNps(admin, "venda_nps", candidates.map((c) => c.id));
   } catch (err) {
-    return { enrolled: 0, semTelefone: 0, errors: [`venda-nps já enviados: ${(err as Error).message}`] };
+    return { enrolled: 0, semTelefone: 0, errors: [`venda-nps já enviados: ${(err as Error).message}`], avisos: [] };
   }
   const naoContatar = await listClientesNaoContatar();
 
-  const eligible = candidates.filter(
-    (c) => !alreadySent.has(c.id) && !naoContatar.has(c.client_id as string) && !isMostruarioRequest(c.invoice, c.client_name)
+  const eligible = priorizarVendas(
+    candidates.filter(
+      (c) => !alreadySent.has(c.id) && !naoContatar.has(c.client_id as string) && !isMostruarioRequest(c.invoice, c.client_name)
+    ),
+    fromDate
   );
-  if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
+  if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
   // 3. Telefone -- mesmo gap/mesmo backfill reativo de entregaNps.ts/
   // nps2Meses.ts (totvs_orders não tem telefone, só o cadastro).
