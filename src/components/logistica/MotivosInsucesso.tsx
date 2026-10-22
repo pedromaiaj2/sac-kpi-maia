@@ -30,6 +30,13 @@ function pct(n: number, total: number) {
   return `${((n / total) * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
+// L06 (pedido não carregado) vem do Protheus como "Logística", mas é falha do
+// CD e conta como CD em Causas da Volta e fora da Volta Logística -- mostra
+// "CD" pra não contradizer o resto da tela (revisão 22/10/2026).
+function categoriaExibida(m: MotivoInsucesso): string | null {
+  return m.codigo === "L06" ? "CD" : m.categoria;
+}
+
 function rotulo(m: MotivoInsucesso) {
   return `${m.codigo ?? "—"} ${m.descricao}`;
 }
@@ -54,7 +61,7 @@ function Barras({ motivos, total, onAbrir }: { motivos: MotivoInsucesso[]; total
                   <span className="truncate">
                     <span className="font-bold tabular-nums mr-1.5">{m.codigo ?? "—"}</span>
                     {m.descricao}
-                    {m.categoria && <span style={{ color: "var(--text-muted)" }}> · {m.categoria}</span>}
+                    {categoriaExibida(m) && <span style={{ color: "var(--text-muted)" }}> · {categoriaExibida(m)}</span>}
                   </span>
                 </span>
                 <span className="shrink-0 tabular-nums font-semibold text-right" style={{ color: "var(--text-primary)" }}>

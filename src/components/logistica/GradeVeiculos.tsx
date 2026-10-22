@@ -50,7 +50,7 @@ export function GradeVeiculos({ linhas, dias }: { linhas: LinhaVeiculo[]; dias: 
           <thead>
             <tr className="border-b" style={{ borderColor: "var(--border)" }}>
               <th className={`${th} text-left`} style={thStyle}>
-                <ThHint hint="Próprios = cargas da nossa frota (TRANSP. LOJAS MAIA, EXPRESSA). Terceirizados = cargas de transportadora de fora (Ronaldo, THZ, D&A, Alenilson, Santos...). Vale a transportadora de cada carga.">
+                <ThHint hint="Próprios = motoristas da nossa frota (TRANSP. LOJAS MAIA, EXPRESSA). Terceirizados = motoristas de transportadora de fora (Ronaldo, THZ, D&A, Alenilson, Santos...). Vale o vínculo do motorista (a transportadora pela qual ele mais rodou nos últimos 180 dias), não a transportadora lançada em cada carga.">
                   Motoristas
                 </ThHint>
               </th>

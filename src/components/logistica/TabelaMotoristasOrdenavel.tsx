@@ -43,7 +43,7 @@ const COLUNAS: { key: SortKey; label: string; hint: string }[] = [
   { key: "cargas", label: "Cargas", hint: "Cargas despachadas com o motorista, pela data da carga (previsão do CD)." },
   {
     key: "visitas",
-    label: "Notas",
+    label: "Notas c/ resultado",
     hint: "Notas que saíram nas cargas dele e já voltaram com resultado (ficou com o cliente, ficou em parte ou voltou). Nota que sai duas vezes conta duas. É a base dos índices de volta. Passe o mouse no número pra ver quantas foram de Strada e de caminhão.",
   },
   { key: "produtosPorCarga", label: "Prod./carga", hint: "Média de produtos (unidades) por carga do motorista no período." },
@@ -248,7 +248,7 @@ export function TabelaMotoristasOrdenavel({
           ))}
         </div>
         <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
-          {linhas.length} motorista{linhas.length === 1 ? "" : "s"} · {grupo.notas.toLocaleString("pt-BR")} notas · volta total{" "}
+          {linhas.length} motorista{linhas.length === 1 ? "" : "s"} · {grupo.notas.toLocaleString("pt-BR")} notas com resultado · volta total{" "}
           <b style={{ color: "var(--text-primary)" }}>{pct(grupo.indiceVolta)}</b> · volta logística{" "}
           <b style={{ color: "var(--text-primary)" }}>{pct(grupo.indiceVoltaLogistica)}</b>
         </span>

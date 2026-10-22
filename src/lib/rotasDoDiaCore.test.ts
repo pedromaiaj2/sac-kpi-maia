@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { grupoDaCarga, minutosDesde, regioesVisiveis, resumirRotas, situacaoBaixa, type CargaRota, formatarDocumento } from "./rotasDoDiaCore";
+import { grupoDaCarga, minutosDesde, regioesVisiveis, resumirRotas, situacaoBaixa, type CargaRota, formatarDocumento, resumoStatusCargas } from "./rotasDoDiaCore";
 
 function carga(over: Partial<CargaRota>): CargaRota {
   return {
@@ -71,5 +71,13 @@ describe("formatarDocumento", () => {
     expect(formatarDocumento("12345678000199")).toBe("12.345.678/0001-99");
     expect(formatarDocumento(null)).toBeNull();
     expect(formatarDocumento("123")).toBe("123");
+  });
+});
+
+describe("resumoStatusCargas", () => {
+  it("conta todas as situações, da mais adiantada pra trás, no plural quando precisa", () => {
+    const c = (statusCodigo: string) => ({ statusCodigo, status: null });
+    expect(resumoStatusCargas([c("6"), c("5"), c("6"), c("3"), c("5"), c("6")])).toBe("3 encerradas · 2 em rota · 1 faturada");
+    expect(resumoStatusCargas([c("1"), c("1")])).toBe("2 em separação");
   });
 });

@@ -108,6 +108,26 @@ export const STATUS_CARGA_ORDEM: Record<string, string> = {
   "6": "Encerrada",
 };
 
+// Linha do card "Cargas" do mural (revisão 22/10/2026): todas as situações,
+// da mais adiantada pra trás ("7 encerradas · 2 em rota · 1 faturada") --
+// antes só "em rota · no CD", e encerradas/faturadas com motorista sumiam.
+const PLURAL_STATUS: Record<string, string> = { Encerrada: "encerradas", Faturada: "faturadas", Programada: "programadas" };
+
+export function resumoStatusCargas(cargas: Pick<CargaRota, "statusCodigo" | "status">[]): string {
+  const contagem = new Map<string, { codigo: string; rotulo: string; n: number }>();
+  for (const c of cargas) {
+    const codigo = c.statusCodigo ?? "";
+    const rotulo = STATUS_CARGA_ORDEM[codigo] ?? c.status ?? "sem situação";
+    const atual = contagem.get(rotulo) ?? { codigo, rotulo, n: 0 };
+    atual.n++;
+    contagem.set(rotulo, atual);
+  }
+  return [...contagem.values()]
+    .sort((a, b) => b.codigo.localeCompare(a.codigo))
+    .map(({ rotulo, n }) => `${n} ${n > 1 && PLURAL_STATUS[rotulo] ? PLURAL_STATUS[rotulo] : rotulo.toLowerCase()}`)
+    .join(" · ");
+}
+
 // Em rota sem nenhuma baixa nova há mais que isso: carga parada.
 export const MINUTOS_SEM_BAIXA_ALERTA = 90;
 
