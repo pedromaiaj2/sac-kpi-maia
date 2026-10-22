@@ -786,7 +786,10 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     const total = conferenteNotasTotais.get(item.label.toUpperCase());
     if (!total) return item;
     const pct = (item.count / total) * 100;
-    return { ...item, label: `${item.label} (${item.count} de ${total} notas · ${pct.toFixed(pct < 1 ? 2 : 1)}%)` };
+    // `pct` também vai num campo próprio (não só embutido no label) --
+    // pedido do Victor 22/10/2026: mostrar esse percentual dentro da
+    // própria barra do gráfico, não só no texto do eixo/tooltip.
+    return { ...item, label: `${item.label} (${item.count} de ${total} notas · ${pct.toFixed(pct < 1 ? 2 : 1)}%)`, pct };
   });
   // Ressalva importante: `driver_name` também é sobrescrito toda vez que
   // a rota/data do chamado é reagendada (setSchedule, actions.ts) -- pra

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis, type LabelProps } from "recharts";
 import type { Count, Coverage } from "@/lib/kpi";
 
 // Achado 27/08/2026 (KPIs da Assistência, "Chamados por produto"): label
@@ -110,7 +110,31 @@ export function BarRanking({
                 />
               ) : null}
               {showCount ? (
-                <LabelList dataKey="count" position="insideRight" style={{ fill: "#fff", fontSize: 11, fontWeight: 600 }} />
+                <LabelList
+                  dataKey="count"
+                  position="insideRight"
+                  // Percentual ao lado do número, entre parênteses -- pedido
+                  // do Victor 22/10/2026: já existia no texto do eixo/tooltip
+                  // (label completo, ver kpiAssistencia.ts), faltava aparecer
+                  // dentro da própria barra. `content` (em vez de `formatter`)
+                  // porque só ele dá acesso ao índice da linha, pra buscar o
+                  // `pct` daquele item específico em `data` -- o `formatter`
+                  // do Recharts só recebe o valor cru do dataKey ("count").
+                  content={(props: LabelProps) => {
+                    const x = Number(props.x ?? 0);
+                    const y = Number(props.y ?? 0);
+                    const width = Number(props.width ?? 0);
+                    const height = Number(props.height ?? 0);
+                    const index = (props as { index?: number }).index;
+                    const pct = index !== undefined ? data[index]?.pct : undefined;
+                    const text = pct !== undefined ? `${props.value} · ${pct.toFixed(pct < 1 ? 2 : 1)}%` : `${props.value}`;
+                    return (
+                      <text x={x + width - 6} y={y + height / 2} dy={4} textAnchor="end" fill="#fff" fontSize={11} fontWeight={600}>
+                        {text}
+                      </text>
+                    );
+                  }}
+                />
               ) : null}
             </Bar>
           </BarChart>

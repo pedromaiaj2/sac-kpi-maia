@@ -39,7 +39,12 @@ export type TicketRow = {
 // só um texto de exibição traduzido (ex.: byCategory) -- usado pra buscar o
 // drill-down de chamados sem precisar re-derivar o tag original a partir do
 // texto já traduzido.
-export type Count = { label: string; count: number; tag?: string };
+// pct opcional -- só quando o percentual já vem calculado em cima de um
+// total próprio do item (ex.: erros de um conferente sobre o total de notas
+// DELE, não sobre a soma de todas as barras) -- ver byConferente em
+// kpiAssistencia.ts. Quando ausente, BarRanking não mostra percentual
+// nenhum dentro da barra (comportamento de sempre).
+export type Count = { label: string; count: number; tag?: string; pct?: number };
 export type Coverage = { withValue: number; total: number; pct: number };
 export type DayCount = { date: string; count: number };
 
