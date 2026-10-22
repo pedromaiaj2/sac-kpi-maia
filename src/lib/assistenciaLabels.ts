@@ -624,13 +624,17 @@ export const CAUSA_RAIZ_ALL_VALUES: string[] = Object.keys(CAUSA_RAIZ_LABELS);
 // "loja", é sempre a mesma loja já escolhida em store_id (a loja do
 // cliente), não existe coluna própria de loja de destino (ver migration
 // 0142_pickup_destination.sql).
-export const PICKUP_DESTINATION_OPTIONS = ["estoque_cd", "avaria_cd", "loja"] as const;
+// "fabrica" -- pedido do Victor 22/10/2026: identificar quando o produto
+// recolhido vai direto pra fábrica (ex.: reparo), em vez de só aparecer em
+// texto livre no Motivo (ver migration 0196).
+export const PICKUP_DESTINATION_OPTIONS = ["estoque_cd", "avaria_cd", "loja", "fabrica"] as const;
 export type PickupDestination = (typeof PICKUP_DESTINATION_OPTIONS)[number];
 
 export const PICKUP_DESTINATION_LABELS: Record<PickupDestination, string> = {
   estoque_cd: "Estoque CD",
   avaria_cd: "Avaria CD",
   loja: "Loja",
+  fabrica: "Fábrica",
 };
 
 // "Loja" sozinho não diz qual -- sempre a própria loja do chamado (ver
