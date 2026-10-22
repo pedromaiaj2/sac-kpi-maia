@@ -1796,7 +1796,7 @@ export async function setRotaDriverAssignment(
 // Diferente da principal, não tem limite de quantidade nem some ao trocar
 // outra rota extra -- cada uma é uma linha própria (ver removeRotaExtra
 // pra tirar).
-export async function addRotaExtra(date: string, rota: string, driverName: string): Promise<{ updatedCount: number }> {
+export async function addRotaExtra(date: string, rota: string, driverName: string): Promise<{ updatedCount: number; driverName: string }> {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
   if (!isRota(rota)) throw new Error("Rota inválida.");
@@ -1827,7 +1827,7 @@ export async function addRotaExtra(date: string, rota: string, driverName: strin
 
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/sac");
-  return { updatedCount: updated?.length ?? 0 };
+  return { updatedCount: updated?.length ?? 0, driverName: name };
 }
 
 export async function removeRotaExtra(id: string): Promise<void> {
@@ -2481,12 +2481,32 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const retiradaEm = isDelivery && (retiradaEmRaw === "loja" || retiradaEmRaw === "cd") ? retiradaEmRaw : null;
   let rotaValue: string | null = null;
   let driverNameForRota: string | null = null;
+  // "Motorista responsável" novo, sem rota extra cadastrada ainda pro dia --
+  // pedido do Victor 22/10/2026: antes disso, um motorista sem atribuição
+  // prévia simplesmente não aparecia no <select> de Rota, obrigando a
+  // assistência a ir em "Motorista do dia" cadastrar a extra antes de
+  // conseguir lançar o chamado. Agora, se vier nome + rota (ver
+  // NovaEntregaAssistenciaForm.tsx), cria a rota extra (mesma addRotaExtra
+  // que "Motorista do dia" usa) e já vincula esse chamado a ela -- sem
+  // precisar ir em outra tela primeiro. Mutuamente exclusivo com
+  // rotaAssignmentIdInput (o formulário só manda um dos dois).
+  const novoMotoristaNome = String(formData.get("novo_motorista_nome") ?? "").trim();
+  const novoMotoristaRota = String(formData.get("novo_motorista_rota") ?? "").trim();
   // Retirada na loja/CD já pode precisar de rota mesmo assim (ex.: motorista
   // leva até lá) -- pedido do Victor 21/10/2026, corrige o travamento antigo
   // que ignorava a rota escolhida sempre que não era entrega no endereço do
   // cliente (migration 0152 original presumia errado que retirada nunca
   // precisava de rota).
-  if (isDelivery && scheduledDateInput && rotaAssignmentIdInput) {
+  if (isDelivery && scheduledDateInput && novoMotoristaNome && novoMotoristaRota) {
+    if (!isRota(novoMotoristaRota)) return { error: "Rota inválida pro motorista novo." };
+    try {
+      const result = await addRotaExtra(scheduledDateInput, novoMotoristaRota, novoMotoristaNome);
+      rotaValue = novoMotoristaRota;
+      driverNameForRota = result.driverName;
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Não foi possível criar a rota extra pro motorista novo." };
+    }
+  } else if (isDelivery && scheduledDateInput && rotaAssignmentIdInput) {
     const availableRotas = await getAvailableRotasForDate(scheduledDateInput);
     const match = availableRotas.find((r) => r.id === rotaAssignmentIdInput);
     if (!match) {
@@ -2968,9 +2988,22 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const retiradaEm = isDeliveryTypeCreate && (retiradaEmRaw === "loja" || retiradaEmRaw === "cd") ? retiradaEmRaw : null;
   let rotaValue: string | null = null;
   let driverNameForRota: string | null = null;
+  // Motorista novo, sem rota extra cadastrada ainda pro dia -- mesmo motivo
+  // de createQuickRequest acima nesse arquivo.
+  const novoMotoristaNome = String(formData.get("novo_motorista_nome") ?? "").trim();
+  const novoMotoristaRota = String(formData.get("novo_motorista_rota") ?? "").trim();
   // Retirada na loja/CD já pode precisar de rota mesmo assim -- ver mesmo
   // comentário no outro fluxo de criação, acima nesse arquivo.
-  if (scheduledDate && rotaAssignmentIdInput) {
+  if (scheduledDate && novoMotoristaNome && novoMotoristaRota) {
+    if (!isRota(novoMotoristaRota)) return { error: "Rota inválida pro motorista novo." };
+    try {
+      const result = await addRotaExtra(scheduledDate, novoMotoristaRota, novoMotoristaNome);
+      rotaValue = novoMotoristaRota;
+      driverNameForRota = result.driverName;
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Não foi possível criar a rota extra pro motorista novo." };
+    }
+  } else if (scheduledDate && rotaAssignmentIdInput) {
     const availableRotas = await getAvailableRotasForDate(scheduledDate);
     const match = availableRotas.find((r) => r.id === rotaAssignmentIdInput);
     if (!match) {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { updateReclamacaoFieldAction } from "@/app/assistencia/reclamacoes-actions";
-import { isStatusInternoResolvido, STATUS_INTERNO_OPTIONS } from "@/lib/reclamacoesLabels";
+import { statusInternoColor, STATUS_INTERNO_OPTIONS } from "@/lib/reclamacoesLabels";
 import type { Reclamacao } from "@/lib/reclamacoes";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -78,7 +78,7 @@ export function ReclamacaoTableRow({ reclamacao }: { reclamacao: Reclamacao }) {
             className="rounded border px-2 py-1 text-xs"
             style={{
               ...inputStyle,
-              background: isStatusInternoResolvido(statusInterno) ? "var(--status-good)" : "var(--brand-orange)",
+              background: statusInternoColor(statusInterno),
               color: "#fff",
               fontWeight: 500,
             }}

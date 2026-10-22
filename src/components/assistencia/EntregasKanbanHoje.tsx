@@ -427,6 +427,16 @@ export function EntregasKanbanHoje({
   // motorista ATRIBUÍDO ao chamado, não necessariamente o que o bairro de
   // fato pede) -- mesmo padrão de clique de SAC/Assistência acima.
   const [selectedRegiao, setSelectedRegiao] = useState<Rota | null>(null);
+  // "⚠ rotas mistas" clicável -- pedido do Victor 22/10/2026: ao clicar,
+  // filtra só os chamados FORA da região predominante desse recorte (os que
+  // estão "misturados" na rota, não a região majoritária em si). Diferente
+  // de selectedRegiao (escolher UMA região específica) -- aqui é "todas
+  // menos a esperada", calculado embaixo (ver dominantRegiao). Mutuamente
+  // exclusivo com selectedRegiao -- os dois ligados ao mesmo tempo não
+  // fariam sentido (ver os dois onClick/onChange abaixo, cada um desliga o
+  // outro). Mesmo padrão de toggle dos outros filtros aqui: clicar nele de
+  // novo desliga.
+  const [showOnlyForaDeRota, setShowOnlyForaDeRota] = useState(false);
 
   // "Rotas" -- pedido do Victor 03/09/2026: "um botão... quando eu clicar
   // ele aparece as rotas dos próximos 5 dias e se eu clicar em algum desses
@@ -662,7 +672,34 @@ export function EntregasKanbanHoje({
   // nesse recorte, ex.: dentro da rota do Junior) quanto pras contagens do
   // dropdown abaixo.
   const regioesPresentes = new Set(atendenteRows.map((row) => regiaoDoBairro(row.r.clientNeighborhood)).filter((r): r is Rota => r !== null));
-  const regiaoRows = selectedRegiao ? atendenteRows.filter((row) => regiaoDoBairro(row.r.clientNeighborhood) === selectedRegiao) : atendenteRows;
+  // Região predominante desse recorte (a que tem mais chamados) -- é a
+  // "esperada" pro botão "⚠ rotas mistas": tudo que não for ela (mas tiver
+  // região reconhecida) conta como fora de rota. Calculado em cima de
+  // atendenteRows (antes de qualquer filtro de região), senão o próprio
+  // filtro mudaria qual região é "a maioria" enquanto ativo.
+  let dominantRegiao: Rota | null = null;
+  if (showOnlyForaDeRota) {
+    const regionCounts = new Map<Rota, number>();
+    for (const row of atendenteRows) {
+      const regiao = regiaoDoBairro(row.r.clientNeighborhood);
+      if (regiao) regionCounts.set(regiao, (regionCounts.get(regiao) ?? 0) + 1);
+    }
+    let maxCount = 0;
+    for (const [regiao, count] of regionCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        dominantRegiao = regiao;
+      }
+    }
+  }
+  const regiaoRows = showOnlyForaDeRota
+    ? atendenteRows.filter((row) => {
+        const regiao = regiaoDoBairro(row.r.clientNeighborhood);
+        return regiao !== null && regiao !== dominantRegiao;
+      })
+    : selectedRegiao
+      ? atendenteRows.filter((row) => regiaoDoBairro(row.r.clientNeighborhood) === selectedRegiao)
+      : atendenteRows;
   const counts: HojeStatusCounts = { programado: 0, concluido: 0, cancelado: 0, nao_concluido: 0 };
   for (const row of regiaoRows) counts[deliveryStatusTab(row.r.status)]++;
   // Aba "Todos" -- pedido do Victor 02/09/2026: "coloque para baixo os que
@@ -880,7 +917,10 @@ export function EntregasKanbanHoje({
         <div className="flex items-center gap-1.5">
           <select
             value={selectedRegiao ?? ""}
-            onChange={(e) => setSelectedRegiao((e.target.value || null) as Rota | null)}
+            onChange={(e) => {
+              setSelectedRegiao((e.target.value || null) as Rota | null);
+              setShowOnlyForaDeRota(false);
+            }}
             className="rounded-md border px-2 py-1.5 text-xs"
             style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: selectedRegiao ? "var(--text-primary)" : "var(--text-secondary)" }}
           >
@@ -892,16 +932,29 @@ export function EntregasKanbanHoje({
             ))}
           </select>
           {regioesPresentes.size > 1 ? (
-            <span
-              className="text-[11px] font-semibold px-2 py-1 rounded-full whitespace-nowrap"
-              style={{
-                color: "light-dark(#fff, color-mix(in srgb, var(--status-warning) 88%, var(--foreground)))",
-                background: "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))",
+            <button
+              type="button"
+              onClick={() => {
+                setShowOnlyForaDeRota((v) => !v);
+                setSelectedRegiao(null);
               }}
-              title="Tem bairro de mais de uma região nesse recorte -- confira se a rota de cada chamado está certa."
+              className="text-[11px] font-semibold px-2 py-1 rounded-full whitespace-nowrap transition-all duration-150"
+              style={
+                showOnlyForaDeRota
+                  ? { color: "#fff", background: "var(--status-warning)", boxShadow: "0 0 0 2px var(--status-warning) inset" }
+                  : {
+                      color: "light-dark(#fff, color-mix(in srgb, var(--status-warning) 88%, var(--foreground)))",
+                      background: "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))",
+                    }
+              }
+              title={
+                showOnlyForaDeRota
+                  ? "Mostrando só quem está fora da região predominante -- clique de novo pra ver todo mundo."
+                  : "Tem bairro de mais de uma região nesse recorte -- clique pra ver só quem está fora da rota esperada."
+              }
             >
               ⚠ rotas mistas
-            </span>
+            </button>
           ) : null}
         </div>
 

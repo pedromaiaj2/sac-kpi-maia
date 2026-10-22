@@ -14,7 +14,7 @@ import {
 import { withRetry } from "@/lib/retryLookup";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS, CHECKLIST_REQUIRED_TYPES } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
-import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
+import { CITY_LABELS, ROTA_CITY, ROTAS_BY_CITY, JP_EXTRA_ROTA, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
@@ -318,6 +318,12 @@ export function NovaEntregaAssistenciaForm({
   // SacCreateRequestForm.tsx (rota extra genérica de JP pode repetir o
   // mesmo valor de `rota` em duas linhas do mesmo dia).
   const [selectedRotaId, setSelectedRotaId] = useState("");
+  // "+ Novo motorista" -- mesmo desenho de SacCreateRequestForm.tsx (pedido
+  // do Victor 22/10/2026).
+  const NOVO_MOTORISTA_VALUE = "__novo__";
+  const isNovoMotorista = selectedRotaId === NOVO_MOTORISTA_VALUE;
+  const [novoMotoristaNome, setNovoMotoristaNome] = useState("");
+  const [novoMotoristaRotaCg, setNovoMotoristaRotaCg] = useState(ROTAS_BY_CITY.campina_grande[0]);
   const [retiradaEm, setRetiradaEm] = useState<"" | "loja" | "cd">("");
   const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
   const [loadingRotas, setLoadingRotas] = useState(false);
@@ -922,7 +928,7 @@ export function NovaEntregaAssistenciaForm({
             quando realmente não precisa de rota nenhuma. */}
         <Field label="Rota">
           <select
-            name="rotaAssignmentId"
+            name={isNovoMotorista ? undefined : "rotaAssignmentId"}
             value={selectedRotaId}
             onChange={(e) => setSelectedRotaId(e.target.value)}
             disabled={!scheduledDate || effectiveLoadingRotas}
@@ -935,6 +941,7 @@ export function NovaEntregaAssistenciaForm({
                 {labelAvailableRota(effectiveAvailableRotas, r)}
               </option>
             ))}
+            <option value={NOVO_MOTORISTA_VALUE}>+ Novo motorista (cria rota extra)</option>
           </select>
         </Field>
         {!scheduledDate ? (
@@ -945,7 +952,7 @@ export function NovaEntregaAssistenciaForm({
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Carregando rotas…
           </p>
-        ) : effectiveAvailableRotas.length === 0 ? (
+        ) : isNovoMotorista ? null : effectiveAvailableRotas.length === 0 ? (
           <p className="text-xs" style={{ color: "var(--status-warning)" }}>
             Nenhuma rota de {CITY_LABELS[selectedCity]} disponível pra essa data.
           </p>
@@ -953,6 +960,44 @@ export function NovaEntregaAssistenciaForm({
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Motorista: {previewDriverName ?? "nenhum escolhido ainda"}
           </p>
+        ) : null}
+
+        {/* Motorista sem rota extra cadastrada ainda -- pedido do Victor
+            22/10/2026: cria a rota extra junto com o chamado, sem precisar
+            ir em "Motorista do dia" antes. */}
+        {isNovoMotorista ? (
+          <>
+            <Field label="Nome do motorista *">
+              <input
+                name="novo_motorista_nome"
+                list="entrega-drivers"
+                required={isNovoMotorista}
+                value={novoMotoristaNome}
+                onChange={(e) => setNovoMotoristaNome(e.target.value)}
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+            </Field>
+            {selectedCity === "campina_grande" ? (
+              <Field label="Qual rota de Campina Grande?">
+                <select
+                  name="novo_motorista_rota"
+                  value={novoMotoristaRotaCg}
+                  onChange={(e) => setNovoMotoristaRotaCg(e.target.value as (typeof ROTAS_BY_CITY)["campina_grande"][number])}
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                >
+                  {ROTAS_BY_CITY.campina_grande.map((r) => (
+                    <option key={r} value={r}>
+                      {labelAvailableRota([], { id: r, rota: r })}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <input type="hidden" name="novo_motorista_rota" value={JP_EXTRA_ROTA} />
+            )}
+          </>
         ) : null}
       </FormSection>
 

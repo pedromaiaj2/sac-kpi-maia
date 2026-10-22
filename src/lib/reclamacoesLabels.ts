@@ -17,7 +17,11 @@ export const ORGAO_OPTIONS = [
 
 // Ordem pensada como um fluxo -- ainda sem resposta -> aguardando alguém
 // (nosso lado ou do cliente) -> sem contato -> resolvido por último, é o
-// estado final que a maioria dos casos busca.
+// estado final que a maioria dos casos busca. "Sem informação/Sem resolução"
+// (pedido do Victor 22/10/2026) é outro estado FINAL -- o caso foi encerrado
+// sem conseguir resolver (diferente de "Resolvido", sucesso) -- por isso
+// entra depois dele, não junto dos "aguardando"/"sem retorno" do meio do
+// fluxo, que ainda estão em andamento.
 export const STATUS_INTERNO_OPTIONS = [
   "Falta responder",
   "Aguardando retorno do gerente",
@@ -26,15 +30,27 @@ export const STATUS_INTERNO_OPTIONS = [
   "Sem retorno do cliente",
   "Não conseguimos contato com o cliente",
   "Resolvido",
+  "Sem informação/Sem resolução",
 ] as const;
 
 // Cor de badge por status -- mesmo espírito de STATUS_ENCOMENDA_COLORS
-// (assistenciaLabels.ts): "Resolvido" em verde, o resto (ainda em aberto,
-// em algum grau) numa cor neutra/de atenção. Sem granularidade fina aqui
-// (não é um workflow com etapas fixas tipo encomenda) -- só "fechado" vs
-// "aberto" já cobre o que a tela precisa mostrar de relance.
+// (assistenciaLabels.ts): "Resolvido" em verde, "Sem informação/Sem
+// resolução" em vermelho (pedido do Victor 22/10/2026, pra destacar visualmente
+// os casos encerrados sem solução), o resto (ainda em aberto, em algum grau)
+// numa cor neutra/de atenção. Sem granularidade fina além disso (não é um
+// workflow com etapas fixas tipo encomenda).
 export function isStatusInternoResolvido(status: string): boolean {
   return status.trim().toLowerCase() === "resolvido";
+}
+
+export function isStatusInternoSemResolucao(status: string): boolean {
+  return status.trim().toLowerCase() === "sem informação/sem resolução";
+}
+
+export function statusInternoColor(status: string): string {
+  if (isStatusInternoResolvido(status)) return "var(--status-good)";
+  if (isStatusInternoSemResolucao(status)) return "var(--status-critical)";
+  return "var(--brand-orange)";
 }
 
 // Agrupamento por órgão pras abas da tela (pedido do Victor 29/09/2026) --
