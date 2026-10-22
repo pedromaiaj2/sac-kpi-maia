@@ -34,7 +34,7 @@ function statusCarga(c: CargaEntregas, ocorrencias: Ocorrencias): { label: strin
     const logistica = Object.keys(c.insucessosPorMotivo).some((cod) => cod.startsWith("L") && cod !== "L06");
     return logistica
       ? { label: "Falha logística", color: "var(--status-critical)", detalhe: motivosTexto(c, ocorrencias) }
-      : { label: "Voltou", color: "var(--status-warning)", detalhe: motivosTexto(c, ocorrencias) };
+      : { label: "Com volta", color: "var(--status-warning)", detalhe: motivosTexto(c, ocorrencias) };
   }
   // Encerrada no Protheus (ou toda nota com resultado) = concluída, mesmo com
   // nota parcial -- antes só "tudo entregue" contava e a carga encerrada com

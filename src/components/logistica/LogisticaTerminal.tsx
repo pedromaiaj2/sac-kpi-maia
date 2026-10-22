@@ -118,7 +118,7 @@ export function LogisticaTerminal({
         <Secao
           id="monitor-cargas"
           titulo="Monitor de Cargas"
-          hint="Cargas do período, da mais recente. Falha logística (vermelho) = alguma nota voltou por falha do transporte (L01 rota estourada, L02 veículo quebrado...). Voltou (amarelo) = nota que voltou por cliente, CD (L06) ou outro motivo, ou cancelada. Concluída = todas as notas com o cliente. Em rota = ainda sem resultado de todas. Passe o mouse na carga pra ver os motivos; clique pra filtrar a tabela de motoristas pelo motorista dela."
+          hint="Cargas do período, da mais recente. Falha logística (vermelho) = alguma nota voltou por falha do transporte (L01 rota estourada, L02 veículo quebrado...). Com volta (amarelo) = alguma nota voltou por cliente, CD (L06) ou outro motivo, ou foi cancelada. Concluída = todas as notas com o cliente. Em rota = ainda sem resultado de todas. Passe o mouse na carga pra ver os motivos; clique pra filtrar a tabela de motoristas pelo motorista dela."
         >
           <CargasMonitor cargas={cargas} ocorrencias={ocorrencias} selecionada={selecionado?.codigo ?? null} onSelect={handleSelect} />
         </Secao>

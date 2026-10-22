@@ -3,7 +3,8 @@ import { memoizeWithTtl } from "@/lib/memoCache";
 import type { PeriodoKpis } from "@/lib/logisticaApi";
 
 // Motorista próprio x terceirizado (migração 0162), pela transportadora
-// das cargas dele no Protheus.
+// pela qual ele mais rodou nos últimos 180 dias. Desde a 0185 toda a tela usa
+// esse vínculo, não a transportadora lançada em cada carga.
 export const VINCULOS = ["Próprio", "Terceirizado"] as const;
 
 // Formato devolvido pela RPC kpis_logistica (migração 0157) -- o mesmo

@@ -12,6 +12,7 @@ import {
   situacaoBaixa,
   resumirRotas,
   STATUS_CARGA_ORDEM,
+  resumoStatusCargas,
   type CargaRota,
   type GrupoRota,
   type NotaRota,
@@ -820,7 +821,7 @@ export function RotasDoDia({
             </Destaque>
             <Destaque rotulo="Cargas" valor={fmt(doDia.length)} onAbrir={() => setDetalhe({ tipo: "cargas" })}>
               <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                {r.emRota} em rota · {noCd.length} no CD
+                {resumoStatusCargas(doDia)}
               </span>
               {paradas > 0 && (
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--status-warning)" }}>

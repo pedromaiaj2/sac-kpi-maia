@@ -114,8 +114,9 @@ export function PainelLogistica({
 
   // Período "Hoje" (revisão 18/10/2026): volta e assistências do dia ainda
   // estão acontecendo -- comparar com o dia anterior inteiro dava queda
-  // falsa. Cargas/notas/produtos seguem comparando (cargas do dia já estão
-  // planejadas desde cedo).
+  // falsa. Desde 22/10/2026 vale também pra cargas/notas/produtos: só entra
+  // carga despachada, e as do dia vão saindo do CD ao longo dele (de manhã
+  // a comparação dava queda sem motivo).
   const diaEmAndamento = sel.preset === "hoje";
   const emAndamento = diaEmAndamento ? { variacao: SEM_VARIACAO, semComparacao: "dia em andamento" } : null;
 
@@ -130,6 +131,7 @@ export function PainelLogistica({
           complemento: `${decimal(resumo ? porDiaDe(resumo.volumes.total, resumo.dias) : null)} produtos · ${decimal(resumo?.caminhoesDia ?? null)} caminhões · ${decimal(resumo?.stradasDia ?? null)} Stradas · ${decimal(resumo?.naoIdentificadosDia ?? null)} sem placa`,
           variacao: variar(notasDia, notasDiaAnterior),
           formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
+          ...emAndamento,
         },
         {
           key: "volta",
@@ -151,19 +153,21 @@ export function PainelLogistica({
         },
         {
           key: "cargas",
-          hint: "Cargas despachadas pelo CD com previsão (ZAG_DTPREV) no período.",
+          hint: "Cargas despachadas pelo CD (em rota ou encerradas) com previsão (ZAG_DTPREV) no período. Carga ainda no CD só entra quando sai: por isso, no dia de hoje, o número pode ficar abaixo do mural Rotas de hoje, que mostra também as que estão sendo montadas.",
           label: "Cargas",
           valor: num(resumo.cargas),
           variacao: variar(resumo.cargas, resumoAnterior?.cargas ?? null),
           formatarDelta: formatarDeltaNum,
+          ...emAndamento,
         },
         {
           key: "notas",
-          hint: "Notas dentro das cargas do período.",
+          hint: "Notas dentro das cargas despachadas do período, inclusive as que ainda não voltaram com resultado. A tabela de motoristas conta só as notas com resultado (base do Índice de Volta), por isso o total dela fica um pouco abaixo.",
           label: "Notas",
           valor: num(resumo.pedidos),
           variacao: variar(resumo.pedidos, resumoAnterior?.pedidos ?? null),
           formatarDelta: formatarDeltaNum,
+          ...emAndamento,
         },
         {
           key: "volume",
@@ -172,6 +176,7 @@ export function PainelLogistica({
           valor: num(resumo.volumes.total),
           variacao: variar(resumo.volumes.total, resumoAnterior?.volumes.total ?? null),
           formatarDelta: formatarDeltaNum,
+          ...emAndamento,
         },
         {
           key: "notas-strada",
@@ -180,6 +185,7 @@ export function PainelLogistica({
           valor: num(totalVeiculos?.Carro.pedidos ?? 0),
           variacao: variar(totalVeiculos?.Carro.pedidos ?? null, totalVeiculosAnterior?.Carro.pedidos ?? null),
           formatarDelta: formatarDeltaNum,
+          ...emAndamento,
         },
         {
           key: "notas-caminhao",
@@ -188,6 +194,7 @@ export function PainelLogistica({
           valor: num(totalVeiculos?.["Caminhão"].pedidos ?? 0),
           variacao: variar(totalVeiculos?.["Caminhão"].pedidos ?? null, totalVeiculosAnterior?.["Caminhão"].pedidos ?? null),
           formatarDelta: formatarDeltaNum,
+          ...emAndamento,
         },
         {
           key: "notas-por-caminhao",
@@ -196,6 +203,7 @@ export function PainelLogistica({
           valor: decimal(notasPorCaminhao(totalVeiculos)),
           variacao: variar(notasPorCaminhao(totalVeiculos), notasPorCaminhao(totalVeiculosAnterior)),
           formatarDelta: (d: number) => `${d >= 0 ? "+" : ""}${decimal(d)}`,
+          ...emAndamento,
         },
         {
           key: "assistencias",
@@ -280,7 +288,7 @@ export function PainelLogistica({
           <Bloco
             id="notas-por-veiculo"
             titulo="Notas e produtos por veículo"
-            hint="Cargas, notas e produtos pela data da carga (ZAG_DTPREV). Por dia: média de veículos na rua nos dias com carga (placa distinta; sem placa, pelo motorista -- estimativa). Próprio ou terceirizado pela transportadora de cada carga no Protheus (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas) -- terceirizado dirigindo caminhão nosso conta nos próprios. % = fatia das notas do período."
+            hint="Cargas, notas e produtos pela data da carga (ZAG_DTPREV). Por dia: média de veículos na rua nos dias com carga (placa distinta; sem placa, pelo motorista -- estimativa). Próprio ou terceirizado pelo vínculo do motorista: a transportadora pela qual ele mais rodou nos últimos 180 dias (TRANSP. LOJAS MAIA e EXPRESSA são nossas; Ronaldo Transportes, THZ, D&A, Alenilson, Santos e outras são terceirizadas). Carga de terceirizado lançada como LOJAS MAIA continua nos terceirizados (ver Qualidade dos dados). % = fatia das notas do período."
           >
             <GradeVeiculos linhas={grade} dias={resumo.dias} />
           </Bloco>
