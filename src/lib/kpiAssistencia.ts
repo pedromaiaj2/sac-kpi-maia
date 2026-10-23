@@ -865,6 +865,14 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   // TODOS os motivos, não só defeito de fabricação).
   const produtoDefeitoPorChamado = new Set<string>();
   const produtoDefeitoCount = new Map<string, number>();
+  // Códigos Protheus vistos por produto com defeito de fabricação --
+  // pedido do Victor 23/10/2026: "percentual sobre as vendas" nesse
+  // ranking, não só "fatia dos chamados mostrados". Populado no mesmo loop
+  // abaixo, reaproveitado depois de vendaQtdPorCodigo ser resolvido (mesma
+  // técnica de breakagePorGrupo mais abaixo, só que restrita a essa causa
+  // raiz) pra montar byProductDefeitoFabricacao com "X de Y vendidos" no
+  // label, igual byConferente já faz com "X de Y notas".
+  const produtoDefeitoCodigos = new Map<string, Set<string>>();
   // Agregação por part_code (Taxa de Quebra/Prejuízo, 10/09/2026) -- Map
   // própria, separada de produtoCount acima (que agrupa por DESCRIÇÃO
   // livre, não por código): um mesmo código pode ter descrições digitadas
@@ -959,11 +967,22 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     }
     breakagePorCodigo.set(codigo, breakageEntry);
 
-    if (parentRow.causa_raiz === "defeito_fabricacao" && !produtoDefeitoPorChamado.has(dedupeKey)) {
-      produtoDefeitoPorChamado.add(dedupeKey);
-      produtoDefeitoCount.set(baseLabel, (produtoDefeitoCount.get(baseLabel) ?? 0) + 1);
-      const produtoDefeitoTag = `produto_defeito:${baseLabel}`;
-      (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
+    if (parentRow.causa_raiz === "defeito_fabricacao") {
+      // Fora do `if` de dedupe por chamado de propósito -- aqui é coleta de
+      // código pra cruzar com venda depois (Set já deduplica sozinho), não
+      // contagem de chamado. Um produto pode aparecer em chamados
+      // diferentes com códigos diferentes (cores), todos precisam entrar
+      // na soma de venda do grupo.
+      const codigos = produtoDefeitoCodigos.get(baseLabel) ?? new Set<string>();
+      codigos.add(codigo);
+      produtoDefeitoCodigos.set(baseLabel, codigos);
+
+      if (!produtoDefeitoPorChamado.has(dedupeKey)) {
+        produtoDefeitoPorChamado.add(dedupeKey);
+        produtoDefeitoCount.set(baseLabel, (produtoDefeitoCount.get(baseLabel) ?? 0) + 1);
+        const produtoDefeitoTag = `produto_defeito:${baseLabel}`;
+        (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
+      }
     }
 
     const grupo = classificarProdutoAssistencia(item.product);
@@ -984,10 +1003,9 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   const byProductGroup: Count[] = [...grupoCount.entries()]
     .map(([key, { label, count }]) => ({ label, count, tag: `grupo:${key}` }))
     .sort((a, b) => b.count - a.count);
-  const byProductDefeitoFabricacao: Count[] = [...produtoDefeitoCount.entries()]
-    .map(([product, count]) => ({ label: product, count, tag: `produto_defeito:${product}` }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, PRODUCT_RANKING_LIMIT);
+  // byProductDefeitoFabricacao é montado mais abaixo, depois de
+  // vendaQtdPorCodigo ser resolvido -- precisa da venda do período pra
+  // calcular o percentual (ver produtoDefeitoCodigos acima).
 
   // Taxa de Quebra / Prejuízo de Estoque (10/09/2026) -- cruza os códigos
   // vistos acima com venda do MESMO período. Converte `range` (Date | null
@@ -1062,6 +1080,33 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
       // TODAS as lojas, com ou sem chamado.
       listStores(),
     ]);
+  // Ranking "Produtos com mais defeito de fabricação" com percentual sobre
+  // VENDA (não mais fatia dos chamados mostrados no próprio gráfico) --
+  // pedido do Victor 23/10/2026: "20 cadeiras heloisa com defeito de
+  // fabricação de 1200 pares vendidos (6%)". Mesmo padrão de
+  // byConferente (linha ~792): embute "X de Y vendidos · Z%" no label e
+  // preenche `pct` (BarRanking.tsx, showCount, já sabe ler isso) -- produto
+  // sem nenhum código Protheus identificado ou com venda abaixo de
+  // MIN_VENDA_PARA_TAXA fica sem o sufixo (mesmo "if (!total) return item"
+  // de byConferente), só mostra o número de chamados puro.
+  const byProductDefeitoFabricacao: Count[] = [...produtoDefeitoCount.entries()]
+    .map(([product, count]) => {
+      const item: Count = { label: product, count, tag: `produto_defeito:${product}` };
+      const codigos = produtoDefeitoCodigos.get(product);
+      if (!codigos) return item;
+      let vendaQtd = 0;
+      let temCodigoReal = false;
+      for (const codigo of codigos) {
+        if (codigo === CODIGO_NAO_IDENTIFICADO) continue;
+        temCodigoReal = true;
+        vendaQtd += vendaQtdPorCodigo.get(codigo) ?? 0;
+      }
+      if (!temCodigoReal || vendaQtd < MIN_VENDA_PARA_TAXA) return item;
+      const pct = (count / vendaQtd) * 100;
+      return { ...item, label: `${product} (${count} de ${vendaQtd} vendidos · ${pct.toFixed(pct < 1 ? 2 : 1)}%)`, pct };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, PRODUCT_RANKING_LIMIT);
   const storeNameById = new Map(allStores.map((s) => [s.id, s.name]));
   // Produto(s) desses chamados -- pedido do Victor 14/09/2026: "coloque o
   // nome do produto também" no resumo (TicketResumoModal.tsx). Mesmo

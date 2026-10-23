@@ -27,13 +27,32 @@ export function ChecklistEntregaFields({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
+      {/* Cabeçalho + cada item com cor própria (âmbar pendente, verde feito)
+          -- pedido do Victor 23/10/2026: a lista de checkbox simples "dava a
+          entender que dava pra marcar só uma ou duas". Cor por item (não só
+          o resumo "completo"/"incompleto" no rodapé) deixa claro, item por
+          item, que os 3 precisam virar verde pra liberar a rota. */}
+      <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
+        Marque os 3 itens abaixo como feito pra liberar a rota:
+      </p>
       <div className="flex flex-col gap-2">
         {[
           { name: "checklist_estoque", label: "Produto consta em estoque", checked: estoque, onChange: setEstoque },
           { name: "checklist_separado", label: "Produto separado", checked: separado, onChange: setSeparado },
           { name: "checklist_placa", label: "Produto sinalizado com placa", checked: placa, onChange: setPlaca },
         ].map((item) => (
-          <label key={item.name} className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+          <label
+            key={item.name}
+            className="flex items-center gap-2 text-sm rounded-md border px-2.5 py-2 transition-colors duration-150"
+            style={{
+              color: item.checked ? "var(--status-good)" : "var(--text-primary)",
+              borderColor: item.checked ? "var(--status-good)" : "var(--status-warning)",
+              background: item.checked
+                ? "color-mix(in srgb, var(--status-good) 10%, var(--surface-1))"
+                : "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))",
+              fontWeight: item.checked ? 600 : 500,
+            }}
+          >
             <input
               type="checkbox"
               name={item.name}
@@ -41,6 +60,7 @@ export function ChecklistEntregaFields({
               onChange={(e) => item.onChange(e.target.checked)}
               className="rounded"
             />
+            {item.checked ? "✓ " : ""}
             {item.label}
           </label>
         ))}

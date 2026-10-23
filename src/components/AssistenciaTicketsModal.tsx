@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import type { ReportRowItem } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./assistencia/StatusBadge";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
+import { exportTicketsPdf } from "@/lib/exportTicketsPdf";
 
 // Mesma estrutura visual de CategoryTicketsModal.tsx (aba "Geral" do
 // painel de KPIs), mas pra chamado de assistência (ReportRowItem,
@@ -23,6 +25,20 @@ export function AssistenciaTicketsModal({
   tickets: ReportRowItem[];
   onClose: () => void;
 }) {
+  // "Salvar relatório" -- pedido do Victor 23/10/2026: mandar o relatório de
+  // um conferente específico (ou qualquer outro drill-down) em PDF, com a
+  // quantidade e o detalhe de cada chamado. Os dados já estão todos aqui
+  // (mesma lista exibida na tela), sem busca nova nenhuma.
+  const [savingPdf, setSavingPdf] = useState(false);
+  async function handleSalvarRelatorio() {
+    setSavingPdf(true);
+    try {
+      await exportTicketsPdf(title, totalCount, tickets);
+    } finally {
+      setSavingPdf(false);
+    }
+  }
+
   return (
     <>
       <button
@@ -41,9 +57,19 @@ export function AssistenciaTicketsModal({
           <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             {title}
           </h3>
-          <button aria-label="Fechar" onClick={onClose} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-muted)" }}>
-            Fechar
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={handleSalvarRelatorio}
+              disabled={savingPdf || tickets.length === 0}
+              className="text-xs px-2 py-1 rounded font-medium disabled:opacity-50"
+              style={{ color: "var(--brand-green)" }}
+            >
+              {savingPdf ? "Salvando…" : "Salvar relatório"}
+            </button>
+            <button aria-label="Fechar" onClick={onClose} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-muted)" }}>
+              Fechar
+            </button>
+          </div>
         </div>
         <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
           {tickets.length === 0

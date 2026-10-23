@@ -232,7 +232,11 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           por ser outro recorte da mesma causa raiz, não perto do ranking
           geral de produto. */}
       {data.byProductDefeitoFabricacao.length > 0 ? (
-        <BarRanking title="Produtos com mais defeito de fabricação" data={data.byProductDefeitoFabricacao} onSelect={openDrilldown} showPercent />
+        // showCount (não showPercent) -- pedido do Victor 23/10/2026: o
+        // percentual agora é sobre VENDA do produto no período (já embutido
+        // no label/pct por kpiAssistencia.ts, mesmo padrão de byConferente),
+        // não mais a fatia desse produto dentro dos 20 exibidos no gráfico.
+        <BarRanking title="Produtos com mais defeito de fabricação" data={data.byProductDefeitoFabricacao} onSelect={openDrilldown} showCount />
       ) : null}
 
       <section className="grid md:grid-cols-2 gap-4">
