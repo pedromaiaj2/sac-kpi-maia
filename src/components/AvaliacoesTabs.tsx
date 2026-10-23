@@ -6,12 +6,14 @@ import type { NpsSummary, NpsDetractor } from "@/lib/kpi";
 import type { StoreGoogleReviews } from "@/lib/googleReviews";
 import type { NpsWeekPoint } from "@/lib/npsTrend";
 import type { NpsDetrator, NpsFaseResumo } from "@/lib/npsDetratores";
+import type { NpsSugestao } from "@/lib/npsSugestoes";
 import { RangePicker } from "./RangePicker";
 import { NpsCard, NPS_SCORE_LABELS } from "./NpsCard";
 import { BarRanking } from "./BarRanking";
 import { NpsTrendChart } from "./NpsTrendChart";
 import { GoogleReviewsSection } from "./GoogleReviewsSection";
 import { AvaliacoesResumo } from "./AvaliacoesResumo";
+import { NpsSugestoesSection } from "./NpsSugestoesSection";
 
 // Cada fonte de avaliação (além do Resumo) tem sua própria aba, sem
 // misturar (pedido do Victor 19/08/2026) -- quando entrar uma fonte nova de
@@ -30,6 +32,7 @@ const TABS = [
   { id: "resumo", label: "Resumo" },
   { id: "nps-sac", label: "NPS Atendimento (SAC)" },
   { id: "google", label: "Avaliações Google" },
+  { id: "sugestoes", label: "Sugestões" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -41,6 +44,7 @@ export function AvaliacoesTabs({
   googleReviews,
   npsDetratores,
   resumoFasesAdicionais,
+  npsSugestoes,
 }: {
   range: DateRange;
   npsSummary: NpsSummary;
@@ -49,6 +53,7 @@ export function AvaliacoesTabs({
   googleReviews: StoreGoogleReviews[];
   npsDetratores: NpsDetrator[];
   resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica" | "entrega" | "compra" | "venda", NpsFaseResumo>;
+  npsSugestoes: NpsSugestao[];
 }) {
   const [activeTab, setActiveTab] = useState<TabId>("resumo");
 
@@ -113,6 +118,8 @@ export function AvaliacoesTabs({
           )}
         </div>
       ) : null}
+
+      {activeTab === "sugestoes" ? <NpsSugestoesSection sugestoes={npsSugestoes} /> : null}
     </div>
   );
 }

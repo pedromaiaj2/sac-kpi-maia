@@ -7,9 +7,10 @@ import { fetchInBatches } from "@/lib/supabaseBatch";
 import { fetchGhlMessages, upsertGhlContact, addContactTag, findGhlConversationId, isHumanReply } from "@/lib/ghlClient";
 import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "@/lib/serviceRequests";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "@/lib/npsDetratores";
-import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/nps2Meses";
+import { enrollPendingCompraNps, detectPendingCompraNpsResponses, detectPendingCompraSugestoes } from "@/lib/nps2Meses";
 import { enrollPendingEntregaNps, detectPendingEntregaNpsResponses } from "@/lib/entregaNps";
 import { enrollPendingVendaNps, detectPendingVendaNpsResponses } from "@/lib/vendaNps";
+import { maybeRequestGoogleReview } from "@/lib/googleReviewRequest";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -264,7 +265,7 @@ async function enrollPendingNps(
 async function detectPendingNpsResponses(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<number> {
   const { data: pending } = await supabase
     .from("service_request_nps")
-    .select("request_id, ghl_contact_id, enviado_em")
+    .select("request_id, ghl_contact_id, enviado_em, tipo, service_requests(store_id)")
     .is("respondido_em", null)
     .limit(100);
   if (!pending || pending.length === 0) return 0;
@@ -283,6 +284,16 @@ async function detectPendingNpsResponses(supabase: ReturnType<typeof getSupabase
     const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await supabase.from("service_request_nps").update({ score, respondido_em: reply.dateAdded }).eq("request_id", row.request_id);
     answered++;
+
+    const request = Array.isArray(row.service_requests) ? row.service_requests[0] : row.service_requests;
+    await maybeRequestGoogleReview(supabase, {
+      origem: row.tipo as "montagem" | "assistencia_tecnica",
+      origemId: row.request_id,
+      clientId: null,
+      score,
+      ghlContactId: row.ghl_contact_id,
+      storeId: request?.store_id ?? null,
+    });
   }
   return answered;
 }
@@ -420,6 +431,9 @@ async function runSync() {
   errors.push(...compraNpsErrors);
   avisos.push(...compraNpsAvisos);
   const compraNpsAnswered = await detectPendingCompraNpsResponses();
+  // Sugestão de melhoria (nps2Meses.ts) -- varredura própria, separada da
+  // detecção de score acima (a resposta pode chegar minutos/horas depois).
+  const compraSugestoesCapturadas = await detectPendingCompraSugestoes();
 
   // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: a entrega ORIGINAL da
   // compra (não um chamado de assistência), mesma fonte de dado que
@@ -454,6 +468,7 @@ async function runSync() {
       compraNpsEnrolled,
       compraNpsSemTelefone,
       compraNpsAnswered,
+      compraSugestoesCapturadas,
       entregaNpsEnrolled,
       entregaNpsSemTelefone,
       entregaNpsAnswered,
@@ -478,6 +493,7 @@ async function runSync() {
     compraNpsEnrolled,
     compraNpsSemTelefone,
     compraNpsAnswered,
+    compraSugestoesCapturadas,
     entregaNpsEnrolled,
     entregaNpsSemTelefone,
     entregaNpsAnswered,

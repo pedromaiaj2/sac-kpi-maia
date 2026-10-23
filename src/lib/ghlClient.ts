@@ -92,6 +92,21 @@ export async function findGhlConversationId(ghlContactId: string, conta?: GhlCon
   return data.conversations?.[0]?.id ?? null;
 }
 
+// Grava um custom field de texto no contato -- usado pelo pedido de
+// avaliação Google (googleReviewRequest.ts): o link da loja é diferente em
+// cada uma das 16 lojas, e todo template de NPS até aqui é texto fixo, sem
+// variável nenhuma por contato. `key` é o Field Key cadastrado no GHL (não
+// o id interno), igual o resto desse arquivo referencia tag/workflow por
+// nome em vez de id -- mais fácil de conferir contra o painel do GHL.
+export async function setGhlContactCustomField(ghlContactId: string, key: string, value: string, conta?: GhlConta): Promise<boolean> {
+  const res = await fetch(`${BASE_URL}/contacts/${ghlContactId}`, {
+    method: "PUT",
+    headers: { ...ghlHeaders(conta?.token), "Content-Type": "application/json" },
+    body: JSON.stringify({ customFields: [{ key, field_value: value }] }),
+  });
+  return res.ok;
+}
+
 // Aplica uma tag no contato -- é o próprio gatilho de envio das pesquisas
 // de NPS (montagem/assistência técnica/entrega/compra, pedido do Victor
 // 22/09/2026): cada Workflow no GHL já tem "Contact Tag" (filtro "Tag

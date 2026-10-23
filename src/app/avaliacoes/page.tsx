@@ -4,6 +4,7 @@ import { listStoreGoogleReviews } from "@/lib/googleReviews";
 import { getNpsTrend } from "@/lib/npsTrend";
 import { listNpsDetratores, getNpsResumoPorFaseAdicional } from "@/lib/npsDetratores";
 import { getCompraNpsResumo } from "@/lib/nps2Meses";
+import { listNpsSugestoes } from "@/lib/npsSugestoes";
 import { AvaliacoesTabs } from "@/components/AvaliacoesTabs";
 
 export const revalidate = 60;
@@ -26,13 +27,14 @@ export default async function AvaliacoesPage({
 }) {
   const params = await searchParams;
   const range = resolveRange(params);
-  const [data, googleReviews, npsTrend, npsDetratores, resumoFasesAdicionais, compraNpsResumo] = await Promise.all([
+  const [data, googleReviews, npsTrend, npsDetratores, resumoFasesAdicionais, compraNpsResumo, npsSugestoes] = await Promise.all([
     getKpiData(range),
     listStoreGoogleReviews(),
     getNpsTrend(NPS_TREND_WEEKS),
     listNpsDetratores(),
     getNpsResumoPorFaseAdicional(),
     getCompraNpsResumo(),
+    listNpsSugestoes(),
   ]);
   // Junta os dois resumos numa coisa só pro Resumo de /avaliacoes mostrar
   // as 4 fases que já calculam sozinhas -- compra_nps é tabela separada
@@ -60,6 +62,7 @@ export default async function AvaliacoesPage({
         googleReviews={googleReviews}
         npsDetratores={npsDetratores}
         resumoFasesAdicionais={resumoFasesCompletas}
+        npsSugestoes={npsSugestoes}
       />
     </div>
   );

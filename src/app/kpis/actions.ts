@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { registrarStatusDetrator, isNpsDetratorStatus, listNpsRespostasPorFase, type NpsDetratorOrigem, type NpsResposta } from "@/lib/npsDetratores";
 import { getVendaSellerRanking, type VendedorRankingEntry } from "@/lib/vendaNps";
+import { setNpsSugestaoLida } from "@/lib/npsSugestoes";
 
 // Avaliações do Google -- puxadas manualmente uma vez por semana (ver
 // src/lib/googleReviews.ts). O painel de KPIs do SAC usa login próprio
@@ -56,6 +57,14 @@ export async function saveGoogleReviewSnapshot(
     );
   if (error) throw new Error(error.message);
 
+  revalidatePath("/avaliacoes");
+}
+
+// Aba "Sugestões" -- pedido do Victor 23/10/2026. Mesmo login (senha única
+// do painel de KPIs) das ações acima.
+export async function marcarNpsSugestaoLidaAction(id: string, lida: boolean): Promise<void> {
+  await requireDashboardAuth();
+  await setNpsSugestaoLida(id, lida);
   revalidatePath("/avaliacoes");
 }
 

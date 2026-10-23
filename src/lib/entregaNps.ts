@@ -6,6 +6,7 @@ import { findGhlConversationId, fetchGhlMessages } from "./ghlClient";
 import { fetchInBatches } from "./supabaseBatch";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
+import { maybeRequestGoogleReview } from "./googleReviewRequest";
 
 // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: pergunta sobre a
 // entrega ORIGINAL da compra (o caminhão leva o móvel pela primeira vez),
@@ -125,7 +126,7 @@ export async function detectPendingEntregaNpsResponses(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: pending } = await admin
     .from("entrega_nps")
-    .select("order_id, ghl_contact_id, enviado_em")
+    .select("order_id, ghl_contact_id, enviado_em, client_id, totvs_orders(branch)")
     .is("respondido_em", null)
     // As mais recentes primeiro (ver vendaNps.ts): sem ordem, as 100 primeiras
     // pendentes eram sempre as mesmas e as novas não eram lidas.
@@ -148,6 +149,16 @@ export async function detectPendingEntregaNpsResponses(): Promise<number> {
     const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await admin.from("entrega_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
     answered++;
+
+    const order = Array.isArray(row.totvs_orders) ? row.totvs_orders[0] : row.totvs_orders;
+    await maybeRequestGoogleReview(admin, {
+      origem: "entrega",
+      origemId: row.order_id,
+      clientId: row.client_id,
+      score,
+      ghlContactId: row.ghl_contact_id,
+      storeId: order?.branch ?? null,
+    });
   }
   return answered;
 }
