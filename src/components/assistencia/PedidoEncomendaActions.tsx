@@ -13,7 +13,7 @@ import {
 import { useQuickAction } from "./useQuickAction";
 import { PEDIDO_ENCOMENDA_STATUS_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import type { TotvsOrderSuggestion } from "@/lib/totvsLookup";
-import { INTERNAL_FABRICAS, EXTERNAL_FABRICAS } from "@/lib/fabricas";
+import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 import { FormSection } from "./FormSection";
 
 type NextStep = {
@@ -71,6 +71,7 @@ export function PedidoEncomendaActions({
   fornecedorExterno,
   matchesFabrica,
   undoTarget,
+  suppliers,
   children,
 }: {
   pedidoId: string;
@@ -87,6 +88,9 @@ export function PedidoEncomendaActions({
   // do servidor (checou papel, janela de tempo e se ninguém mexeu depois,
   // ver undoLastPedidoStatusChange). null = não tem o que desfazer agora.
   undoTarget: string | null;
+  // Cadastro real de fornecedores (ver mesmo comentário em
+  // NovoPedidoEncomendaForm.tsx) -- usado na correção de fornecedor abaixo.
+  suppliers: string[];
   children?: React.ReactNode;
 }) {
   const { pending, run } = useQuickAction();
@@ -100,7 +104,7 @@ export function PedidoEncomendaActions({
   const [showFornecedor, setShowFornecedor] = useState(false);
   const [novoFornecedorTipo, setNovoFornecedorTipo] = useState<"fabrica_interna" | "fabrica_externa">(fornecedorTipo);
   const [novaFabricaId, setNovaFabricaId] = useState(fabricaId ?? INTERNAL_FABRICAS[0].id);
-  const [novoFornecedorExterno, setNovoFornecedorExterno] = useState(fornecedorExterno ?? EXTERNAL_FABRICAS[0]);
+  const [novoFornecedorExterno, setNovoFornecedorExterno] = useState(fornecedorExterno ?? suppliers[0] ?? "");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -319,7 +323,7 @@ export function PedidoEncomendaActions({
                 className="rounded border px-3 py-2 text-sm"
                 style={{ borderColor: "var(--border)" }}
               >
-                {EXTERNAL_FABRICAS.map((f) => (
+                {suppliers.map((f) => (
                   <option key={f} value={f}>
                     {f}
                   </option>

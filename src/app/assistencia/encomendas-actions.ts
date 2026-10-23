@@ -7,7 +7,8 @@ import { requireEncomendaAction } from "@/lib/dal";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
 import { resolveEncomendaRequester, canEditPedido } from "@/lib/encomendaRequester";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
-import { INTERNAL_FABRICAS, EXTERNAL_FABRICAS } from "@/lib/fabricas";
+import { INTERNAL_FABRICAS } from "@/lib/fabricas";
+import { listSuppliers } from "@/lib/partOrders";
 import {
   createPedidoEncomenda,
   updatePedidoStatus,
@@ -122,7 +123,8 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
     const rawTipo = String(formData.get("fornecedor_tipo") ?? "");
     if (rawTipo === "fabrica_externa") {
       const rawExterno = String(formData.get("fornecedor_externo") ?? "").trim();
-      if (!EXTERNAL_FABRICAS.includes(rawExterno)) return { error: "Selecione um fornecedor externo válido." };
+      const suppliers = await listSuppliers();
+      if (!suppliers.includes(rawExterno)) return { error: "Selecione um fornecedor externo válido." };
       fornecedorTipo = "fabrica_externa";
       fornecedorExterno = rawExterno;
     } else {
@@ -444,7 +446,8 @@ export async function updatePedidoFornecedorAction(
   let fabricaId: string | null = null;
   let fornecedorExterno: string | null = null;
   if (input.fornecedorTipo === "fabrica_externa") {
-    if (!EXTERNAL_FABRICAS.includes(input.fornecedorExterno ?? "")) throw new Error("Selecione um fornecedor externo válido.");
+    const suppliers = await listSuppliers();
+    if (!suppliers.includes(input.fornecedorExterno ?? "")) throw new Error("Selecione um fornecedor externo válido.");
     fornecedorTipo = "fabrica_externa";
     fornecedorExterno = input.fornecedorExterno;
   } else {

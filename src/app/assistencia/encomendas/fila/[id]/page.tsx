@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
 import { getPedidoDetail, PEDIDO_UNDO_WINDOW_MS, type PedidoEncomendaEvent } from "@/lib/pedidosEncomenda";
+import { listSuppliers } from "@/lib/partOrders";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
 import { PedidoEncomendaActions } from "@/components/assistencia/PedidoEncomendaActions";
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
@@ -60,7 +61,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
   }
 
   const { pedido, events } = result;
-  const photos = await listEncomendaPhotos(pedido.id);
+  const [photos, suppliers] = await Promise.all([listEncomendaPhotos(pedido.id), listSuppliers()]);
   const externo = pedido.fornecedorTipo === "fabrica_externa";
   const matchesFabrica = actor.role !== "fabrica" || actor.fabricaId == null || actor.fabricaId === pedido.fabricaId;
   const fornecedorLabel = externo ? `Externo: ${pedido.fornecedorExterno}` : pedido.fabricaNome;
@@ -170,6 +171,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
             fornecedorExterno={pedido.fornecedorExterno}
             matchesFabrica={matchesFabrica}
             undoTarget={undoTarget}
+            suppliers={suppliers}
           >
             <div className="grid sm:grid-cols-2 gap-4">
               <PedidoPrazoField

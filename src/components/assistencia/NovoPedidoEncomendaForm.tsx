@@ -7,7 +7,7 @@ import {
   lookupTotvsProductForEncomenda,
   type FormState,
 } from "@/app/assistencia/encomendas-actions";
-import { INTERNAL_FABRICAS, EXTERNAL_FABRICAS } from "@/lib/fabricas";
+import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -52,6 +52,7 @@ export function NovoPedidoEncomendaForm({
   storeOptions,
   showFornecedorPicker = true,
   allowExternal = true,
+  suppliers,
 }: {
   fixedStoreName?: string;
   storeOptions?: { id: string; name: string }[];
@@ -61,6 +62,11 @@ export function NovoPedidoEncomendaForm({
   // encomendas-actions.ts) -- então o picker, quando aparece pra esse
   // papel, mostra só as fábricas, sem a opção externa.
   allowExternal?: boolean;
+  // Cadastro real de fornecedores (partOrders.ts/suppliers) -- pedido do
+  // Victor 23/10/2026: antes era uma lista fixa de 8 nomes no código,
+  // defasada do cadastro real (42 fornecedores). Agora vem do mesmo
+  // cadastro que Pedidos a Fornecedores/Devoluções já usam.
+  suppliers: string[];
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPedidoEncomendaAction, undefined);
   const formRef = useRef<HTMLFormElement>(null);
@@ -83,8 +89,8 @@ export function NovoPedidoEncomendaForm({
   // aproveita o fabricante que já vem nessa busca (match.manufacturer,
   // puxado do histórico de vendas do TOTVS) pra evitar o erro mais comum
   // nessa tela: caixa deixa marcado "fábrica interna" (valor padrão) sem
-  // perceber que o produto é de um fornecedor externo conhecido (Tekshine,
-  // Probel etc, ver EXTERNAL_FABRICAS) -- se bater, troca sozinho e avisa.
+  // perceber que o produto é de um fornecedor externo conhecido (algum dos
+  // `suppliers` cadastrados) -- se bater, troca sozinho e avisa.
   function lookupItemProduct(index: number, code: string) {
     if (!code.trim()) {
       setProductLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
@@ -101,7 +107,7 @@ export function NovoPedidoEncomendaForm({
         setProductLookupStatus((prev) => ({ ...prev, [index]: "found" }));
 
         if (match.manufacturer && allowExternal && !fornecedorTouched) {
-          const detected = EXTERNAL_FABRICAS.find((f) => f.toLowerCase() === match.manufacturer!.trim().toLowerCase());
+          const detected = suppliers.find((f) => f.toLowerCase() === match.manufacturer!.trim().toLowerCase());
           if (detected) {
             setFornecedorTipo("fabrica_externa");
             setFornecedorExterno(detected);
@@ -298,7 +304,7 @@ export function NovoPedidoEncomendaForm({
                   <option value="" disabled>
                     Selecione…
                   </option>
-                  {EXTERNAL_FABRICAS.map((nome) => (
+                  {suppliers.map((nome) => (
                     <option key={nome} value={nome}>
                       {nome}
                     </option>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
+import { listSuppliers } from "@/lib/partOrders";
 import { NovoPedidoEncomendaForm } from "@/components/assistencia/NovoPedidoEncomendaForm";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
@@ -20,6 +21,7 @@ export default async function SolicitarEncomendaPage({
   }
 
   const admin = getSupabaseAdmin();
+  const suppliers = await listSuppliers();
 
   const noFixedStore =
     requester.kind === "cd" || requester.kind === "fabrica" || requester.kind === "sac" || requester.kind === "assistencia";
@@ -81,6 +83,7 @@ export default async function SolicitarEncomendaPage({
         storeOptions={storeOptions}
         showFornecedorPicker={requester.kind !== "fabrica" || requester.fabricaId === null}
         allowExternal={requester.kind !== "fabrica"}
+        suppliers={suppliers}
       />
     </div>
   );
