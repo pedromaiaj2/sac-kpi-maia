@@ -92,17 +92,23 @@ export async function findGhlConversationId(ghlContactId: string, conta?: GhlCon
   return data.conversations?.[0]?.id ?? null;
 }
 
-// Grava um custom field de texto no contato -- usado pelo pedido de
-// avaliação Google (googleReviewRequest.ts): o link da loja é diferente em
-// cada uma das 16 lojas, e todo template de NPS até aqui é texto fixo, sem
-// variável nenhuma por contato. `key` é o Field Key cadastrado no GHL (não
-// o id interno), igual o resto desse arquivo referencia tag/workflow por
-// nome em vez de id -- mais fácil de conferir contra o painel do GHL.
-export async function setGhlContactCustomField(ghlContactId: string, key: string, value: string, conta?: GhlConta): Promise<boolean> {
-  const res = await fetch(`${BASE_URL}/contacts/${ghlContactId}`, {
-    method: "PUT",
+// Manda mensagem de WhatsApp livre (sem Template da Meta) direto pro
+// contato -- pedido do Victor/achado do Pedro 24/10/2026: pedir avaliação
+// Google via Template sempre cai como categoria "Marketing" (a Meta trata
+// pedido de review como isso, não tem como fugir reformulando o texto) --
+// Marketing só entrega pra quem tem opt-in, e ainda custa mais caro por
+// conversa. Mensagem livre não passa por aprovação nem categoria nenhuma
+// contanto que esteja dentro da janela de 24h desde a última mensagem do
+// contato -- e como quem chama isso (googleReviewRequest.ts/entregaNps.ts)
+// só roda logo depois de detectar a resposta do próprio cliente, está
+// sempre bem dentro dessa janela. Usado tanto pro pedido de avaliação
+// quanto pela pergunta de sugestão de melhoria -- nenhum dos dois precisa
+// de Workflow/Template novo no GHL.
+export async function sendGhlMessage(ghlContactId: string, message: string, conta?: GhlConta): Promise<boolean> {
+  const res = await fetch(`${BASE_URL}/conversations/messages`, {
+    method: "POST",
     headers: { ...ghlHeaders(conta?.token), "Content-Type": "application/json" },
-    body: JSON.stringify({ customFields: [{ key, field_value: value }] }),
+    body: JSON.stringify({ type: "WhatsApp", contactId: ghlContactId, message }),
   });
   return res.ok;
 }

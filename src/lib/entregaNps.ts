@@ -2,7 +2,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
-import { findGhlConversationId, fetchGhlMessages } from "./ghlClient";
+import { findGhlConversationId, fetchGhlMessages, sendGhlMessage } from "./ghlClient";
 import { fetchInBatches } from "./supabaseBatch";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
@@ -150,6 +150,18 @@ export async function detectPendingEntregaNpsResponses(): Promise<number> {
     await admin.from("entrega_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
     answered++;
 
+    // Pergunta de sugestão -- mandada direto daqui (texto livre, sem
+    // Template/Workflow, ver sendGhlMessage), pra TODO MUNDO que respondeu a
+    // nota, não só promotor (acerto do Pedro 24/10/2026: a resposta do
+    // cliente a essa mensagem é lida depois por detectPendingEntregaSugestoes
+    // abaixo, não importa quem mandou a pergunta).
+    try {
+      await sendGhlMessage(row.ghl_contact_id, "Muito obrigado! 🙏 Se tiver alguma sugestão pra melhorarmos, pode escrever aqui 👇");
+    } catch {
+      // best-effort -- não pode derrubar a detecção de score, que já
+      // aconteceu acima.
+    }
+
     const order = Array.isArray(row.totvs_orders) ? row.totvs_orders[0] : row.totvs_orders;
     await maybeRequestGoogleReview(admin, {
       origem: "entrega",
@@ -166,14 +178,13 @@ export async function detectPendingEntregaNpsResponses(): Promise<number> {
 // Sugestão de melhoria em texto livre -- pedido do Victor 23/10/2026,
 // movido de "compra" pra "entrega" (24/10/2026): mais perto do "calor do
 // momento" da entrega do que 20 dias depois, mesmo raciocínio do pedido de
-// avaliação Google acima. A pergunta é a seguinte dentro do MESMO Workflow
-// "Pós-entrega" (configurada no GHL, fora daqui), depois da nota -- não é
-// um disparo novo, não precisa de tag. A resposta pode chegar minutos ou
-// horas depois da nota (o cliente responde quando quiser), por isso é uma
-// varredura própria, separada da detecção de score acima -- não dá pra
-// conferir só no mesmo instante em que o score é detectado.
-// `sugestao_verificada` (0199_entrega_sugestao.sql) evita reconferir pra
-// sempre: desiste depois de 3 dias sem resposta.
+// avaliação Google acima. A pergunta em si é mandada direto por
+// detectPendingEntregaNpsResponses (sendGhlMessage, sem Template/Workflow) --
+// a resposta pode chegar minutos ou horas depois (o cliente responde quando
+// quiser), por isso a LEITURA é uma varredura própria, separada da detecção
+// de score acima -- não dá pra conferir só no mesmo instante em que a
+// pergunta é mandada. `sugestao_verificada` (0199_entrega_sugestao.sql)
+// evita reconferir pra sempre: desiste depois de 3 dias sem resposta.
 const SUGESTAO_JANELA_DIAS = 3;
 
 export async function detectPendingEntregaSugestoes(): Promise<number> {

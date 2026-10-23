@@ -1,5 +1,5 @@
 import type { getSupabaseAdmin } from "./supabaseAdmin";
-import { setGhlContactCustomField, addContactTag, type GhlConta } from "./ghlClient";
+import { sendGhlMessage, type GhlConta } from "./ghlClient";
 import { listClientesNaoContatar } from "./recompra";
 
 // Pedido de avaliação Google pros clientes promotores -- pedido do Victor
@@ -11,21 +11,21 @@ import { listClientesNaoContatar } from "./recompra";
 // (esses NÃO chamam essa função). Chamada de dentro de
 // detectPendingEntregaNpsResponses (entregaNps.ts) logo depois que o score
 // é gravado, reaproveitando o ghlContactId que a pesquisa já resolveu (sem
-// telefone/contato de novo). Mesma mecânica de tag + Workflow do GHL que as
-// pesquisas de NPS já usam (ver npsEnvio.ts) -- só que aqui o Workflow
-// (criado no GHL, fora daqui) espera o link da loja num custom field do
-// contato, porque cada loja tem um link diferente (stores.google_maps_url)
-// e todo template de NPS até hoje é texto fixo.
+// telefone/contato de novo).
+//
+// Mensagem livre (sendGhlMessage), não tag+Workflow+Template -- achado do
+// Pedro 24/10/2026: Template de pedido de avaliação sempre cai como
+// categoria "Marketing" na revisão da Meta (não tem como fugir reformulando
+// o texto), que só entrega pra quem tem opt-in de marketing. Mensagem livre
+// dentro da janela de 24h (sempre é o caso aqui -- isso roda logo depois de
+// detectar a resposta do próprio cliente) não passa por template nem
+// categoria nenhuma. Sem custom field também: o link da loja já vai embutido
+// direto no texto.
 //
 // Best-effort de propósito: nunca lança -- um problema aqui (loja sem link,
 // GHL fora do ar) não pode derrubar a detecção da pesquisa original por
 // trás, que já rodou e gravou o score antes de chamar isso.
 export type GoogleReviewOrigem = "entrega";
-
-const GOOGLE_REVIEW_TAG = "pedir-avaliacao-google";
-// Field Key do custom field no GHL -- precisa bater exatamente com o
-// cadastrado lá (ver plano/README do Workflow "Pedir avaliação Google").
-const GOOGLE_REVIEW_CUSTOM_FIELD_KEY = "link_avaliacao_google";
 
 // "Pós-entrega" não tem o limite de 1 pesquisa a cada X dias por cliente
 // que "compra" tem (um cliente com 2 entregas na mesma semana recebe as
@@ -91,8 +91,11 @@ export async function maybeRequestGoogleReview(
       .select("id");
     if (error || !reservada || reservada.length === 0) return;
 
-    await setGhlContactCustomField(opts.ghlContactId, GOOGLE_REVIEW_CUSTOM_FIELD_KEY, link, opts.conta);
-    await addContactTag(opts.ghlContactId, GOOGLE_REVIEW_TAG, opts.conta);
+    await sendGhlMessage(
+      opts.ghlContactId,
+      `Que bom que você gostou! 😀 Poderia deixar sua avaliação da loja no Google? ${link}`,
+      opts.conta
+    );
   } catch {
     // best-effort, ver comentário no topo do arquivo.
   }
