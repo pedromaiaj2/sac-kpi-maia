@@ -10,7 +10,7 @@ function formatDateTime(iso: string): string {
 }
 
 // Sugestões de melhoria dos clientes, capturadas em texto livre (ver
-// nps2Meses.ts/detectPendingCompraSugestoes) -- pedido do Victor
+// entregaNps.ts/detectPendingEntregaSugestoes) -- pedido do Victor
 // 23/10/2026. Lista simples + botão "marcar como lida", mesmo espírito de
 // edição inline que ReclamacaoTableRow.tsx já usa (sem abrir formulário
 // nenhum só pra isso).
@@ -36,7 +36,7 @@ export function NpsSugestoesSection({ sugestoes }: { sugestoes: NpsSugestao[] })
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Pergunta extra na pesquisa &quot;20 dias pós-recebimento&quot; -- {naoLidas} sugestão{naoLidas === 1 ? "" : "ões"} não lida
+          Pergunta extra na pesquisa &quot;Pós-entrega&quot; -- {naoLidas} sugestão{naoLidas === 1 ? "" : "ões"} não lida
           {naoLidas === 1 ? "" : "s"}.
         </p>
         <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: "var(--text-secondary)" }}>

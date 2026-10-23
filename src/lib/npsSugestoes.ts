@@ -1,8 +1,8 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 
 // Sugestões de melhoria em texto livre -- pedido do Victor 23/10/2026,
-// capturadas hoje só na pesquisa "compra" (ver nps2Meses.ts,
-// detectPendingCompraSugestoes). `origem` já vem aberto pra outro momento
+// capturadas hoje só na pesquisa "Pós-entrega" (ver entregaNps.ts,
+// detectPendingEntregaSugestoes). `origem` já vem aberto pra outro momento
 // da jornada entrar depois sem precisar de migração nova.
 export type NpsSugestao = {
   id: string;

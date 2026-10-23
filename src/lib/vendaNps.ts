@@ -5,7 +5,6 @@ import { findGhlConversationId, fetchGhlMessages, type GhlConta } from "./ghlCli
 import { SUBCONTAS } from "./ghlSubcontas";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
-import { maybeRequestGoogleReview } from "./googleReviewRequest";
 
 // NPS "Pós-venda" -- pedido do Victor 19/10/2026: avaliar o ATENDIMENTO EM
 // LOJA, disparado assim que a venda é registrada no Protheus. Mais simples
@@ -127,7 +126,7 @@ export async function detectPendingVendaNpsResponses(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: pending } = await admin
     .from("venda_nps")
-    .select("order_id, ghl_contact_id, enviado_em, ghl_location_id, client_id, totvs_orders(branch)")
+    .select("order_id, ghl_contact_id, enviado_em, ghl_location_id")
     .is("respondido_em", null)
     .gte("enviado_em", new Date(Date.now() - RESPOSTA_JANELA_DIAS * 24 * 60 * 60 * 1000).toISOString())
     .order("enviado_em", { ascending: false })
@@ -150,17 +149,6 @@ export async function detectPendingVendaNpsResponses(): Promise<number> {
     const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await admin.from("venda_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
     answered++;
-
-    const order = Array.isArray(row.totvs_orders) ? row.totvs_orders[0] : row.totvs_orders;
-    await maybeRequestGoogleReview(admin, {
-      origem: "venda",
-      origemId: row.order_id,
-      clientId: row.client_id,
-      score,
-      ghlContactId: row.ghl_contact_id,
-      storeId: order?.branch ?? null,
-      conta,
-    });
   }
   return answered;
 }

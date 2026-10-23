@@ -3,24 +3,37 @@ import { setGhlContactCustomField, addContactTag, type GhlConta } from "./ghlCli
 import { listClientesNaoContatar } from "./recompra";
 
 // Pedido de avaliação Google pros clientes promotores -- pedido do Victor
-// 23/10/2026. Chamada de dentro de cada "detectPendingXxxNpsResponses" logo
-// depois que o score da pesquisa original é gravado, reaproveitando o
-// ghlContactId que aquela pesquisa já resolveu (sem telefone/contato de
-// novo). Mesma mecânica de tag + Workflow do GHL que as pesquisas de NPS já
-// usam (ver npsEnvio.ts) -- só que aqui o Workflow (criado no GHL, fora
-// daqui) espera o link da loja num custom field do contato, porque cada
-// loja tem um link diferente (stores.google_maps_url) e todo template de
-// NPS até hoje é texto fixo.
+// 23/10/2026, restrito à pesquisa "Pós-entrega" (24/10/2026, decisão do
+// Victor): é a que dispara mais perto do "calor do momento" (1-2 dias
+// depois da entrega, contra 20 dias de "compra"), maior chance de converter
+// em avaliação de verdade -- e evita pedir a mesma coisa mais de uma vez
+// pro mesmo cliente que também é promotor em venda/montagem/assistência
+// (esses NÃO chamam essa função). Chamada de dentro de
+// detectPendingEntregaNpsResponses (entregaNps.ts) logo depois que o score
+// é gravado, reaproveitando o ghlContactId que a pesquisa já resolveu (sem
+// telefone/contato de novo). Mesma mecânica de tag + Workflow do GHL que as
+// pesquisas de NPS já usam (ver npsEnvio.ts) -- só que aqui o Workflow
+// (criado no GHL, fora daqui) espera o link da loja num custom field do
+// contato, porque cada loja tem um link diferente (stores.google_maps_url)
+// e todo template de NPS até hoje é texto fixo.
 //
 // Best-effort de propósito: nunca lança -- um problema aqui (loja sem link,
 // GHL fora do ar) não pode derrubar a detecção da pesquisa original por
 // trás, que já rodou e gravou o score antes de chamar isso.
-export type GoogleReviewOrigem = "venda" | "entrega" | "compra" | "montagem" | "assistencia_tecnica";
+export type GoogleReviewOrigem = "entrega";
 
 const GOOGLE_REVIEW_TAG = "pedir-avaliacao-google";
 // Field Key do custom field no GHL -- precisa bater exatamente com o
 // cadastrado lá (ver plano/README do Workflow "Pedir avaliação Google").
 const GOOGLE_REVIEW_CUSTOM_FIELD_KEY = "link_avaliacao_google";
+
+// "Pós-entrega" não tem o limite de 1 pesquisa a cada X dias por cliente
+// que "compra" tem (um cliente com 2 entregas na mesma semana recebe as
+// duas pesquisas de propósito) -- sem essa trava aqui, um cliente que
+// compra com frequência receberia o pedido de avaliação Google de novo a
+// cada entrega nova. 90 dias, mesmo prazo que compra_nps já usa pro envio
+// da pesquisa em si.
+const COOLDOWN_DIAS = 90;
 
 type Admin = ReturnType<typeof getSupabaseAdmin>;
 
@@ -47,6 +60,15 @@ export async function maybeRequestGoogleReview(
     if (opts.clientId) {
       const naoContatar = await listClientesNaoContatar();
       if (naoContatar.has(opts.clientId)) return;
+
+      const sinceIso = new Date(Date.now() - COOLDOWN_DIAS * 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentes } = await admin
+        .from("google_review_requests")
+        .select("id")
+        .eq("client_id", opts.clientId)
+        .gte("enviado_em", sinceIso)
+        .limit(1);
+      if (recentes && recentes.length > 0) return;
     }
 
     // Reserva antes de mexer no GHL (mesmo motivo de npsEnvio.ts): só

@@ -7,7 +7,6 @@ import { SUBCONTAS } from "./ghlSubcontas";
 import { fetchInBatches } from "./supabaseBatch";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN, type NpsFaseResumo } from "./npsDetratores";
-import { maybeRequestGoogleReview } from "./googleReviewRequest";
 
 // Subconta do disparo -- mesmo mecanismo de vendaNps.ts (0194/21-10-2026):
 // COMPRA_NPS_SUBCONTA=lojas_maia liga; sem a variável continua pelo SAC. Na
@@ -180,7 +179,7 @@ export async function detectPendingCompraNpsResponses(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: pending } = await admin
     .from("compra_nps")
-    .select("order_id, ghl_contact_id, enviado_em, ghl_location_id, client_id, totvs_orders(branch)")
+    .select("order_id, ghl_contact_id, enviado_em, ghl_location_id")
     .is("respondido_em", null)
     // As mais recentes primeiro (ver vendaNps.ts): sem ordem, as 100 primeiras
     // pendentes eram sempre as mesmas e as novas não eram lidas.
@@ -205,82 +204,8 @@ export async function detectPendingCompraNpsResponses(): Promise<number> {
     const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await admin.from("compra_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
     answered++;
-
-    const order = Array.isArray(row.totvs_orders) ? row.totvs_orders[0] : row.totvs_orders;
-    await maybeRequestGoogleReview(admin, {
-      origem: "compra",
-      origemId: row.order_id,
-      clientId: row.client_id,
-      score,
-      ghlContactId: row.ghl_contact_id,
-      storeId: order?.branch ?? null,
-      conta,
-    });
   }
   return answered;
-}
-
-// Sugestão de melhoria em texto livre -- pedido do Victor 23/10/2026. A
-// pergunta é a seguinte dentro do MESMO Workflow "compra" (configurada no
-// GHL, fora daqui), depois da nota -- não é um disparo novo, não precisa de
-// tag. A resposta pode chegar minutos ou horas depois da nota (o cliente
-// responde quando quiser), por isso é uma varredura própria, separada da
-// detecção de score acima -- não dá pra conferir só no mesmo instante em
-// que o score é detectado. `sugestao_verificada` (0198_nps_sugestoes.sql)
-// evita reconferir pra sempre: desiste depois de 3 dias sem resposta.
-const SUGESTAO_JANELA_DIAS = 3;
-
-export async function detectPendingCompraSugestoes(): Promise<number> {
-  const admin = getSupabaseAdmin();
-  const sinceIso = new Date(Date.now() - SUGESTAO_JANELA_DIAS * 24 * 60 * 60 * 1000).toISOString();
-  const { data: pending } = await admin
-    .from("compra_nps")
-    .select("order_id, ghl_contact_id, respondido_em, ghl_location_id, client_id, totvs_orders(branch, client_name)")
-    .eq("sugestao_verificada", false)
-    .not("respondido_em", "is", null)
-    .gte("respondido_em", sinceIso)
-    .order("respondido_em", { ascending: false })
-    .limit(200);
-  if (!pending || pending.length === 0) return 0;
-
-  let capturadas = 0;
-  for (const row of pending) {
-    const conta = row.ghl_location_id === SUBCONTAS.lojas_maia.locationId ? contaLojasMaiaCompra() : undefined;
-    const conversationId = await findGhlConversationId(row.ghl_contact_id, conta);
-    if (!conversationId) continue;
-    const msgs = await fetchGhlMessages(conversationId, conta?.token);
-    if (!msgs) continue;
-
-    const respondidoAtMs = new Date(row.respondido_em).getTime();
-    // Qualquer mensagem inbound DEPOIS da resposta de nota que não seja ela
-    // mesma (não bate o padrão fixo "N - Label") é texto livre -- é a
-    // sugestão.
-    const sugestaoMsg = msgs.find(
-      (m) => m.direction === "inbound" && new Date(m.dateAdded).getTime() > respondidoAtMs && !NPS_1_5_PATTERN.test((m.body ?? "").trim())
-    );
-    const expirado = Date.now() - respondidoAtMs > SUGESTAO_JANELA_DIAS * 24 * 60 * 60 * 1000;
-
-    if (sugestaoMsg?.body?.trim()) {
-      const order = Array.isArray(row.totvs_orders) ? row.totvs_orders[0] : row.totvs_orders;
-      await admin.from("nps_sugestoes").upsert(
-        {
-          origem: "compra",
-          origem_id: row.order_id,
-          client_id: row.client_id,
-          client_name: order?.client_name ?? null,
-          store_id: order?.branch ?? null,
-          mensagem: sugestaoMsg.body.trim(),
-          capturada_em: sugestaoMsg.dateAdded,
-        },
-        { onConflict: "origem,origem_id", ignoreDuplicates: true }
-      );
-      await admin.from("compra_nps").update({ sugestao_verificada: true }).eq("order_id", row.order_id);
-      capturadas++;
-    } else if (expirado) {
-      await admin.from("compra_nps").update({ sugestao_verificada: true }).eq("order_id", row.order_id);
-    }
-  }
-  return capturadas;
 }
 
 // Resumo (NPS clássico: %promotores - %detratores, adaptado pra escala 1-5
