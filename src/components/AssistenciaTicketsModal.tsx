@@ -108,6 +108,11 @@ export function AssistenciaTicketsModal({
                   📦 {t.productSummary}
                 </span>
               ) : null}
+              {t.numeroCarga ? (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Carga: {t.numeroCarga}
+                </span>
+              ) : null}
               {t.reason ? (
                 <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                   {t.reason}

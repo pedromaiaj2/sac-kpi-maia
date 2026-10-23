@@ -51,6 +51,7 @@ type RequestRow = {
   rota: Rota | null;
   causa_raiz: string | null;
   causa_conferente: string | null;
+  causa_carga: string | null;
   driver_name: string | null;
   created_at: string;
   client_name: string | null;
@@ -80,6 +81,11 @@ function toReportRowItem(r: RequestRow, productSummary?: string | null): ReportR
     createdAt: r.created_at,
     reason: r.reason,
     productSummary,
+    // Pedido do Victor 23/10/2026: "preciso que saia também com o número
+    // da carga, nesse relatório dos conferentes" -- mesmo campo livre
+    // (causa_carga) já exibido em DeliveryRequestDetailContent.tsx
+    // ("Carga: X") pra erro_conferencia/sujeira_conferencia/erro_motorista.
+    numeroCarga: r.causa_carga,
   };
 }
 
@@ -657,7 +663,7 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
       let query = admin
         .from("service_requests")
         .select(
-          "id, ticket_number, type, status, store_id, rota, causa_raiz, causa_conferente, driver_name, created_at, client_name, reason, requested_by_name, stores(name), requester:profiles!requested_by(full_name)",
+          "id, ticket_number, type, status, store_id, rota, causa_raiz, causa_conferente, causa_carga, driver_name, created_at, client_name, reason, requested_by_name, stores(name), requester:profiles!requested_by(full_name)",
           { count: "exact" }
         )
         .in("type", DELIVERY_REQUEST_TYPES)

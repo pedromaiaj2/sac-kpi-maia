@@ -1925,6 +1925,11 @@ export type ReportRowItem = {
   // relatório antigo (getRequestsReport, abaixo) não busca item nenhum,
   // fica undefined lá (o modal simplesmente não mostra a linha).
   productSummary?: string | null;
+  // Número da carga (causa_carga, texto livre) -- pedido do Victor
+  // 23/10/2026, pro relatório de conferente sair com essa informação.
+  // Mesmo opcional de propósito que productSummary: só
+  // getAssistenciaKpiData preenche isso hoje.
+  numeroCarga?: string | null;
 };
 
 export type ReportRow = { key: string; total: number; concluida: number; cancelada: number; items: ReportRowItem[] };
