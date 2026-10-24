@@ -111,6 +111,10 @@ export function AssistenciaTicketsModal({
               {t.numeroCarga ? (
                 <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                   Carga: {t.numeroCarga}
+                  {/* dataCarregamento é DATE pura ("YYYY-MM-DD"), sem hora --
+                      new Date()+timeZone (formatDateOnlyBr) voltaria um dia,
+                      mesmo cuidado de DespachoCard.tsx/formatScheduledDateBr. */}
+                  {t.dataCarregamento ? ` · ${t.dataCarregamento.split("-").reverse().join("/")}` : ""}
                 </span>
               ) : null}
               {t.reason ? (

@@ -154,7 +154,12 @@ export async function exportTicketsPdf(title: string, totalCount: number, ticket
 
     if (t.numeroCarga) {
       ensureSpace(LINE_HEIGHT);
-      doc.text(`Carga: ${t.numeroCarga}`, MARGIN_X, y);
+      // dataCarregamento é DATE pura ("YYYY-MM-DD") -- split/reverse/join
+      // em vez de formatDateTimeBr, mesmo cuidado de fuso de
+      // DespachoCard.tsx/formatScheduledDateBr (new Date()+timeZone
+      // voltaria um dia).
+      const dataSuffix = t.dataCarregamento ? ` · ${t.dataCarregamento.split("-").reverse().join("/")}` : "";
+      doc.text(`Carga: ${t.numeroCarga}${dataSuffix}`, MARGIN_X, y);
       y += LINE_HEIGHT;
     }
 

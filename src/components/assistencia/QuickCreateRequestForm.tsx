@@ -17,6 +17,7 @@ import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
 import { useFormPrefill } from "./useFormPrefill";
+import { SummaryRow, ReviewWarningBanner } from "./ReviewSummary";
 
 // "Nova visita" -- só os tipos de montador de verdade (pedido do Victor
 // 18/08/2026: "hoje temos uma aba de visitas e uma aba de entregas, tem que
@@ -27,6 +28,26 @@ const ASSISTENCIA_TYPES = ["montagem", "desmontagem", "troca_peca", "vistoria"] 
 const SAC_TYPE = "notificacao_externa" as const;
 
 const inputStyle = { borderColor: "var(--border)" };
+
+type Snapshot = {
+  storeName: string;
+  typeLabel: string;
+  combo: boolean;
+  linkedPartOrderRef: string;
+  clientName: string;
+  clientCpf: string;
+  clientPhone: string;
+  clientAddress: string;
+  clientNeighborhood: string;
+  addressNumber: string;
+  addressComplement: string;
+  reason: string;
+  montadorInstruction: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  shiftLabel: string;
+  assemblerName: string;
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -179,6 +200,8 @@ export function QuickCreateRequestForm({
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
   const formRef = useRef<HTMLFormElement>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const TYPES = includeSacTypes ? [...ASSISTENCIA_TYPES, SAC_TYPE] : ASSISTENCIA_TYPES;
   const [type, setType] = useState<string>("vistoria");
   const [storeId, setStoreId] = useState("");
@@ -399,6 +422,39 @@ export function QuickCreateRequestForm({
   // um rascunho velho que porventura exista.
   useFormPrefill(formRef, initial ?? {});
 
+  // Mesma técnica de PublicRequestForm.tsx/SacCreateRequestForm.tsx --
+  // pedido do Victor 24/10/2026: revisão explícita antes de enviar.
+  function handleRevisar() {
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
+
+    const fd = new FormData(form);
+    const str = (name: string) => String(fd.get(name) ?? "").trim();
+    const shift = str("shift");
+
+    setSnapshot({
+      storeName: stores.find((s) => s.id === storeId)?.name ?? storeId,
+      typeLabel: REQUEST_TYPE_LABELS[type as keyof typeof REQUEST_TYPE_LABELS] ?? type,
+      combo,
+      linkedPartOrderRef: linkedPartOrder ? (linkedPartOrder.externalReference ?? `#${linkedPartOrder.ticketNumber}`) : "",
+      clientName,
+      clientCpf,
+      clientPhone,
+      clientAddress,
+      clientNeighborhood,
+      addressNumber,
+      addressComplement: isApartment ? addressComplement : "",
+      reason: str("reason"),
+      montadorInstruction: str("montador_instruction"),
+      scheduledDate,
+      scheduledTime: str("scheduled_time"),
+      shiftLabel: shift ? (SHIFT_LABELS[shift as keyof typeof SHIFT_LABELS] ?? shift) : "",
+      assemblerName: str("assembler_name"),
+    });
+    setReviewing(true);
+  }
+
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">
       {/* Fecha o ciclo -- pedido do Victor 10/09/2026: o chamado criado a
@@ -407,6 +463,7 @@ export function QuickCreateRequestForm({
           sentidos), aparece como "Solicitação vinculada" na tela da peça. */}
       {linkedPartOrder ? <input type="hidden" name="part_order_id" value={linkedPartOrder.id} /> : null}
 
+      <div style={{ display: reviewing ? "none" : undefined }} className="flex flex-col gap-4">
       <FormSection title="Loja e tipo" number={1}>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Loja *">
@@ -783,20 +840,113 @@ export function QuickCreateRequestForm({
         </FormSection>
       ) : null}
 
-      {state?.error ? (
-        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
-          {state.error}
-        </p>
-      ) : null}
-
       <button
-        type="submit"
-        disabled={pending}
-        className="rounded px-4 py-2 font-medium self-start disabled:opacity-60"
+        type="button"
+        onClick={handleRevisar}
+        className="rounded px-4 py-2 font-medium self-start"
         style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
       >
-        {pending ? "Criando…" : "Criar"}
+        Revisar solicitação
       </button>
+      </div>
+
+      {reviewing && snapshot ? (
+        <FormSection title="Confira antes de enviar" hint="Se algo estiver errado, volte e corrija.">
+          <ReviewWarningBanner />
+          <div className="flex flex-col gap-3 mt-3">
+            <SummaryRow label="Loja" value={snapshot.storeName} />
+            <SummaryRow label="Tipo" value={snapshot.typeLabel} />
+            {snapshot.combo ? (
+              <SummaryRow
+                label="Combo"
+                value={type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
+              />
+            ) : null}
+            <SummaryRow label="Vinculado ao pedido de peça" value={snapshot.linkedPartOrderRef} />
+            <SummaryRow label="Cliente" value={snapshot.clientName} />
+            <SummaryRow label="CPF" value={snapshot.clientCpf} />
+            <SummaryRow label="Telefone" value={snapshot.clientPhone} />
+            <SummaryRow
+              label="Endereço"
+              value={[
+                [snapshot.clientAddress, snapshot.addressNumber ? `nº ${snapshot.addressNumber}` : null].filter(Boolean).join(", "),
+                snapshot.addressComplement ? `apto ${snapshot.addressComplement}` : null,
+                snapshot.clientNeighborhood,
+              ]
+                .filter(Boolean)
+                .join(" — ")}
+            />
+            <SummaryRow label="O que precisa ser feito" value={snapshot.reason} />
+            <SummaryRow label="Instrução pro montador" value={snapshot.montadorInstruction} />
+            {items.filter((i) => i.product.trim()).length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {combo ? `Produtos a ${type === "montagem" ? "montar" : "desmontar"}` : "Produtos"}
+                </span>
+                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                  {items
+                    .filter((i) => i.product.trim())
+                    .map((i, idx) => (
+                      <li key={idx}>
+                        {i.quantity}x {i.product}
+                        {i.code ? ` (${i.code})` : ""}
+                        {i.unitValue ? ` — R$ ${i.unitValue}` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            {combo && secondaryItems.filter((i) => i.product.trim()).length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Produtos a {type === "montagem" ? "desmontar" : "montar"}
+                </span>
+                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                  {secondaryItems
+                    .filter((i) => i.product.trim())
+                    .map((i, idx) => (
+                      <li key={idx}>
+                        {i.quantity}x {i.product}
+                        {i.code ? ` (${i.code})` : ""}
+                        {i.unitValue ? ` — R$ ${i.unitValue}` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            <SummaryRow label="Data agendada" value={snapshot.scheduledDate ? snapshot.scheduledDate.split("-").reverse().join("/") : ""} />
+            <SummaryRow label="Hora" value={snapshot.scheduledTime} />
+            <SummaryRow label="Turno" value={snapshot.shiftLabel} />
+            <SummaryRow label="Técnico/montador" value={snapshot.assemblerName} />
+          </div>
+
+          {state?.error ? (
+            <p className="text-sm mt-3" style={{ color: "var(--status-critical)" }}>
+              {state.error}
+            </p>
+          ) : null}
+
+          <div className="flex items-center gap-3 pt-3">
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded px-4 py-2 font-medium disabled:opacity-60"
+              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            >
+              {pending ? "Criando…" : "Confirmar e enviar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReviewing(false)}
+              disabled={pending}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Voltar e editar
+            </button>
+          </div>
+        </FormSection>
+      ) : null}
     </form>
   );
 }

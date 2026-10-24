@@ -1930,6 +1930,15 @@ export type ReportRowItem = {
   // Mesmo opcional de propósito que productSummary: só
   // getAssistenciaKpiData preenche isso hoje.
   numeroCarga?: string | null;
+  // Data de EMISSÃO DA NOTA FISCAL daquela carga (totvs_orders.issue_date,
+  // cruzado via causa_carga -> totvs_delivery_cargas.nota_fiscal+serie) --
+  // pedido do Victor 24/10/2026: "preciso que mostre a data do
+  // carregamento e não a data da entrada da notificação no sistema
+  // integrado, para que ele possa ver a data do erro". Diferente de
+  // `createdAt` (quando o CHAMADO foi aberto, pode ser dias depois do
+  // erro de verdade). Null quando a carga não bate com nenhuma nota
+  // fiscal sincronizada (texto livre sem match, ou carga ainda sem NF).
+  dataCarregamento?: string | null;
 };
 
 export type ReportRow = { key: string; total: number; concluida: number; cancelada: number; items: ReportRowItem[] };

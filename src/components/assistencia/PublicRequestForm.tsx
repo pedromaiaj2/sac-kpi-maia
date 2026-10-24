@@ -5,6 +5,7 @@ import { createPublicRequest, lookupTotvsClient, lookupTotvsProduct, type FormSt
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
+import { SummaryRow, ReviewWarningBanner } from "./ReviewSummary";
 
 // Loja/gerente só pede montagem e desmontagem (pedido do Victor 18/08/2026)
 // -- recolhimento/envio de peça, troca de peça, vistoria e notificação
@@ -20,20 +21,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {label}
       {children}
     </label>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  if (!value) return null;
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {label}
-      </span>
-      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-        {value}
-      </span>
-    </div>
   );
 }
 
@@ -645,7 +632,8 @@ export function PublicRequestForm({
           title="Confira antes de enviar"
           hint="Se algo estiver errado, volte e corrija — depois de enviado, dá pra editar até a assistência entrar em contato."
         >
-          <div className="flex flex-col gap-3">
+          <ReviewWarningBanner />
+          <div className="flex flex-col gap-3 mt-3">
             <SummaryRow label="Loja" value={snapshot.storeName} />
             <SummaryRow label="Tipo de solicitação" value={REQUEST_TYPE_LABELS[type]} />
             {combo ? (

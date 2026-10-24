@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, fetchAllPagesForIds, type PagedQueryResult } from "./supabasePagination";
+import { fetchInBatches } from "./supabaseBatch";
 import type { DateRange, RangePreset } from "./dateRange";
 import type { Count, Coverage, DayCount } from "./kpi";
 import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES, ALL_REQUEST_TYPES } from "./assistenciaLabels";
@@ -70,7 +71,7 @@ const PAGE_SIZE = 1000;
 // já buscado); `aggregate()` e os pushes manuais no loop de produto
 // passam isso -- sem 3º argumento, fica `undefined` (mesmo efeito de
 // antes, o modal só não mostra a linha).
-function toReportRowItem(r: RequestRow, productSummary?: string | null): ReportRowItem {
+function toReportRowItem(r: RequestRow, productSummary?: string | null, dataCarregamentoPorCarga?: Map<string, string>): ReportRowItem {
   return {
     id: r.id,
     ticketNumber: r.ticket_number,
@@ -86,6 +87,10 @@ function toReportRowItem(r: RequestRow, productSummary?: string | null): ReportR
     // (causa_carga) já exibido em DeliveryRequestDetailContent.tsx
     // ("Carga: X") pra erro_conferencia/sujeira_conferencia/erro_motorista.
     numeroCarga: r.causa_carga,
+    // Pedido do Victor 24/10/2026: data de emissão da NF daquela carga, não
+    // a data de abertura do chamado -- ver dataCarregamentoPorCarga em
+    // computeAssistenciaKpiData.
+    dataCarregamento: (r.causa_carga && dataCarregamentoPorCarga?.get(r.causa_carga)) || null,
   };
 }
 
@@ -242,7 +247,8 @@ function aggregate(
   labelFn: (key: string) => string,
   ticketsByTag: Record<string, ReportRowItem[]>,
   tagPrefix: string,
-  produtosPorChamado: Map<string, string>
+  produtosPorChamado: Map<string, string>,
+  dataCarregamentoPorCarga?: Map<string, string>
 ): Count[] {
   const counts = new Map<string, number>();
   for (const r of rows) {
@@ -250,7 +256,7 @@ function aggregate(
     if (!key) continue;
     counts.set(key, (counts.get(key) ?? 0) + 1);
     const tag = `${tagPrefix}:${key}`;
-    (ticketsByTag[tag] ??= []).push(toReportRowItem(r, produtosPorChamado.get(r.id)));
+    (ticketsByTag[tag] ??= []).push(toReportRowItem(r, produtosPorChamado.get(r.id), dataCarregamentoPorCarga));
   }
   return [...counts.entries()]
     .map(([key, count]) => ({ label: labelFn(key), count, tag: `${tagPrefix}:${key}` }))
@@ -683,6 +689,33 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     { pageSize: PAGE_SIZE }
   );
 
+  // Data de emissão da NF por carga -- pedido do Victor 24/10/2026: no
+  // relatório de conferente, mostrar a data do ERRO (carga/NF), não a
+  // data em que o chamado foi aberto no sistema. causa_carga é texto
+  // livre (ver RequestRow acima); cruza com totvs_delivery_cargas pra
+  // achar nota_fiscal+serie daquela carga, e com totvs_orders pra achar a
+  // data de emissão -- mesmo cruzamento de baselineFor/listEntregasEmRisco
+  // (entregasRisco.ts), reaproveitado aqui via fetchInBatches
+  // (supabaseBatch.ts) em vez de inventar um 2º jeito de fazer a mesma
+  // coisa.
+  const cargasUnicas = [...new Set(rows.map((r) => r.causa_carga).filter((c): c is string => !!c))];
+  const cargaRows = await fetchInBatches<{ carga: string; nota_fiscal: string | null; serie: string | null }>(cargasUnicas, (batch) =>
+    admin.from("totvs_delivery_cargas").select("carga, nota_fiscal, serie").in("carga", batch)
+  );
+  const cargaToInvoiceSerie = new Map(
+    cargaRows.filter((c) => c.nota_fiscal && c.serie).map((c) => [c.carga, `${c.nota_fiscal}|${c.serie}`])
+  );
+  const invoicesUnicas = [...new Set([...cargaToInvoiceSerie.values()].map((v) => v.split("|")[0]))];
+  const orderRows = await fetchInBatches<{ invoice: string; serie: string; issue_date: string }>(invoicesUnicas, (batch) =>
+    admin.from("totvs_orders").select("invoice, serie, issue_date").in("invoice", batch)
+  );
+  const ordersByInvoiceSerie = new Map(orderRows.map((o) => [`${o.invoice}|${o.serie}`, o.issue_date]));
+  const dataCarregamentoPorCarga = new Map<string, string>();
+  for (const [carga, invoiceSerie] of cargaToInvoiceSerie) {
+    const issueDate = ordersByInvoiceSerie.get(invoiceSerie);
+    if (issueDate) dataCarregamentoPorCarga.set(carga, issueDate);
+  }
+
   const ids = rows.map((r) => r.id);
   // part_code/quantity entraram 10/09/2026 -- base do cruzamento com
   // vendas (Taxa de Quebra/Prejuízo, ver ProductBreakageStat acima).
@@ -780,7 +813,8 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     titleCase,
     ticketsByTag,
     "conferente",
-    produtosPorChamado
+    produtosPorChamado,
+    dataCarregamentoPorCarga
   );
   // Acrescenta "de quantas notas" no label de quem a gente consegue
   // identificar pelo código do TOTVS (ver getConferenteNotasTotais acima)
@@ -810,7 +844,8 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     titleCase,
     ticketsByTag,
     "motorista",
-    produtosPorChamado
+    produtosPorChamado,
+    dataCarregamentoPorCarga
   );
 
   // Peças atrasadas por fornecedor -- pedido do Victor 12/10/2026. Reusa

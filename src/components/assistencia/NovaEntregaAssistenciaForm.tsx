@@ -12,7 +12,14 @@ import {
   type FormState,
 } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS, CHECKLIST_REQUIRED_TYPES } from "@/lib/assistenciaLabels";
+import {
+  REQUEST_TYPE_LABELS,
+  SHIFT_LABELS,
+  CAUSA_RAIZ_OPTIONS,
+  CAUSA_RAIZ_LABELS,
+  CHECKLIST_REQUIRED_TYPES,
+  PRODUCT_CHECKLIST_LOCATION_LABELS,
+} from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, ROTAS_BY_CITY, JP_EXTRA_ROTA, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
@@ -20,8 +27,10 @@ import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
 import { useFormPrefill } from "./useFormPrefill";
 import { ConferenteField } from "./ConferenteField";
+import { CONFERENTE_OUTRO_VALUE } from "@/lib/conferentes";
 import { ChecklistEntregaFields } from "./ChecklistEntregaFields";
 import { DeliveryTimeRestrictionField } from "./DeliveryTimeRestrictionField";
+import { SummaryRow, ReviewWarningBanner } from "./ReviewSummary";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -32,6 +41,35 @@ const inputStyle = { borderColor: "var(--border)" };
 // combinada, uma peça vai e outra volta na mesma ida do motorista.
 const ENTREGA_TYPES = ["recolhimento", "envio_peca", "envio_recolhimento_peca"] as const;
 type EntregaType = (typeof ENTREGA_TYPES)[number];
+
+type Snapshot = {
+  typeLabel: string;
+  storeName: string;
+  linkedPartOrderRef: string;
+  clientCode: string;
+  clientCpf: string;
+  clientName: string;
+  clientPhone: string;
+  clientAddress: string;
+  clientNeighborhood: string;
+  addressNumber: string;
+  addressComplement: string;
+  reason: string;
+  authorizedBy: string;
+  timeRestrictionLabel: string;
+  causaRaizLabel: string;
+  causaCarga: string;
+  conferenteNome: string;
+  driverNameErro: string;
+  sellerName: string;
+  causaRaizDetalhe: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  urgent: boolean;
+  cityLabel: string;
+  rotaLabel: string;
+  checklistLabel: string;
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -227,6 +265,8 @@ export function NovaEntregaAssistenciaForm({
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
   const formRef = useRef<HTMLFormElement>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [type, setType] = useState<EntregaType>("recolhimento");
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
@@ -436,6 +476,72 @@ export function NovaEntregaAssistenciaForm({
   // um rascunho velho que porventura exista.
   useFormPrefill(formRef, initial ?? {});
 
+  // Mesma técnica de PublicRequestForm.tsx/SacCreateRequestForm.tsx --
+  // pedido do Victor 24/10/2026: revisão explícita antes de enviar.
+  function handleRevisar() {
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
+
+    const fd = new FormData(form);
+    const str = (name: string) => String(fd.get(name) ?? "").trim();
+    const storeId = str("store_id");
+    const conferenteChoice = str("causa_conferente");
+    const conferenteNome = conferenteChoice === CONFERENTE_OUTRO_VALUE ? str("causa_conferente_other") : conferenteChoice;
+
+    const timeMode = str("time_restriction_mode");
+    const timeRestrictionLabel =
+      timeMode === "turno"
+        ? `Turno: ${SHIFT_LABELS[str("time_restriction_shift") as keyof typeof SHIFT_LABELS] ?? str("time_restriction_shift")}`
+        : timeMode === "hora"
+          ? `Das ${str("time_restriction_from")} às ${str("time_restriction_to")}`
+          : timeMode === "sem_restricao"
+            ? "Sem restrição"
+            : "";
+
+    const checklistParts: string[] = [];
+    if (fd.get("checklist_estoque")) checklistParts.push("Em estoque");
+    if (fd.get("checklist_separado")) checklistParts.push("Separado");
+    if (fd.get("checklist_placa")) checklistParts.push("Sinalizado com placa");
+    const localizacao = str("checklist_localizacao");
+    if (localizacao) checklistParts.push(PRODUCT_CHECKLIST_LOCATION_LABELS[localizacao as keyof typeof PRODUCT_CHECKLIST_LOCATION_LABELS] ?? localizacao);
+
+    setSnapshot({
+      typeLabel: REQUEST_TYPE_LABELS[type] ?? type,
+      storeName: stores.find((s) => s.id === storeId)?.name ?? storeId,
+      linkedPartOrderRef: linkedPartOrder ? (linkedPartOrder.externalReference ?? `#${linkedPartOrder.ticketNumber}`) : "",
+      clientCode,
+      clientCpf,
+      clientName,
+      clientPhone,
+      clientAddress,
+      clientNeighborhood,
+      addressNumber,
+      addressComplement: isApartment ? addressComplement : "",
+      reason: str("reason"),
+      authorizedBy: str("authorized_by"),
+      timeRestrictionLabel,
+      causaRaizLabel: causaRaiz ? (CAUSA_RAIZ_LABELS[causaRaiz] ?? causaRaiz) : "",
+      causaCarga: str("causa_carga"),
+      conferenteNome,
+      driverNameErro: causaRaiz === "erro_motorista" ? str("driver_name") : "",
+      sellerName: str("seller_name"),
+      causaRaizDetalhe: str("causa_raiz_detalhe"),
+      scheduledDate,
+      scheduledTime: str("scheduled_time"),
+      urgent: !!fd.get("urgent"),
+      cityLabel: scheduledDate ? CITY_LABELS[selectedCity] : "",
+      rotaLabel: isNovoMotorista
+        ? `+ Novo motorista: ${novoMotoristaNome || "(nome não preenchido)"} — ${selectedCity === "campina_grande" ? novoMotoristaRotaCg : "rota extra JP"}`
+        : (() => {
+            const found = effectiveAvailableRotas.find((r) => r.id === selectedRotaId);
+            return found ? `${labelAvailableRota(effectiveAvailableRotas, found)}${previewDriverName ? ` — motorista ${previewDriverName}` : ""}` : "";
+          })(),
+      checklistLabel: checklistParts.join(" · "),
+    });
+    setReviewing(true);
+  }
+
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">
       {/* Fecha o ciclo -- mesmo padrão de QuickCreateRequestForm.tsx: o
@@ -443,6 +549,7 @@ export function NovaEntregaAssistenciaForm({
           (service_request_id). */}
       {linkedPartOrder ? <input type="hidden" name="part_order_id" value={linkedPartOrder.id} /> : null}
 
+      <div style={{ display: reviewing ? "none" : undefined }} className="flex flex-col gap-4">
       <FormSection title="Tipo e loja" number={1}>
         <Field label="Tipo">
           <select
@@ -1011,20 +1118,116 @@ export function NovaEntregaAssistenciaForm({
         </FormSection>
       ) : null}
 
-      {state?.error ? (
-        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
-          {state.error}
-        </p>
-      ) : null}
-
       <button
-        type="submit"
-        disabled={pending}
-        className="rounded px-4 py-2 font-medium self-start disabled:opacity-60"
+        type="button"
+        onClick={handleRevisar}
+        className="rounded px-4 py-2 font-medium self-start"
         style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
       >
-        {pending ? "Criando…" : "Criar"}
+        Revisar solicitação
       </button>
+      </div>
+
+      {reviewing && snapshot ? (
+        <FormSection title="Confira antes de enviar" hint="Se algo estiver errado, volte e corrija.">
+          <ReviewWarningBanner />
+          <div className="flex flex-col gap-3 mt-3">
+            <SummaryRow label="Tipo" value={snapshot.typeLabel} />
+            <SummaryRow label="Loja" value={snapshot.storeName} />
+            <SummaryRow label="Vinculado ao pedido de peça" value={snapshot.linkedPartOrderRef} />
+            <SummaryRow label="Cliente" value={snapshot.clientName} />
+            <SummaryRow label="CPF" value={snapshot.clientCpf} />
+            <SummaryRow label="Telefone" value={snapshot.clientPhone} />
+            <SummaryRow
+              label="Endereço"
+              value={[
+                [snapshot.clientAddress, snapshot.addressNumber ? `nº ${snapshot.addressNumber}` : null].filter(Boolean).join(", "),
+                snapshot.addressComplement ? `apto ${snapshot.addressComplement}` : null,
+                snapshot.clientNeighborhood,
+              ]
+                .filter(Boolean)
+                .join(" — ")}
+            />
+            {items.filter((i) => i.product.trim()).length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {type === "recolhimento" ? "Produto e peça a recolher" : "Produto e peça a enviar"}
+                </span>
+                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                  {items
+                    .filter((i) => i.product.trim())
+                    .map((i, idx) => (
+                      <li key={idx}>
+                        {i.quantity}x {i.product}
+                        {i.code ? ` (${i.code})` : ""}
+                        {i.partName ? ` — peça: ${i.partName}` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            {isEnvioRecolhimento && pickupItems.filter((i) => i.product.trim()).length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Produto e peça a recolher
+                </span>
+                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                  {pickupItems
+                    .filter((i) => i.product.trim())
+                    .map((i, idx) => (
+                      <li key={idx}>
+                        {i.quantity}x {i.product}
+                        {i.code ? ` (${i.code})` : ""}
+                        {i.partName ? ` — peça: ${i.partName}` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            <SummaryRow label="Motivo" value={snapshot.reason} />
+            <SummaryRow label="Autorizado por" value={snapshot.authorizedBy} />
+            <SummaryRow label="Restrição de horário" value={snapshot.timeRestrictionLabel} />
+            <SummaryRow label="Quem errou (controle interno)" value={snapshot.causaRaizLabel} />
+            <SummaryRow label="Carga" value={snapshot.causaCarga} />
+            <SummaryRow label="Conferente" value={snapshot.conferenteNome} />
+            <SummaryRow label="Motorista (erro)" value={snapshot.driverNameErro} />
+            <SummaryRow label="Vendedor(a)" value={snapshot.sellerName} />
+            <SummaryRow label="Causa raiz detalhada" value={snapshot.causaRaizDetalhe} />
+            <SummaryRow label="Data agendada" value={snapshot.scheduledDate ? snapshot.scheduledDate.split("-").reverse().join("/") : ""} />
+            <SummaryRow label="Hora" value={snapshot.scheduledTime} />
+            <SummaryRow label="Urgente" value={snapshot.urgent ? "Sim" : ""} />
+            <SummaryRow label="Cidade" value={snapshot.cityLabel} />
+            <SummaryRow label="Rota" value={snapshot.rotaLabel} />
+            <SummaryRow label="Checklist" value={snapshot.checklistLabel} />
+          </div>
+
+          {state?.error ? (
+            <p className="text-sm mt-3" style={{ color: "var(--status-critical)" }}>
+              {state.error}
+            </p>
+          ) : null}
+
+          <div className="flex items-center gap-3 pt-3">
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded px-4 py-2 font-medium disabled:opacity-60"
+              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            >
+              {pending ? "Criando…" : "Confirmar e enviar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReviewing(false)}
+              disabled={pending}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Voltar e editar
+            </button>
+          </div>
+        </FormSection>
+      ) : null}
     </form>
   );
 }

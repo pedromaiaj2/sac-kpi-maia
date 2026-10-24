@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useActionState } from "react";
 import { createSacRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
+import { SummaryRow, ReviewWarningBanner } from "./ReviewSummary";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -116,8 +117,26 @@ function ItemsFields({
 // entrega). Sem montador aqui -- quem atribui é a assistência depois (mesma
 // regra de sempre, ver comentário de createSacRequest em actions.ts). Sem
 // rota/autorizado por/quem errou -- isso é entrega, não visita.
+type Snapshot = {
+  typeLabel: string;
+  storeName: string;
+  urgent: boolean;
+  combo: boolean;
+  clientName: string;
+  clientCpf: string;
+  clientPhone: string;
+  clientAddress: string;
+  clientNeighborhood: string;
+  addressNumber: string;
+  addressComplement: string;
+  reason: string;
+};
+
 export function SacNovaVisitaForm({ stores }: { stores: Store[] }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [type, setType] = useState<SacVisitaType>("montagem");
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
@@ -213,8 +232,36 @@ export function SacNovaVisitaForm({ stores }: { stores: Store[] }) {
   const itemHandlers = makeItemHandlers(setItems, setItemsLookupStatus);
   const secondaryHandlers = makeItemHandlers(setSecondaryItems, setSecondaryLookupStatus);
 
+  // Mesma técnica de PublicRequestForm.tsx/SacCreateRequestForm.tsx --
+  // pedido do Victor 24/10/2026: revisão explícita antes de enviar.
+  function handleRevisar() {
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
+
+    const fd = new FormData(form);
+    const storeId = String(fd.get("store_id") ?? "");
+
+    setSnapshot({
+      typeLabel: REQUEST_TYPE_LABELS[type],
+      storeName: stores.find((s) => s.id === storeId)?.name ?? storeId,
+      urgent: !!fd.get("urgent"),
+      combo,
+      clientName,
+      clientCpf,
+      clientPhone,
+      clientAddress,
+      clientNeighborhood,
+      addressNumber,
+      addressComplement: isApartment ? addressComplement : "",
+      reason: String(fd.get("reason") ?? "").trim(),
+    });
+    setReviewing(true);
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">
+      <div style={{ display: reviewing ? "none" : undefined }} className="flex flex-col gap-4">
       <FormSection title="Tipo e loja" number={1}>
         <Field label="Tipo">
           <select
@@ -437,20 +484,106 @@ export function SacNovaVisitaForm({ stores }: { stores: Store[] }) {
         </Field>
       </FormSection>
 
-      {state?.error ? (
-        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
-          {state.error}
-        </p>
-      ) : null}
-
       <button
-        type="submit"
-        disabled={pending}
-        className="rounded px-4 py-2 font-medium self-start disabled:opacity-60"
+        type="button"
+        onClick={handleRevisar}
+        className="rounded px-4 py-2 font-medium self-start"
         style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
       >
-        {pending ? "Criando…" : "Criar solicitação"}
+        Revisar solicitação
       </button>
+      </div>
+
+      {reviewing && snapshot ? (
+        <FormSection title="Confira antes de enviar" hint="Se algo estiver errado, volte e corrija.">
+          <ReviewWarningBanner />
+          <div className="flex flex-col gap-3 mt-3">
+            <SummaryRow label="Tipo" value={snapshot.typeLabel} />
+            <SummaryRow label="Loja" value={snapshot.storeName} />
+            <SummaryRow label="Urgente" value={snapshot.urgent ? "Sim" : ""} />
+            {snapshot.combo ? (
+              <SummaryRow
+                label="Combo"
+                value={type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
+              />
+            ) : null}
+            <SummaryRow label="Cliente" value={snapshot.clientName} />
+            <SummaryRow label="CPF" value={snapshot.clientCpf} />
+            <SummaryRow label="Telefone" value={snapshot.clientPhone} />
+            <SummaryRow
+              label="Endereço"
+              value={[
+                [snapshot.clientAddress, snapshot.addressNumber ? `nº ${snapshot.addressNumber}` : null].filter(Boolean).join(", "),
+                snapshot.addressComplement ? `apto ${snapshot.addressComplement}` : null,
+                snapshot.clientNeighborhood,
+              ]
+                .filter(Boolean)
+                .join(" — ")}
+            />
+            {items.filter((i) => i.product.trim()).length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {type === "montagem" ? "Móvel(is) a montar" : "Móvel(is) a desmontar"}
+                </span>
+                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                  {items
+                    .filter((i) => i.product.trim())
+                    .map((i, idx) => (
+                      <li key={idx}>
+                        {i.quantity}x {i.product}
+                        {i.code ? ` (${i.code})` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            {combo && secondaryItems.filter((i) => i.product.trim()).length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {type === "montagem" ? "Móveis a desmontar" : "Móveis a montar"}
+                </span>
+                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                  {secondaryItems
+                    .filter((i) => i.product.trim())
+                    .map((i, idx) => (
+                      <li key={idx}>
+                        {i.quantity}x {i.product}
+                        {i.code ? ` (${i.code})` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            <SummaryRow label="Motivo" value={snapshot.reason} />
+          </div>
+
+          {state?.error ? (
+            <p className="text-sm mt-3" style={{ color: "var(--status-critical)" }}>
+              {state.error}
+            </p>
+          ) : null}
+
+          <div className="flex items-center gap-3 pt-3">
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded px-4 py-2 font-medium disabled:opacity-60"
+              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            >
+              {pending ? "Criando…" : "Confirmar e enviar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReviewing(false)}
+              disabled={pending}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Voltar e editar
+            </button>
+          </div>
+        </FormSection>
+      ) : null}
     </form>
   );
 }
