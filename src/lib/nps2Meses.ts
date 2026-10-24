@@ -6,7 +6,7 @@ import { findGhlConversationId, fetchGhlMessages, type GhlConta } from "./ghlCli
 import { SUBCONTAS } from "./ghlSubcontas";
 import { fetchInBatches } from "./supabaseBatch";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
-import { NPS_GHL_TAG, NPS_1_5_PATTERN, type NpsFaseResumo } from "./npsDetratores";
+import { NPS_GHL_TAG, NPS_1_5_PATTERN, sendNpsAutoReply, type NpsFaseResumo } from "./npsDetratores";
 
 // Subconta do disparo -- mesmo mecanismo de vendaNps.ts (0194/21-10-2026):
 // COMPRA_NPS_SUBCONTA=lojas_maia liga; sem a variável continua pelo SAC. Na
@@ -203,6 +203,7 @@ export async function detectPendingCompraNpsResponses(): Promise<number> {
     if (!reply) continue;
     const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await admin.from("compra_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
+    await sendNpsAutoReply(row.ghl_contact_id, score, conta);
     answered++;
   }
   return answered;
