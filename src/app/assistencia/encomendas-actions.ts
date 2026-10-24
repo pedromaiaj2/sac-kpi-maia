@@ -136,8 +136,13 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   }
 
   const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
-  const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
-  if (!clienteCodigo) return { error: "Informe o código do cliente." };
+  // "Pra a loja" (estoque próprio, sem venda associada) -- pedido do Victor
+  // 24/10/2026: antes era sempre obrigatório um código de cliente, mesmo
+  // quando o pedido não tinha um. Nesse caso ignora qualquer código digitado
+  // (não devia nem aparecer no formulário, ver NovoPedidoEncomendaForm.tsx).
+  const destino = String(formData.get("destino") ?? "cliente");
+  const clienteCodigo = destino === "loja" ? null : String(formData.get("cliente_codigo") ?? "").trim() || null;
+  if (destino !== "loja" && !clienteCodigo) return { error: "Informe o código do cliente." };
 
   const produtoDescricoes = formData.getAll("item_produto_descricao").map((v) => String(v).trim());
   const produtoCodigos = formData.getAll("item_produto_codigo").map((v) => String(v).trim() || null);
@@ -232,8 +237,9 @@ export async function editPedidoEncomendaAction(pedidoId: string, _state: FormSt
   }
 
   const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
-  const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
-  if (!clienteCodigo) return { error: "Informe o código do cliente." };
+  const destino = String(formData.get("destino") ?? "cliente");
+  const clienteCodigo = destino === "loja" ? null : String(formData.get("cliente_codigo") ?? "").trim() || null;
+  if (destino !== "loja" && !clienteCodigo) return { error: "Informe o código do cliente." };
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
   const produtoDescricoes = formData.getAll("item_produto_descricao").map((v) => String(v).trim());

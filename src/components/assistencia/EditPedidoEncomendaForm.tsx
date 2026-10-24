@@ -50,13 +50,14 @@ export function EditPedidoEncomendaForm({ pedido }: { pedido: PedidoEncomendaSum
       .catch(() => setProductLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
   }
 
+  const [destino, setDestino] = useState<"cliente" | "loja">(pedido.clienteCodigo ? "cliente" : "loja");
   const [clienteCodigo, setClienteCodigo] = useState(pedido.clienteCodigo ?? "");
   const [clienteNome, setClienteNome] = useState<string | null>(null);
   const [clienteLookupStatus, setClienteLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!clienteCodigo.trim()) {
+      if (destino === "loja" || !clienteCodigo.trim()) {
         setClienteLookupStatus("idle");
         return;
       }
@@ -74,7 +75,7 @@ export function EditPedidoEncomendaForm({ pedido }: { pedido: PedidoEncomendaSum
         .catch(() => setClienteLookupStatus("not_found"));
     }, 400);
     return () => clearTimeout(timer);
-  }, [clienteCodigo]);
+  }, [clienteCodigo, destino]);
 
   function updateItem(index: number, patch: Partial<Item>) {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -89,30 +90,47 @@ export function EditPedidoEncomendaForm({ pedido }: { pedido: PedidoEncomendaSum
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
       <FormSection title="Cliente" number={1}>
-        <Field label="Código do cliente *">
-          <input
-            name="cliente_codigo"
-            value={clienteCodigo}
-            onChange={(e) => setClienteCodigo(e.target.value)}
-            required
-            placeholder="Código do cliente na venda"
-            className="rounded border px-3 py-2"
-            style={inputStyle}
-          />
-          {clienteLookupStatus === "loading" ? (
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Buscando…
-            </span>
-          ) : clienteLookupStatus === "found" ? (
-            <span className="text-xs" style={{ color: "var(--status-good)" }}>
-              Cliente encontrado: {clienteNome}
-            </span>
-          ) : clienteLookupStatus === "not_found" ? (
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Código não encontrado — pode salvar assim mesmo.
-            </span>
-          ) : null}
-        </Field>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+            Esse pedido é *
+          </span>
+          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+            <input type="radio" name="destino_radio" checked={destino === "cliente"} onChange={() => setDestino("cliente")} />
+            Pra um cliente
+          </label>
+          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+            <input type="radio" name="destino_radio" checked={destino === "loja"} onChange={() => setDestino("loja")} />
+            Pra a loja (estoque, sem cliente)
+          </label>
+          <input type="hidden" name="destino" value={destino} />
+        </div>
+
+        {destino === "cliente" ? (
+          <Field label="Código do cliente *">
+            <input
+              name="cliente_codigo"
+              value={clienteCodigo}
+              onChange={(e) => setClienteCodigo(e.target.value)}
+              required
+              placeholder="Código do cliente na venda"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+            {clienteLookupStatus === "loading" ? (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Buscando…
+              </span>
+            ) : clienteLookupStatus === "found" ? (
+              <span className="text-xs" style={{ color: "var(--status-good)" }}>
+                Cliente encontrado: {clienteNome}
+              </span>
+            ) : clienteLookupStatus === "not_found" ? (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Código não encontrado — pode salvar assim mesmo.
+              </span>
+            ) : null}
+          </Field>
+        ) : null}
       </FormSection>
 
       <FormSection title="Produtos" number={2} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">

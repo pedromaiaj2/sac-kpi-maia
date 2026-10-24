@@ -41,7 +41,7 @@ type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 type Snapshot = {
   storeName: string;
   fornecedorLabel: string;
-  clienteCodigo: string;
+  destinoLabel: string;
   vendedorName: string;
   notes: string;
   cupomFiscalName: string;
@@ -81,7 +81,15 @@ export function NovoPedidoEncomendaForm({
   // automática (abaixo) pode ajustar sozinha -- assim que ela escolhe algo
   // com a própria mão, para de sobrescrever (senão um segundo item com
   // fabricante diferente troca o fornecedor de novo sem avisar direito).
-  const [fornecedorTouched, setFornecedorTouched] = useState(false);
+  // Achado do Victor 24/10/2026 (loja de Tambaú): pedido saiu roteado pra
+  // fornecedor externo mesmo depois de escolher fábrica interna na tela.
+  // Causa: a busca do produto (abaixo) é assíncrona -- se a pessoa clica no
+  // radio "fábrica interna" ENQUANTO a busca ainda está em voo, o `.then`
+  // conferia `fornecedorTouched` lido do closure de quando a busca começou
+  // (ainda `false` naquele instante), não o valor atual -- e sobrescrevia a
+  // escolha que acabou de ser feita. Precisa de um ref (lido na hora que o
+  // `.then` roda de verdade), um `useState` sozinho não resolve isso.
+  const fornecedorTouchedRef = useRef(false);
   const [autoDetectedNote, setAutoDetectedNote] = useState<string | null>(null);
 
   // Busca ao sair do campo (não debounced) -- pega o código do produto e
@@ -106,7 +114,7 @@ export function NovoPedidoEncomendaForm({
         updateItem(index, { produtoDescricao: match.description! });
         setProductLookupStatus((prev) => ({ ...prev, [index]: "found" }));
 
-        if (match.manufacturer && allowExternal && !fornecedorTouched) {
+        if (match.manufacturer && allowExternal && !fornecedorTouchedRef.current) {
           const detected = suppliers.find((f) => f.toLowerCase() === match.manufacturer!.trim().toLowerCase());
           if (detected) {
             setFornecedorTipo("fabrica_externa");
@@ -121,10 +129,15 @@ export function NovoPedidoEncomendaForm({
   }
 
   function touchFornecedor() {
-    setFornecedorTouched(true);
+    fornecedorTouchedRef.current = true;
     setAutoDetectedNote(null);
   }
 
+  // Pedido "pra loja" -- Victor 24/10/2026: estoque da própria loja, não
+  // sempre atrelado a uma venda (código de cliente) específica. Antes o
+  // código do cliente era obrigatório mesmo quando não existia (forçando
+  // digitar qualquer coisa só pra passar na validação).
+  const [destino, setDestino] = useState<"cliente" | "loja">("cliente");
   const [clienteCodigo, setClienteCodigo] = useState("");
   const [clienteNome, setClienteNome] = useState<string | null>(null);
   const [clienteLookupStatus, setClienteLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
@@ -134,7 +147,7 @@ export function NovoPedidoEncomendaForm({
   // enviar, pra pegar erro de digitação. Não preenche nada.
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!clienteCodigo.trim()) {
+      if (destino === "loja" || !clienteCodigo.trim()) {
         setClienteLookupStatus("idle");
         return;
       }
@@ -152,7 +165,7 @@ export function NovoPedidoEncomendaForm({
         .catch(() => setClienteLookupStatus("not_found"));
     }, 400);
     return () => clearTimeout(timer);
-  }, [clienteCodigo]);
+  }, [clienteCodigo, destino]);
 
   function updateItem(index: number, patch: Partial<Item>) {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -181,11 +194,13 @@ export function NovoPedidoEncomendaForm({
         ? `Externo: ${String(fd.get("fornecedor_externo") ?? "")}`
         : (INTERNAL_FABRICAS.find((f) => f.id === fabricaId)?.nome ?? fabricaId);
     const cupom = fd.get("cupom_fiscal");
+    const destinoLabel =
+      destino === "loja" ? "Loja (estoque, sem cliente)" : `Cliente${clienteCodigo.trim() ? ` ${clienteCodigo.trim()}` : ""}`;
 
     setSnapshot({
       storeName,
       fornecedorLabel,
-      clienteCodigo: String(fd.get("cliente_codigo") ?? "").trim(),
+      destinoLabel,
       vendedorName: String(fd.get("vendedor_name") ?? "").trim(),
       notes: String(fd.get("notes") ?? "").trim(),
       cupomFiscalName: cupom instanceof File && cupom.size > 0 ? cupom.name : "",
@@ -221,30 +236,52 @@ export function NovoPedidoEncomendaForm({
             </Field>
           )}
 
-          <Field label="Código do cliente *">
-            <input
-              name="cliente_codigo"
-              value={clienteCodigo}
-              onChange={(e) => setClienteCodigo(e.target.value)}
-              required
-              placeholder="Código do cliente na venda"
-              className="rounded border px-3 py-2"
-              style={inputStyle}
-            />
-            {clienteLookupStatus === "loading" ? (
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Buscando…
-              </span>
-            ) : clienteLookupStatus === "found" ? (
-              <span className="text-xs" style={{ color: "var(--status-good)" }}>
-                Cliente encontrado: {clienteNome}
-              </span>
-            ) : clienteLookupStatus === "not_found" ? (
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Código não encontrado — pode enviar assim mesmo.
-              </span>
-            ) : null}
-          </Field>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+              Esse pedido é *
+            </span>
+            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+              <input
+                type="radio"
+                name="destino_radio"
+                checked={destino === "cliente"}
+                onChange={() => setDestino("cliente")}
+              />
+              Pra um cliente
+            </label>
+            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+              <input type="radio" name="destino_radio" checked={destino === "loja"} onChange={() => setDestino("loja")} />
+              Pra a loja (estoque, sem cliente)
+            </label>
+            <input type="hidden" name="destino" value={destino} />
+          </div>
+
+          {destino === "cliente" ? (
+            <Field label="Código do cliente *">
+              <input
+                name="cliente_codigo"
+                value={clienteCodigo}
+                onChange={(e) => setClienteCodigo(e.target.value)}
+                required
+                placeholder="Código do cliente na venda"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+              {clienteLookupStatus === "loading" ? (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Buscando…
+                </span>
+              ) : clienteLookupStatus === "found" ? (
+                <span className="text-xs" style={{ color: "var(--status-good)" }}>
+                  Cliente encontrado: {clienteNome}
+                </span>
+              ) : clienteLookupStatus === "not_found" ? (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Código não encontrado — pode enviar assim mesmo.
+                </span>
+              ) : null}
+            </Field>
+          ) : null}
         </FormSection>
 
         {showFornecedorPicker ? (
@@ -446,7 +483,7 @@ export function NovoPedidoEncomendaForm({
                   ))}
               </ul>
             </div>
-            <SummaryRow label="Código do cliente" value={snapshot.clienteCodigo} />
+            <SummaryRow label="Pedido pra" value={snapshot.destinoLabel} />
             <SummaryRow label="Vendedor responsável" value={snapshot.vendedorName} />
             <SummaryRow label="Observações" value={snapshot.notes} />
             <SummaryRow label="Cupom fiscal" value={snapshot.cupomFiscalName} />

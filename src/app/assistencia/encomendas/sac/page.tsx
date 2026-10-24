@@ -371,7 +371,9 @@ function PedidosDetailGroup({
                 </Link>
               ) : null}
               {p.vendedorName ? <p className="text-xs text-gray-500 dark:text-gray-400">Vendedor: {p.vendedorName}</p> : null}
-              {p.clienteCodigo ? <p className="text-xs text-gray-500 dark:text-gray-400">Código do cliente: {p.clienteCodigo}</p> : null}
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {p.clienteCodigo ? `Código do cliente: ${p.clienteCodigo}` : "Pra a loja (sem cliente)"}
+              </p>
               {p.carga ? <p className="text-xs text-gray-500 dark:text-gray-400">Carga: {p.carga}</p> : null}
               {p.nfE ? <p className="text-xs text-gray-500 dark:text-gray-400">NF-e: {p.nfE}</p> : null}
               {(photosByPedido.get(p.id) ?? []).length > 0 ? (
