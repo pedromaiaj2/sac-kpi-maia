@@ -52,9 +52,25 @@ export function BarRanking({
         {title}
       </h3>
       {coverage ? (
-        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-          Cobertura: {coverage.pct}% dos chamados têm essa informação ({coverage.withValue} de {coverage.total})
-        </p>
+        <>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Cobertura: {coverage.pct}% dos chamados têm essa informação ({coverage.withValue} de {coverage.total})
+          </p>
+          {/* "Cobertura" acima mede só "tem o campo preenchido", não "aparece
+              no gráfico" -- com mais valores distintos do que o corte (ver
+              `limit` em topCounts, kpi.ts), ela podia acusar 95%+ sem avisar
+              que o gráfico esconde a cauda longa. Achado na auditoria de
+              24/10/2026 -- mesmo cenário que o Victor já tinha pego antes no
+              painel de Assistência ("136 produtos distintos, só 20 no
+              gráfico"). */}
+          {coverage.distinctCount !== undefined && coverage.distinctCount > data.length ? (
+            <p className="text-xs mb-3" style={{ color: "var(--status-warning)" }}>
+              Mostrando as {data.length} maiores de {coverage.distinctCount} diferentes — o restante fica fora do gráfico.
+            </p>
+          ) : (
+            <div className="mb-3" />
+          )}
+        </>
       ) : (
         <div className="mb-3" />
       )}

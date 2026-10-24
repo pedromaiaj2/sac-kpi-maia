@@ -293,18 +293,20 @@ export type AssistenciaKpiData = {
   // loja. Contexto de referência ao lado de totalChamados.
   totalVendasNoPeriodo: number;
   dailyVolume: DayCount[];
-  // Contagem de verdade de produtos distintos -- byProduct abaixo é
-  // cortado em PRODUCT_RANKING_LIMIT (senão o gráfico vira uma parede de
-  // barras ilegível), então `byProduct.length` SUBESTIMA o total sempre
-  // que passa do limite (achado 27/08/2026, pedido do Victor "revise
-  // essa tela inteira": 136 produtos distintos de verdade, StatTile
-  // mostrando 20). Esse campo existe só pro StatTile "Produtos distintos
-  // com chamado" -- o gráfico continua usando byProduct (cortado).
+  // Contagem de verdade de produtos distintos -- StatTile "Produtos
+  // distintos com chamado". O ranking por produto (byProductBreakage
+  // abaixo) é cortado em PRODUCT_RANKING_LIMIT (senão o gráfico vira uma
+  // parede de barras ilegível), então esse total pode passar do que o
+  // gráfico mostra (achado 27/08/2026, pedido do Victor "revise essa tela
+  // inteira": 136 produtos distintos de verdade, gráfico mostrando 20).
+  // Removido o campo `byProduct` (ranking por volume, sem cruzar com
+  // vendas) em 24/10/2026 -- auditoria achou que não era mais exibido em
+  // nenhum lugar da tela desde que `byProductBreakage` assumiu esse
+  // ranking (10/09/2026), ficava só pesando o payload cacheado.
   distinctProductCount: number;
-  byProduct: Count[];
-  // Ranking por Taxa de Quebra (ver ProductBreakageStat acima) -- diferente
-  // de byProduct (que ordena por volume de chamados): esse ordena por %
-  // chamados/vendas. Mesmo corte de PRODUCT_RANKING_LIMIT.
+  // Ranking por Taxa de Quebra (ver ProductBreakageStat acima) -- ordena
+  // por % chamados/vendas, não por volume bruto. Mesmo corte de
+  // PRODUCT_RANKING_LIMIT.
   byProductBreakage: ProductBreakageStat[];
   // Mesmo conjunto, ordenado por PREJUÍZO (R$) em vez de Taxa de Quebra
   // (%) -- usado só no detalhamento do card de destaque
@@ -335,7 +337,7 @@ export type AssistenciaKpiData = {
   prejuizoCobertura: Coverage;
   byProductGroup: Count[];
   // Produtos com mais chamados por defeito de fabricação especificamente
-  // (causa_raiz = 'defeito_fabricacao') -- subconjunto de byProduct acima,
+  // (causa_raiz = 'defeito_fabricacao') -- subconjunto de byProductBreakage,
   // não o mesmo ranking. Ver comentário em getAssistenciaKpiData.
   byProductDefeitoFabricacao: Count[];
   byAgent: Count[];
@@ -796,15 +798,15 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, count]) => ({ date, count }));
 
-  const byRota = aggregate(rows, (r) => r.rota, (k) => ROTA_LABELS[k as Rota] ?? k, ticketsByTag, "rota", produtosPorChamado);
-  const byStore = aggregate(rows, (r) => r.stores?.name ?? r.store_id, (k) => k, ticketsByTag, "loja", produtosPorChamado);
-  const byType = aggregate(rows, (r) => r.type, (k) => REQUEST_TYPE_LABELS[k as RequestType] ?? k, ticketsByTag, "tipo", produtosPorChamado);
-  const byCausaRaiz = aggregate(rows, (r) => r.causa_raiz, (k) => CAUSA_RAIZ_LABELS[k] ?? k, ticketsByTag, "causa", produtosPorChamado);
+  const byRota = aggregate(rows, (r) => r.rota, (k) => ROTA_LABELS[k as Rota] ?? k, ticketsByTag, "rota", produtosPorChamado, dataCarregamentoPorCarga);
+  const byStore = aggregate(rows, (r) => r.stores?.name ?? r.store_id, (k) => k, ticketsByTag, "loja", produtosPorChamado, dataCarregamentoPorCarga);
+  const byType = aggregate(rows, (r) => r.type, (k) => REQUEST_TYPE_LABELS[k as RequestType] ?? k, ticketsByTag, "tipo", produtosPorChamado, dataCarregamentoPorCarga);
+  const byCausaRaiz = aggregate(rows, (r) => r.causa_raiz, (k) => CAUSA_RAIZ_LABELS[k] ?? k, ticketsByTag, "causa", produtosPorChamado, dataCarregamentoPorCarga);
   // Quem registrou o chamado (requested_by, ver toSummary em
   // serviceRequests.ts pro mesmo fallback join→texto) -- "atendente" no
   // sentido de quem atendeu/criou a notificação, não quem tá responsável
   // por ela agora (esse último muda de dono com claimRequest).
-  const byAgent = aggregate(rows, atendenteName, (k) => k, ticketsByTag, "atendente", produtosPorChamado);
+  const byAgent = aggregate(rows, atendenteName, (k) => k, ticketsByTag, "atendente", produtosPorChamado, dataCarregamentoPorCarga);
   // Ver titleCase acima -- agrupa por nome em caixa alta (mesma pessoa,
   // caixa diferente, conta junto), exibe sempre em Title Case.
   const byConferenteRaw = aggregate(
@@ -967,9 +969,10 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     const dedupeKey = `${item.request_id}::${baseLabel}`;
     if (!produtoPorChamado.has(dedupeKey)) {
       produtoPorChamado.add(dedupeKey);
+      // Só alimenta distinctProductCount (StatTile) -- o ranking por produto
+      // em si (`byProduct`) foi removido em 24/10/2026, não era mais exibido
+      // em lugar nenhum da tela (ver comentário em AssistenciaKpiData).
       produtoCount.set(baseLabel, (produtoCount.get(baseLabel) ?? 0) + 1);
-      const produtoTag = `produto:${baseLabel}`;
-      (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
 
     const codigo = item.part_code?.trim() || CODIGO_NAO_IDENTIFICADO;
@@ -1004,7 +1007,7 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
       // relatório não usa essa soma por linha).
       breakageEntry.custoOperacionalEstimado += custoOperacionalDoChamado(parentRow.id);
       const breakageTag = `produto_quebra:${codigo}`;
-      (ticketsByTag[breakageTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
+      (ticketsByTag[breakageTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id), dataCarregamentoPorCarga));
     }
     breakagePorCodigo.set(codigo, breakageEntry);
 
@@ -1022,7 +1025,7 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
         produtoDefeitoPorChamado.add(dedupeKey);
         produtoDefeitoCount.set(baseLabel, (produtoDefeitoCount.get(baseLabel) ?? 0) + 1);
         const produtoDefeitoTag = `produto_defeito:${baseLabel}`;
-        (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
+        (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id), dataCarregamentoPorCarga));
       }
     }
 
@@ -1034,13 +1037,9 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
       grupoEntry.count++;
       grupoCount.set(grupo.key, grupoEntry);
       const grupoTag = `grupo:${grupo.key}`;
-      (ticketsByTag[grupoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
+      (ticketsByTag[grupoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id), dataCarregamentoPorCarga));
     }
   }
-  const byProduct: Count[] = [...produtoCount.entries()]
-    .map(([product, count]) => ({ label: product, count, tag: `produto:${product}` }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, PRODUCT_RANKING_LIMIT);
   const byProductGroup: Count[] = [...grupoCount.entries()]
     .map(([key, { label, count }]) => ({ label, count, tag: `grupo:${key}` }))
     .sort((a, b) => b.count - a.count);
@@ -1424,7 +1423,6 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     totalVendasNoPeriodo: [...vendasPorLoja.values()].reduce((a, b) => a + b, 0),
     dailyVolume,
     distinctProductCount: produtoCount.size,
-    byProduct,
     byProductBreakage,
     byProductBreakageTopValor,
     prejuizoTotalEstimado,
@@ -1513,10 +1511,19 @@ async function computeAssistenciaMonthlyEvolution(monthsBack: number): Promise<A
 
   return Promise.all(
     months.map(async ({ key, year, month }) => {
-      const fromIso = new Date(Date.UTC(year, month, 1)).toISOString();
-      const toIsoExclusive = new Date(Date.UTC(year, month + 1, 1)).toISOString();
-      const fromDate = fromIso.slice(0, 10);
-      const toDateExclusive = toIsoExclusive.slice(0, 10);
+      // `fromDate`/`toDateExclusive` são datas de calendário (YYYY-MM-DD) --
+      // seguras de construir via Date.UTC só pra extrair o dia certo, usadas
+      // direto contra `issue_date` (coluna DATE pura, sem hora/fuso).
+      // `created_at` de `service_requests` já é timestamptz de verdade, então
+      // precisa dos limites do mês em horário LOCAL (-03:00), senão chamados
+      // abertos entre ~21h e meia-noite no último dia do mês contavam no mês
+      // seguinte -- achado na auditoria de 24/10/2026, mesmo cuidado que
+      // chamadosFromIso/chamadosToIso (linhas ~1074-1075) já tinham, só não
+      // replicado aqui.
+      const fromDate = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+      const toDateExclusive = new Date(Date.UTC(year, month + 1, 1)).toISOString().slice(0, 10);
+      const fromIso = `${fromDate}T00:00:00.000-03:00`;
+      const toIsoExclusive = `${toDateExclusive}T00:00:00.000-03:00`;
 
       const [chamadosResult, vendasResult] = await Promise.all([
         admin

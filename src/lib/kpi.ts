@@ -45,7 +45,15 @@ export type TicketRow = {
 // kpiAssistencia.ts. Quando ausente, BarRanking não mostra percentual
 // nenhum dentro da barra (comportamento de sempre).
 export type Count = { label: string; count: number; tag?: string; pct?: number };
-export type Coverage = { withValue: number; total: number; pct: number };
+// `distinctCount` opcional -- quantos valores DIFERENTES existem pro campo
+// (ex.: quantas categorias/lojas/produtos distintos, não só "quantos
+// chamados têm o campo preenchido"). Adicionado 24/10/2026 (auditoria): sem
+// isso, um ranking cortado em `topCounts`/`PRODUCT_RANKING_LIMIT` podia
+// mostrar "Cobertura: 98%" escondendo uma cauda longa inteira sem avisar --
+// ver uso em BarRanking.tsx. Opcional pra não quebrar quem monta um
+// Coverage que não tem essa noção de "valor distinto" (ex. prejuizoCobertura
+// em kpiAssistencia.ts, que mede % de chamados com custo rastreado).
+export type Coverage = { withValue: number; total: number; pct: number; distinctCount?: number };
 export type DayCount = { date: string; count: number };
 
 export type AttentionRow = {
@@ -345,6 +353,7 @@ function computeCoverage(rows: TicketRow[], key: "store_tag" | "category" | "pro
     withValue,
     total: rows.length,
     pct: rows.length > 0 ? Math.round((withValue / rows.length) * 100) : 0,
+    distinctCount: new Set(rows.map((r) => r[key]).filter((v): v is string => v !== null)).size,
   };
 }
 
@@ -614,10 +623,12 @@ function getPreviousWeekRange(nowUtc: Date): { from: Date; to: Date; fromLabel: 
 // escondia quem respondeu de verdade só porque o chamado não tava com a tag
 // certa -- ver relato real onde isso sumiu com 2 de 8 avaliações. "Elegível"
 // (chamados resolvidos no período) continua só como referência pra taxa de
-// resposta, sem funcionar mais como filtro do que aparece.
-function buildNpsSummary(rows: TicketRow[], untrackedScores: number[]): NpsSummary {
+// resposta, sem funcionar mais como filtro do que aparece. `scoresInRange`
+// já vem filtrado por nps_answered_at (ver comentário em getKpiData, achado
+// 24/10/2026) -- não refiltra aqui por opened_at do chamado.
+function buildNpsSummary(rows: TicketRow[], scoresInRange: number[]): NpsSummary {
   const eligibleCount = rows.filter((r) => r.resolved_effective).length;
-  const scores = [...rows.filter((r) => r.nps_score !== null).map((r) => r.nps_score as number), ...untrackedScores];
+  const scores = scoresInRange;
 
   const distribution: NpsDistributionEntry[] = ([1, 2, 3, 4, 5] as const).map((score) => ({
     score,
@@ -653,10 +664,6 @@ function buildNpsSummary(rows: TicketRow[], untrackedScores: number[]): NpsSumma
   };
 }
 
-// Só dá pra atribuir a nota a um atendente quando o chamado tem a tag de
-// atendente aplicada (mesmo critério de byAgentCounts/buildAgentStats) --
-// avaliação de conversa sem essa tag entra no resumo geral, mas não dá pra
-// saber de quem foi.
 function buildPreviousWeekSummary(allRows: TicketRow[], now: Date): PreviousWeekSummary {
   const { from, to, fromLabel, toLabel } = getPreviousWeekRange(now);
   const weekRows = allRows.filter((r) => {
@@ -781,13 +788,20 @@ function buildBacklogOverTime(rows: TicketRow[], from: Date | null, to: Date): D
   if (!Number.isFinite(start)) return [];
 
   const dayMs = 24 * 60 * 60 * 1000;
-  const startDay = Math.floor(start / dayMs) * dayMs;
-  const endDay = Math.floor(to.getTime() / dayMs) * dayMs;
+  // Dias em horário LOCAL (Fortaleza, UTC-3), não blocos de 00h-24h UTC --
+  // achado na auditoria de 24/10/2026: um chamado resolvido perto da
+  // virada do dia (ex. 23h local = 02h UTC do dia seguinte) ficava
+  // deslocado em até ~3h no gráfico "Backlog ao longo do tempo". Desloca
+  // pro fuso local antes de "cortar" o dia (Math.floor), e desfaz o
+  // deslocamento na hora de comparar contra os timestamps reais (que
+  // continuam em UTC) -- mesma técnica de toLocalDateString acima.
+  const startDay = Math.floor((start + BUSINESS_TZ_OFFSET_MS) / dayMs) * dayMs;
+  const endDay = Math.floor((to.getTime() + BUSINESS_TZ_OFFSET_MS) / dayMs) * dayMs;
   const maxDays = 366;
 
   const result: DayCount[] = [];
   for (let day = startDay, i = 0; day <= endDay && i < maxDays; day += dayMs, i++) {
-    const endOfDay = day + dayMs - 1;
+    const endOfDay = day + dayMs - 1 - BUSINESS_TZ_OFFSET_MS;
     const openCount = rows.filter((r) => {
       const opened = new Date(r.opened_at).getTime();
       const resolved = r.resolved_at ? new Date(r.resolved_at).getTime() : null;
@@ -1096,9 +1110,19 @@ const getKpiDataCached = memoizeWithTtl(
   // que não dá pra inspecionar com segurança daqui. Toda avaliação entra na
   // conta, mesmo quando a conversa não aparece em v_ticket_enriched (sem
   // categoria/loja marcada) -- essas ficam de fora do join principal, mas
-  // ainda contam pro resumo geral via `untrackedNpsScores` abaixo.
+  // ainda contam pro resumo geral via `npsScoresInRange` abaixo.
   const rowsByConversationId = new Map(allRows.map((r) => [r.conversation_id, r]));
-  const untrackedNpsScores: number[] = [];
+  // Critério ÚNICO pra "entrar no período selecionado": nps_answered_at
+  // (quando o cliente respondeu), nunca opened_at do chamado -- ele pode
+  // responder dias depois, inclusive já fechado. Achado na auditoria de
+  // 24/10/2026: antes, pontuação de conversa TRACKED (tem linha em
+  // v_ticket_enriched) entrava no resumo geral (buildNpsSummary) se o
+  // CHAMADO tivesse aberto no período (via `rows`, filtrado por opened_at
+  // mais abaixo), enquanto untracked e a lista de detratores (ambos
+  // abaixo) sempre usaram nps_answered_at -- os três podiam discordar
+  // sobre o "mesmo" período selecionado. Null em `nps_answered_at` conta
+  // sempre (sem data pra filtrar, mesmo comportamento de antes).
+  const npsScoresInRange: number[] = [];
   // Candidatos a detrator (nota 1-2) juntados aqui na mesma varredura --
   // tracked (tem linha em v_ticket_enriched) e untracked, pra depois buscar
   // nome/telefone em `contacts` numa query só (ver npsDetractors abaixo).
@@ -1119,14 +1143,12 @@ const getKpiDataCached = memoizeWithTtl(
     const score = row.nps_score;
     const answeredAt = row.nps_answered_at;
     const match = rowsByConversationId.get(conversationId);
-    if (match) {
-      match.nps_score = score;
-    } else {
-      const answeredAtDate = answeredAt ? new Date(answeredAt) : null;
-      if (range.from && answeredAtDate && answeredAtDate < range.from) continue;
-      if (answeredAtDate && answeredAtDate > range.to) continue;
-      untrackedNpsScores.push(score);
-    }
+    if (match) match.nps_score = score;
+
+    const answeredAtDate = answeredAt ? new Date(answeredAt) : null;
+    const answeredInRange = !(range.from && answeredAtDate && answeredAtDate < range.from) && !(answeredAtDate && answeredAtDate > range.to);
+    if (answeredInRange) npsScoresInRange.push(score);
+
     if (score <= 2 && answeredAt) {
       detractorCandidates.push({
         conversationId,
@@ -1137,9 +1159,8 @@ const getKpiDataCached = memoizeWithTtl(
     }
   }
 
-  // Só entra na lista se a resposta caiu dentro do período selecionado --
-  // consistente com o critério já usado pros untracked acima (nps_answered_at,
-  // não opened_at do chamado, já que o cliente pode responder dias depois).
+  // Mesmo critério de `npsScoresInRange` acima (nps_answered_at) -- os dois
+  // agora sempre concordam sobre o que "está no período".
   const detractorsInRange = detractorCandidates.filter((d) => {
     const t = new Date(d.answeredAt);
     if (range.from && t < range.from) return false;
@@ -1238,7 +1259,13 @@ const getKpiDataCached = memoizeWithTtl(
 
   const dailyMap = new Map<string, number>();
   for (const row of rows) {
-    const date = row.opened_at.slice(0, 10);
+    // `opened_at` é timestamptz de verdade -- fatiar os 10 primeiros
+    // caracteres pega a data em UTC, não em horário local (Fortaleza,
+    // UTC-3). Achado na auditoria de 24/10/2026: um chamado aberto entre
+    // ~21h e meia-noite local caía no dia seguinte no gráfico "Volume
+    // diário". `toLocalDateString` (já usado em outras partes deste
+    // arquivo) faz a conversão de fuso certa.
+    const date = toLocalDateString(new Date(row.opened_at));
     dailyMap.set(date, (dailyMap.get(date) ?? 0) + 1);
   }
   const dailyVolume = [...dailyMap.entries()].map(([date, count]) => ({ date, count })).sort((a, b) =>
@@ -1287,7 +1314,15 @@ const getKpiDataCached = memoizeWithTtl(
 
   const recurrenceCount = rows.filter((r) => r.is_recurrence).length;
 
-  const byCategory = topCounts(rows.filter((r) => r.category !== DUVIDA_CATEGORY_TAG), "category");
+  const categoryRowsForPareto = rows.filter((r) => r.category !== DUVIDA_CATEGORY_TAG);
+  const byCategory = topCounts(categoryRowsForPareto, "category");
+  // Lista SEM corte, só pro cálculo de Pareto logo abaixo -- achado na
+  // auditoria de 24/10/2026: `byCategory` (exibido no gráfico) já vem
+  // cortado em 10 (ver `limit` em topCounts); `buildParetoSummary` somava
+  // cumulativamente só sobre esse corte, então nunca conseguia achar o
+  // "ponto de 80%" de verdade quando a cauda longa exigia mais de 10
+  // categorias -- só reportava a soma do que sobrou visível.
+  const byCategoryFull = topCounts(categoryRowsForPareto, "category", Number.MAX_SAFE_INTEGER);
   const previousWeek = buildPreviousWeekSummary(allRows, new Date());
   const escalations = buildEscalationSummary(escalationRows);
   const escalationList = [...escalationRows].sort(
@@ -1349,7 +1384,7 @@ const getKpiDataCached = memoizeWithTtl(
     slaMinutesThreshold: 30,
     recurrenceCount,
     recurrencePct: rows.length > 0 ? Math.round((recurrenceCount / rows.length) * 100) : null,
-    paretoSummary: buildParetoSummary(byCategory, rows.length, categoryLabel),
+    paretoSummary: buildParetoSummary(byCategoryFull, rows.length, categoryLabel),
     storeBreakdown,
     categoryTickets,
     productTickets,
@@ -1367,7 +1402,7 @@ const getKpiDataCached = memoizeWithTtl(
     escalationByStore: buildEscalationByStore(escalationRows, storeLabel),
     byAgentStats: buildAgentStats(rows),
     performanceReport: buildPerformanceReportSet(allRows, new Date()),
-    npsSummary: buildNpsSummary(rows, untrackedNpsScores),
+    npsSummary: buildNpsSummary(rows, npsScoresInRange),
     npsDetractors,
     agentDrilldown,
   };
