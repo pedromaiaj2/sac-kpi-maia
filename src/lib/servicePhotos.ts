@@ -234,6 +234,15 @@ export async function saveRequestPhoto(opts: {
 // ser criado. attachPendingRequestPhoto grava o metadado depois que o
 // ticket existe de fato (FK exige a linha pai); se isso falhar, o chamador
 // deve desfazer o ticket para não deixar um chamado "válido" sem anexo.
+// Foto que não pertence a um chamado deste sistema (ex.: comprovante da
+// entrega do Odoo, ver rota de upload em assistencia/motorista/odoo). Mesma
+// validação (tipo, 10 MB, magic bytes) e mesmo disco; sem linha em
+// service_request_photos. `prefix` é gerado pelo servidor, nunca pela
+// entrada do usuário.
+export async function uploadLoosePhotoBytes(prefix: string, file: File): Promise<string> {
+  return uploadPhotoBytes(prefix, file);
+}
+
 export async function uploadPendingRequestPhoto(requestId: string, file: File): Promise<string> {
   return uploadPhotoBytes(requestId, file);
 }

@@ -1,0 +1,355 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
+import {
+  CATEGORIA_LABELS,
+  MODO_LABELS,
+  SEM_ZONA,
+  TIPO_CARGA_LABELS,
+  filtrarExpedicao,
+  formatarDiaIso,
+  somarVolumes,
+  zonaUnica,
+  type AcaoEntrega,
+  type CatalogosOdoo,
+  type EmpresaOdoo,
+  type EntregaOdoo,
+  type ExpedicaoResposta,
+  type VisaoExpedicao,
+} from "@/lib/odoo/logisticaTipos";
+import { AcaoEntregaDialog, type AlvoEntrega } from "./AcaoEntregaDialog";
+import { useAcaoOdoo } from "./useAcaoOdoo";
+import { Chip, Kpi, VolumesChips, botaoClass, botaoLaranjaStyle, botaoStyle, inputClass, inputStyle } from "./ui";
+
+const VISOES: { id: VisaoExpedicao; label: string }[] = [
+  { id: "fila", label: "Fila (sem carga)" },
+  { id: "pendencias", label: "Pendências do CD" },
+  { id: "retornos", label: "Retornos" },
+];
+
+export function ExpedicaoBoard({
+  companyId,
+  expedicao,
+  catalogos,
+  empresas,
+}: {
+  companyId: number;
+  expedicao: ExpedicaoResposta;
+  catalogos: CatalogosOdoo;
+  empresas: EmpresaOdoo[];
+}) {
+  const router = useRouter();
+  const { pending, run } = useAcaoOdoo();
+  const [visao, setVisao] = useState<VisaoExpedicao>("fila");
+  const [zona, setZona] = useState("");
+  const [modo, setModo] = useState("");
+  const [busca, setBusca] = useState("");
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [alvo, setAlvo] = useState<AlvoEntrega | null>(null);
+  const [form, setForm] = useState({ tipo: "entrega", zona_id: "", motorista_id: "", veiculo_id: "", descricao: "", transportadora: "", data_prevista: "" });
+
+  const todas = useMemo(() => [...expedicao.entregas, ...expedicao.pendencias], [expedicao]);
+  const modos = useMemo(() => [...new Set(todas.map((e) => e.modo).filter(Boolean))].sort(), [todas]);
+  const temRetornoNoOdoo = todas.some((e) => typeof e.retorno === "boolean");
+  const lista = filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona, modo, busca });
+  const vols = somarVolumes(lista);
+  const selecionadas = expedicao.entregas.filter((e) => sel.has(e.picking_id));
+  const volsSel = somarVolumes(selecionadas);
+
+  function alternar(id: number) {
+    setSel((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+
+  function selecionarVisiveis() {
+    if (visao !== "fila") return;
+    setSel(new Set(lista.map((e) => e.picking_id)));
+  }
+
+  function abrirMontar() {
+    const z = zonaUnica(selecionadas);
+    if (z && !form.zona_id) setForm((f) => ({ ...f, zona_id: String(z) }));
+  }
+
+  function montar() {
+    const n = (v: string) => (v ? Number(v) : null);
+    run(
+      () =>
+        montarCargaAction({
+          company_id: companyId,
+          picking_ids: [...sel],
+          tipo: form.tipo,
+          zona_id: n(form.zona_id),
+          motorista_id: n(form.motorista_id),
+          veiculo_id: n(form.veiculo_id),
+          descricao: form.descricao || null,
+          transportadora: form.transportadora || null,
+          data_prevista: form.data_prevista || null,
+        }),
+      (c) => `Carga ${c.romaneio} montada com ${c.qtd_paradas} parada(s).`,
+      (c) => {
+        setSel(new Set());
+        router.push(`/assistencia/logistica/cargas/${c.carga_id}?empresa=${companyId}`);
+      },
+    );
+  }
+
+  function acao(e: EntregaOdoo, a: AcaoEntrega) {
+    setAlvo({ pickingId: e.picking_id, nome: e.nome, cliente: e.cliente, acao: a });
+  }
+
+  return (
+    <div className="flex flex-col gap-4 min-w-0">
+      <div className="cartao p-4 flex flex-col gap-3">
+        <div className="flex gap-2 flex-wrap">
+          {VISOES.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => {
+                setVisao(v.id);
+                setSel(new Set());
+              }}
+              className="text-xs px-3 py-1.5 rounded-full border"
+              style={{
+                borderColor: "var(--border)",
+                background: visao === v.id ? "var(--brand-green)" : "transparent",
+                color: visao === v.id ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                fontWeight: visao === v.id ? 700 : 500,
+              }}
+            >
+              {v.label}
+              {v.id === "pendencias" ? ` (${expedicao.total_pendencias})` : v.id === "fila" ? ` (${expedicao.total})` : ""}
+            </button>
+          ))}
+        </div>
+        {visao === "retornos" && !temRetornoNoOdoo ? (
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            O Odoo ainda não marca as saídas que voltaram de rota (falta o campo “retorno” na API). Assim que vier, esta visão enche sozinha.
+          </p>
+        ) : null}
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <select value={zona} onChange={(e) => setZona(e.target.value)} className={inputClass} style={inputStyle} aria-label="Região">
+            <option value="">Todas as regiões</option>
+            <option value={SEM_ZONA}>Sem região</option>
+            {catalogos.zonas.map((z) => (
+              <option key={z.id} value={z.nome}>
+                {z.nome} {expedicao.por_zona[z.nome] ? `(${expedicao.por_zona[z.nome]})` : ""}
+              </option>
+            ))}
+          </select>
+          <select value={modo} onChange={(e) => setModo(e.target.value)} className={inputClass} style={inputStyle} aria-label="Modo">
+            <option value="">Todos os modos (entrega, retira ABA…)</option>
+            {modos.map((m) => (
+              <option key={m} value={m}>
+                {MODO_LABELS[m] ?? m}
+              </option>
+            ))}
+          </select>
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Cliente, pedido, bairro, CEP, NF" className={inputClass} style={inputStyle} />
+          <div className="flex gap-2">
+            <button type="button" onClick={() => router.refresh()} className={botaoClass} style={botaoStyle}>
+              Atualizar
+            </button>
+            {visao === "fila" ? (
+              <button type="button" onClick={selecionarVisiveis} className={botaoClass} style={botaoStyle}>
+                Selecionar visíveis
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <div className="grid gap-2 grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
+          <Kpi rotulo="Saídas" valor={lista.length} />
+          {Object.entries(vols).map(([k, v]) => (
+            <Kpi key={k} rotulo={CATEGORIA_LABELS[k] ?? k} valor={v} />
+          ))}
+        </div>
+      </div>
+
+      {sel.size > 0 ? (
+        <div className="cartao p-4 flex flex-col gap-3" style={{ border: "2px solid var(--brand-orange)" }} onFocus={abrirMontar} onMouseEnter={abrirMontar}>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
+              Montar carga com {sel.size} saída(s)
+            </h3>
+            <VolumesChips volumes={volsSel} />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <Campo rotulo="Tipo">
+              <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className={inputClass} style={inputStyle}>
+                {Object.entries(catalogos.tipos_carga && Object.keys(catalogos.tipos_carga).length ? catalogos.tipos_carga : TIPO_CARGA_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {TIPO_CARGA_LABELS[k] ?? v}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo rotulo="Região">
+              <select value={form.zona_id} onChange={(e) => setForm({ ...form, zona_id: e.target.value })} className={inputClass} style={inputStyle}>
+                <option value="">— sem região —</option>
+                {catalogos.zonas.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.codigo} · {z.nome}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo rotulo="Motorista">
+              <select value={form.motorista_id} onChange={(e) => setForm({ ...form, motorista_id: e.target.value })} className={inputClass} style={inputStyle}>
+                <option value="">— definir depois —</option>
+                {catalogos.motoristas.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo rotulo="Veículo">
+              <select value={form.veiculo_id} onChange={(e) => setForm({ ...form, veiculo_id: e.target.value })} className={inputClass} style={inputStyle}>
+                <option value="">— definir depois —</option>
+                {catalogos.veiculos.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome}
+                    {v.placa ? ` · ${v.placa}` : ""}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo rotulo="Descrição">
+              <input value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} placeholder="ex.: A TARDE, ABA BARÃO" className={inputClass} style={inputStyle} />
+            </Campo>
+            <Campo rotulo="Transportadora">
+              <input value={form.transportadora} onChange={(e) => setForm({ ...form, transportadora: e.target.value })} placeholder="ex.: Lojas Maia, D&A" className={inputClass} style={inputStyle} />
+            </Campo>
+            <Campo rotulo="Saída prevista">
+              <input type="date" value={form.data_prevista} onChange={(e) => setForm({ ...form, data_prevista: e.target.value })} className={inputClass} style={inputStyle} />
+            </Campo>
+            <div className="flex items-end gap-2">
+              <button type="button" disabled={pending} onClick={montar} className={`${botaoClass} flex-1`} style={botaoLaranjaStyle}>
+                {pending ? "Montando no Odoo…" : "Montar carga"}
+              </button>
+              <button type="button" onClick={() => setSel(new Set())} className={botaoClass} style={botaoStyle}>
+                Limpar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="cartao p-0 overflow-x-auto">
+        <table className="w-full text-sm min-w-[900px]">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>
+              <th className="p-2 w-8" />
+              <th className="p-2">Cliente</th>
+              <th className="p-2">Pedido · NF</th>
+              <th className="p-2">Região · endereço</th>
+              <th className="p-2">Programada</th>
+              <th className="p-2">Modo</th>
+              <th className="p-2">Volumes · itens</th>
+              <th className="p-2">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lista.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="p-6 text-center" style={{ color: "var(--text-muted)" }}>
+                  Nenhuma saída aqui.
+                </td>
+              </tr>
+            ) : null}
+            {lista.map((e) => {
+              const marcada = sel.has(e.picking_id);
+              return (
+                <tr key={e.picking_id} style={{ borderBottom: "1px solid var(--border)", background: marcada ? "var(--brand-green-soft)" : undefined }}>
+                  <td className="p-2 align-top">
+                    {visao === "fila" ? (
+                      <input type="checkbox" checked={marcada} onChange={() => alternar(e.picking_id)} aria-label={`Selecionar ${e.cliente}`} className="w-5 h-5" />
+                    ) : null}
+                  </td>
+                  <td className="p-2 align-top">
+                    <b style={{ color: "var(--text-primary)" }}>{e.cliente}</b>
+                    <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      {e.telefone}
+                    </div>
+                    {e.dias !== null ? (
+                      <div className="text-xs" style={{ color: e.dias > 3 ? "var(--status-critical)" : "var(--text-muted)" }}>
+                        {e.dias} dia(s) desde a venda
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="p-2 align-top">
+                    {e.pedido || e.origem}
+                    <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      {e.nome}
+                    </div>
+                    {e.nf5922 ? <Chip>5922 nº {e.nf5922}</Chip> : <Chip cor="var(--status-critical)">sem nota</Chip>}
+                    {e.nf5117 ? <Chip forte>5117 nº {e.nf5117}</Chip> : null}
+                  </td>
+                  <td className="p-2 align-top">
+                    {e.zona ? <Chip forte>{e.zona}</Chip> : <Chip>sem região</Chip>}
+                    {e.filial_entrega ? <Chip cor="var(--status-info)">entrega: {e.filial_entrega}</Chip> : null}
+                    <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
+                      {e.endereco}
+                    </div>
+                  </td>
+                  <td className="p-2 align-top whitespace-nowrap">{formatarDiaIso(e.data_programada || null)}</td>
+                  <td className="p-2 align-top">{MODO_LABELS[e.modo] ?? e.modo}</td>
+                  <td className="p-2 align-top">
+                    <VolumesChips volumes={e.volumes_por_categoria} total={e.volumes} />
+                    <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
+                      {e.itens.map((i, idx) => (
+                        <div key={idx}>
+                          {i.qtd}× {i.codigo || ""} {i.nome.slice(0, 40)}
+                        </div>
+                      ))}
+                    </div>
+                    {e.pendencia ? <Chip cor="var(--status-serious)">pendência: {e.pendencia_motivo}</Chip> : null}
+                    {e.anotacao ? (
+                      <div className="text-xs italic mt-1" style={{ color: "var(--text-muted)" }}>
+                        {e.anotacao.slice(-140)}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="p-2 align-top">
+                    <select
+                      value=""
+                      onChange={(ev) => ev.target.value && acao(e, ev.target.value as AcaoEntrega)}
+                      className="rounded-lg border px-2 py-1 text-xs"
+                      style={inputStyle}
+                      aria-label={`Ações de ${e.cliente}`}
+                    >
+                      <option value="">Ações…</option>
+                      {e.pendencia ? <option value="fila">Voltar à fila</option> : <option value="pendencia">Enviar para pendência</option>}
+                      <option value="programar">Data programada</option>
+                      <option value="transferir_filial">Transferir filial</option>
+                      <option value="anotar">Anotação</option>
+                      <option value="historico">Histórico</option>
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <AcaoEntregaDialog alvo={alvo} empresas={empresas} onFechar={() => setAlvo(null)} />
+    </div>
+  );
+}
+
+function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1 text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
+      {rotulo}
+      {children}
+    </label>
+  );
+}
