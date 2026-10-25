@@ -68,3 +68,6 @@ scripts/clv/__pycache__/
 
 .vercel
 .env*
+
+# exemplo de variáveis (sem segredo) pode ir pro git
+!.env.example
