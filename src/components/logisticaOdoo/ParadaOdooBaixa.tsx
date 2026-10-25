@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { registrarParadaAction } from "@/app/assistencia/motorista/odoo/odoo-actions";
+import { useToast } from "@/components/assistencia/ToastProvider";
 import type { CatalogosOdoo, ResultadoParada } from "@/lib/odoo/logisticaTipos";
-import { useAcaoOdoo } from "./useAcaoOdoo";
+import { enviarFila, enviarRegistro, filaDisponivel, guardarNaFila, listarFila, pedirSyncEmSegundoPlano, reduzirFoto, tirarDaFila } from "@/lib/pwa/filaBaixas";
+import { FILA_CANAL, novoEventoUid, type BaixaPendente, type FotoPendente } from "@/lib/pwa/filaBaixasRegras";
+
+const MAX_FOTOS = 4;
 
 function lerGeo(): Promise<{ lat: number; lng: number } | null> {
   return new Promise((res) => {
@@ -17,39 +20,97 @@ function lerGeo(): Promise<{ lat: number; lng: number } | null> {
   });
 }
 
+type FotoLocal = FotoPendente & { preview: string };
+type Guardada = { motivo: "sem_rede" | "sessao"; erro: string | null };
+
 // Baixa da parada do Odoo: foto do comprovante (opcional por enquanto),
 // Entreguei / Entrega parcial / Não consegui (motivo do catálogo do Odoo +
 // observação). Geolocalização best-effort no momento da baixa.
-export function ParadaOdooBaixa({ cargaId, paradaId, motivos }: { cargaId: number; paradaId: number; motivos: CatalogosOdoo["motivos"] }) {
+//
+// PWA (25/10/2026): a baixa vai primeiro para a fila do celular (IndexedDB,
+// com evento_uid e as fotos), depois é enviada. Sem rede, fica guardada e
+// segue sozinha quando a conexão voltar (ver src/lib/pwa/filaBaixas.ts). As
+// fotos ficam no celular até o envio da baixa (não sobem na hora da escolha).
+export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos }: { cargaId: number; paradaId: number; rotulo: string; motivos: CatalogosOdoo["motivos"] }) {
   const router = useRouter();
-  const { pending, run, showToast } = useAcaoOdoo();
-  const [fotos, setFotos] = useState<string[]>([]);
-  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const { showToast } = useToast();
+  const [pending, startTransition] = useTransition();
+  const [fotos, setFotos] = useState<FotoLocal[]>([]);
+  const [preparandoFoto, setPreparandoFoto] = useState(false);
   const [inputKey, setInputKey] = useState(0);
   const [motivo, setMotivo] = useState("");
   const [obs, setObs] = useState("");
-  const ocupado = pending || enviandoFoto;
+  const [guardada, setGuardada] = useState<Guardada | null>(null);
+  const fotosRef = useRef<FotoLocal[]>([]);
+  const estavaNaFila = useRef(false);
+  const ocupado = pending || preparandoFoto;
 
-  async function enviarFoto(file: File) {
-    setEnviandoFoto(true);
+  useEffect(() => {
+    fotosRef.current = fotos;
+  }, [fotos]);
+  useEffect(() => () => fotosRef.current.forEach((f) => URL.revokeObjectURL(f.preview)), []);
+
+  // Já existe baixa desta parada na fila? Mostra "guardada" em vez do
+  // formulário (evita segunda baixa da mesma parada). Relê quando a fila muda
+  // (enviou em segundo plano -> volta para a rota).
+  useEffect(() => {
+    let vivo = true;
+    async function conferir() {
+      const lista = await listarFila().catch(() => [] as BaixaPendente[]);
+      if (!vivo) return;
+      const minha = lista.find((b) => b.cargaId === cargaId && b.paradaId === paradaId);
+      if (minha) {
+        estavaNaFila.current = true;
+        setGuardada((g) => g ?? { motivo: "sem_rede", erro: minha.ultimoErro });
+      } else if (estavaNaFila.current) {
+        // saiu da fila (enviada em segundo plano): recarrega a parada do servidor
+        estavaNaFila.current = false;
+        setGuardada(null);
+        router.refresh();
+      }
+    }
+    void conferir();
+    let canal: BroadcastChannel | null = null;
     try {
-      const fd = new FormData();
-      fd.set("photo", file);
-      fd.set("cargaId", String(cargaId));
-      fd.set("paradaId", String(paradaId));
-      // POST comum (navegador embutido do WhatsApp), igual ao upload do Victor;
-      // aqui a rota devolve a URL da foto, que vai na observação da baixa.
-      const res = await fetch("/assistencia/motorista/odoo/foto", { method: "POST", body: fd, signal: AbortSignal.timeout(45_000) });
-      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
-      if (!res.ok || !data.url) throw new Error(data.error || `Não foi possível enviar a foto (erro ${res.status}).`);
-      setFotos((f) => [...f, data.url as string]);
-      showToast("Foto enviada.", "success");
+      canal = new BroadcastChannel(FILA_CANAL);
+      canal.onmessage = () => void conferir();
+    } catch {
+      canal = null;
+    }
+    const local = () => void conferir();
+    window.addEventListener(FILA_CANAL, local);
+    return () => {
+      vivo = false;
+      canal?.close();
+      window.removeEventListener(FILA_CANAL, local);
+    };
+  }, [cargaId, paradaId, router]);
+
+  async function adicionarFoto(file: File) {
+    if (fotos.length >= MAX_FOTOS) {
+      showToast(`No máximo ${MAX_FOTOS} fotos.`, "error");
+      return;
+    }
+    setPreparandoFoto(true);
+    try {
+      const blob = await reduzirFoto(file);
+      if (blob.size > 10 * 1024 * 1024) throw new Error("Foto grande demais (máximo 10 MB).");
+      const nome = blob === file ? file.name || "comprovante.jpg" : "comprovante.jpg";
+      setFotos((f) => [...f, { id: novoEventoUid(), blob, nome, url: null, preview: URL.createObjectURL(blob) }]);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Falha ao enviar a foto.", "error");
+      showToast(e instanceof Error ? e.message : "Não foi possível usar a foto.", "error");
     } finally {
-      setEnviandoFoto(false);
+      setPreparandoFoto(false);
       setInputKey((k) => k + 1);
     }
+  }
+
+  function removerFoto(id: string) {
+    setFotos((lista) => {
+      const f = lista.find((x) => x.id === id);
+      if (f) URL.revokeObjectURL(f.preview);
+      return lista.filter((x) => x.id !== id);
+    });
   }
 
   function baixa(resultado: ResultadoParada) {
@@ -57,13 +118,95 @@ export function ParadaOdooBaixa({ cargaId, paradaId, motivos }: { cargaId: numbe
       showToast("Escolha o motivo.", "error");
       return;
     }
-    run(
-      async () => {
-        const g = await lerGeo();
-        return registrarParadaAction(cargaId, paradaId, { resultado, motivo: motivo || null, obs: obs || null, geoLat: g?.lat ?? null, geoLng: g?.lng ?? null, fotoUrls: fotos });
-      },
-      (d) => `Registrado. Faltam ${d.pendentes} parada(s).`,
-      () => router.push("/assistencia/motorista/odoo"),
+    startTransition(async () => {
+      const g = await lerGeo();
+      const agora = new Date().toISOString();
+      const registro: BaixaPendente = {
+        evento_uid: novoEventoUid(),
+        cargaId,
+        paradaId,
+        rotulo,
+        resultado,
+        motivo: resultado === "insucesso" ? motivo : null,
+        obs: obs.trim() || null,
+        geoLat: g?.lat ?? null,
+        geoLng: g?.lng ?? null,
+        registradoEm: agora,
+        fotos: fotos.map(({ id, blob, nome, url }) => ({ id, blob, nome, url })),
+        estado: "pendente",
+        tentativas: 0,
+        ultimoErro: null,
+        atualizadoEm: agora,
+      };
+
+      // 1) guarda no celular; 2) tenta enviar. Sem IndexedDB (aba anônima,
+      // navegador embutido restrito), envia direto sem fila.
+      const temFila = await filaDisponivel();
+      let desfecho: string;
+      let erro: string | null;
+      let pendentes: number | undefined;
+      if (temFila) {
+        try {
+          await guardarNaFila(registro);
+        } catch (e) {
+          showToast(e instanceof Error ? `Não deu para guardar no celular: ${e.message}` : "Não deu para guardar no celular.", "error");
+          return;
+        }
+        const r = await enviarFila({ somente: registro.evento_uid });
+        const t = r.porUid[registro.evento_uid];
+        desfecho = t?.desfecho ?? "transitorio";
+        erro = t?.erro ?? null;
+        pendentes = t?.dados?.pendentes;
+        // Recusa na hora (motivo inválido, carga fora de rota...): o motorista
+        // está olhando -- mostra o erro e tira da fila, como era antes.
+        if (desfecho === "recusada") await tirarDaFila(registro.evento_uid);
+      } else {
+        const t = await enviarRegistro(registro, async () => {});
+        desfecho = t.desfecho;
+        erro = t.erro;
+        pendentes = t.dados?.pendentes;
+      }
+
+      if (desfecho === "enviado" || desfecho === "ja_registrada") {
+        showToast(desfecho === "enviado" ? `Registrado. Faltam ${pendentes ?? "?"} parada(s).` : (erro ?? "Parada já registrada."), desfecho === "enviado" ? "success" : "info");
+        router.push("/assistencia/motorista/odoo");
+        router.refresh();
+        return;
+      }
+      if (desfecho === "recusada") {
+        showToast(erro ?? "O Odoo recusou a baixa.", "error");
+        return;
+      }
+      if (!temFila) {
+        showToast("Sem conexão e este navegador não deixa guardar a baixa. Tente de novo quando a rede voltar.", "error");
+        return;
+      }
+      void pedirSyncEmSegundoPlano();
+      estavaNaFila.current = true;
+      setGuardada({ motivo: desfecho === "sessao" ? "sessao" : "sem_rede", erro });
+    });
+  }
+
+  if (guardada) {
+    return (
+      <div className="rounded-lg p-4 flex flex-col gap-2" style={{ background: "color-mix(in srgb, var(--status-warning) 10%, var(--surface-1))", border: "2px solid var(--status-warning)" }}>
+        <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
+          {guardada.motivo === "sessao" ? "🔒 Baixa guardada — entre de novo" : "📶 Baixa guardada no celular"}
+        </h3>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          {guardada.motivo === "sessao"
+            ? "Sua sessão expirou. A baixa (com as fotos) ficou guardada neste celular e será enviada assim que você entrar de novo pelo login."
+            : "Sem conexão agora. A baixa (com as fotos) ficou guardada neste celular e será enviada sozinha quando a rede voltar. Não precisa registrar de novo."}
+        </p>
+        {guardada.erro ? (
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Último erro: {guardada.erro}
+          </p>
+        ) : null}
+        <button type="button" onClick={() => router.push("/assistencia/motorista/odoo")} className="text-sm font-semibold rounded-xl px-4 py-3 border" style={{ borderColor: "var(--border)", color: "var(--text-primary)", background: "var(--surface-1)" }}>
+          ← Voltar para a rota
+        </button>
+      </div>
     );
   }
 
@@ -73,7 +216,7 @@ export function ParadaOdooBaixa({ cargaId, paradaId, motivos }: { cargaId: numbe
       style={{ border: "2px dashed var(--status-warning)", color: "var(--status-warning)", opacity: ocupado ? 0.6 : 1, pointerEvents: ocupado ? "none" : "auto" }}
     >
       <span className="text-2xl leading-none">{icone}</span>
-      {enviandoFoto ? "Enviando…" : texto}
+      {preparandoFoto ? "Preparando…" : texto}
       <input
         key={`${capture ? "cam" : "gal"}-${inputKey}`}
         type="file"
@@ -81,7 +224,7 @@ export function ParadaOdooBaixa({ cargaId, paradaId, motivos }: { cargaId: numbe
         {...(capture ? { capture: "environment" as const } : {})}
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) void enviarFoto(f);
+          if (f) void adicionarFoto(f);
         }}
         className="hidden"
       />
@@ -95,7 +238,7 @@ export function ParadaOdooBaixa({ cargaId, paradaId, motivos }: { cargaId: numbe
           📝 Comprovante (foto do canhoto assinado)
         </h3>
         <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-          A foto fica guardada aqui e o link vai junto da baixa para o Odoo.
+          A foto vai junto com a baixa e o link segue para o Odoo. Sem sinal, fica guardada no celular até a rede voltar.
         </p>
         <div className="grid grid-cols-2 gap-2">
           {fotoLabel("Tirar foto", "📷", true)}
@@ -103,11 +246,21 @@ export function ParadaOdooBaixa({ cargaId, paradaId, motivos }: { cargaId: numbe
         </div>
         {fotos.length ? (
           <div className="flex gap-2 flex-wrap">
-            {fotos.map((u) => (
-              <a key={u} href={u} target="_blank" rel="noopener noreferrer">
+            {fotos.map((f) => (
+              <div key={f.id} className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={u} alt="Comprovante" className="h-20 w-20 object-cover rounded-lg border" style={{ borderColor: "var(--border)" }} />
-              </a>
+                <img src={f.preview} alt="Comprovante" className="h-20 w-20 object-cover rounded-lg border" style={{ borderColor: "var(--border)" }} />
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => removerFoto(f.id)}
+                  aria-label="Remover foto"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full text-xs font-bold"
+                  style={{ background: "var(--status-critical)", color: "#fff" }}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
         ) : null}
