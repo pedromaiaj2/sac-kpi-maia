@@ -1,0 +1,116 @@
+"use server";
+
+// Verbos do operador do CD sobre o Odoo (motor). Cada action: confere a
+// sessão (CD por PIN ou equipe admin/assistência), chama a ponte com o
+// nome do operador (fica no histórico do Odoo) e devolve o resultado como
+// dado -- ver ResultadoAcao em logisticaTipos.ts.
+
+import { revalidatePath } from "next/cache";
+import {
+  acaoEntrega,
+  acaoExtraCarga,
+  estornarEntrega,
+  executarAcaoCarga,
+  historicoEntrega,
+  listarDanfesCarga,
+  mensagemDeErro,
+  montarCarga,
+  reordenarParadas,
+} from "@/lib/odoo/logistica";
+import { exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
+import type {
+  AcaoCarga,
+  AcaoCargaResposta,
+  AcaoEntrega,
+  CargaDetalhe,
+  DanfeCarga,
+  EntregaOdoo,
+  HistoricoEntrega,
+  MontarCargaInput,
+  ResultadoAcao,
+} from "@/lib/odoo/logisticaTipos";
+
+const BASE = "/assistencia/logistica";
+
+async function executar<T>(fn: (operador: string) => Promise<T>, revalidar: string[] = []): Promise<ResultadoAcao<T>> {
+  try {
+    const op = await exigirOperadorLogistica();
+    const dados = await fn(op.operadorOdoo);
+    for (const p of revalidar) revalidatePath(p);
+    return { ok: true, dados };
+  } catch (err) {
+    console.error("[logistica-odoo]", err);
+    return { ok: false, erro: mensagemDeErro(err) };
+  }
+}
+
+const ACOES_CARGA: AcaoCarga[] = ["separacao", "conferir", "liberar", "sair", "finalizar"];
+
+export async function montarCargaAction(input: Omit<MontarCargaInput, "operador">): Promise<ResultadoAcao<CargaDetalhe>> {
+  return executar((operador) => montarCarga({ ...input, operador }), [`${BASE}/expedicao`, `${BASE}/cargas`]);
+}
+
+export async function acaoCargaAction(
+  cargaId: number,
+  acao: AcaoCarga,
+  extra: { motorista_id?: number | null; veiculo_id?: number | null } = {},
+): Promise<ResultadoAcao<AcaoCargaResposta>> {
+  if (!ACOES_CARGA.includes(acao)) return { ok: false, erro: `Ação inválida: ${acao}` };
+  return executar(
+    (operador) => executarAcaoCarga(cargaId, acao, { operador, motorista_id: extra.motorista_id, veiculo_id: extra.veiculo_id }),
+    [`${BASE}/cargas`, `${BASE}/cargas/${cargaId}`],
+  );
+}
+
+export async function reordenarParadasAction(cargaId: number, paradaIds: number[]): Promise<ResultadoAcao<CargaDetalhe>> {
+  return executar(() => reordenarParadas(cargaId, paradaIds), [`${BASE}/cargas/${cargaId}`]);
+}
+
+export async function editarCargaAction(
+  cargaId: number,
+  campo: "programar" | "descricao" | "transportadora",
+  valor: string,
+): Promise<ResultadoAcao<unknown>> {
+  if (campo === "programar" && valor && !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return { ok: false, erro: "Data no formato AAAA-MM-DD." };
+  return executar((operador) => acaoExtraCarga(cargaId, campo, valor || null, operador), [`${BASE}/cargas/${cargaId}`, `${BASE}/cargas`]);
+}
+
+export async function excluirCargaAction(cargaId: number): Promise<ResultadoAcao<unknown>> {
+  return executar((operador) => acaoExtraCarga(cargaId, "excluir", null, operador), [`${BASE}/cargas`, `${BASE}/expedicao`]);
+}
+
+// Baixa manual pelo CD (o Protheus chama de "Baixar Entrega"): parada vira
+// "entregue" com origem odoo, sem geo/foto.
+export async function baixarEntregaManualAction(cargaId: number, paradaId: number): Promise<ResultadoAcao<unknown>> {
+  return executar((operador) => acaoExtraCarga(cargaId, "baixar_entrega", paradaId, operador), [`${BASE}/cargas/${cargaId}`]);
+}
+
+export async function listarDanfesAction(cargaId: number): Promise<ResultadoAcao<DanfeCarga[]>> {
+  return executar(() => listarDanfesCarga(cargaId));
+}
+
+type AcaoEntregaSimples = Exclude<AcaoEntrega, "historico" | "estornar">;
+const ACOES_ENTREGA: AcaoEntregaSimples[] = ["pendencia", "fila", "transferir_filial", "programar", "anotar", "remover_da_carga"];
+
+export async function acaoEntregaAction(
+  pickingId: number,
+  acao: AcaoEntregaSimples,
+  valor: string | number | null,
+  cargaId?: number,
+): Promise<ResultadoAcao<EntregaOdoo>> {
+  if (!ACOES_ENTREGA.includes(acao)) return { ok: false, erro: `Ação inválida: ${acao}` };
+  if ((acao === "pendencia" || acao === "anotar") && !String(valor ?? "").trim()) return { ok: false, erro: "Escreva o texto." };
+  if (acao === "programar" && !/^\d{4}-\d{2}-\d{2}$/.test(String(valor ?? ""))) return { ok: false, erro: "Data no formato AAAA-MM-DD." };
+  if (acao === "transferir_filial" && !(Number(valor) > 0)) return { ok: false, erro: "Escolha a filial." };
+  const revalidar = [`${BASE}/expedicao`];
+  if (cargaId) revalidar.push(`${BASE}/cargas/${cargaId}`);
+  return executar((operador) => acaoEntrega(pickingId, acao, valor, operador), revalidar);
+}
+
+export async function estornarEntregaAction(pickingId: number): Promise<ResultadoAcao<{ estornada: string; retorno: string; nova: string }>> {
+  return executar((operador) => estornarEntrega(pickingId, operador), [`${BASE}/expedicao`]);
+}
+
+export async function historicoEntregaAction(pickingId: number): Promise<ResultadoAcao<HistoricoEntrega>> {
+  return executar((operador) => historicoEntrega(pickingId, operador));
+}
