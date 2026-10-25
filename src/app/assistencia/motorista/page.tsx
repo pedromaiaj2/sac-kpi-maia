@@ -17,6 +17,7 @@ import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia"
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, bucketByScheduledDate } from "@/lib/dateBuckets";
 import { ROTAS, ROTA_LABELS, getRotaWeekOverview, JP_DEFAULT_DRIVER, type Rota } from "@/lib/rotas";
 import { DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
+import { MotoristaOdooAbas } from "@/components/logisticaOdoo/MotoristaOdooAbas";
 
 // Rota e data no mesmo cabeçalho, lado a lado -- pedido do Victor
 // 18/08/2026: "a data... tem que aparecer ao lado da rota, não dentro".
@@ -124,6 +125,10 @@ export default async function MotoristaHomePage({
           }}
         />
       ) : null}
+
+      {/* Entregas de venda do Odoo (motor da logística) ao lado das trocas e
+          recolhimentos -- mesmo login PIN, ver /assistencia/motorista/odoo. */}
+      <MotoristaOdooAbas ativa="assistencia" />
 
       <div className="flex items-center gap-2">
         <Link
