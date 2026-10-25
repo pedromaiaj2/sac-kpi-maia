@@ -276,6 +276,10 @@ export type RegistrarParadaInput = {
   origem?: "app" | "odoo";
   motorista_id?: number | null;
   obs?: string | null; // Odoo corta em 500 caracteres
+  // UUID gerado no celular no toque do botão (fila offline da PWA). A ponte
+  // ainda IGNORA este campo (lê só os de cima com d.get) -- quando o Odoo
+  // aceitar, deve deduplicar por ele. Ver docs/LOGISTICA-ODOO.md (PWA).
+  evento_uid?: string | null;
 };
 
 // ---------------------------------------------------------------- funções puras
