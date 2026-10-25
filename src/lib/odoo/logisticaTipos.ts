@@ -394,3 +394,20 @@ export function montarObservacao(obs: string | null | undefined, fotoUrls: strin
 // Server Action por um texto genérico -- e o operador precisa ler o motivo
 // real que o Odoo deu (ex.: "liberar exige motorista + veículo").
 export type ResultadoAcao<T> = { ok: true; dados: T } | { ok: false; erro: string };
+
+// Pedidos de abastecimento das lojas (25/10/2026): a loja pede no caixa,
+// o CD atende aqui -> NF 5152 CD -> loja (maia_caixa/abastecimento_loja.py).
+export type ItemSolicitacaoAbast = { codigo: string; nome: string; qtd: number; saldo_cd: number; saldo_loja: number };
+export type SolicitacaoAbast = {
+  id: number;
+  nome: string;
+  loja: string;
+  company_id: number;
+  estado: "aberta" | "cancelada" | string;
+  criado: string;
+  obs: string;
+  solicitante: string;
+  itens: ItemSolicitacaoAbast[];
+  historico: { data: string; texto: string }[];
+};
+export type AtenderAbastResposta = { saida?: string; entrada?: string; numero?: string | number; solicitacao?: SolicitacaoAbast };

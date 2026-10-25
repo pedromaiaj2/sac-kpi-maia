@@ -16,6 +16,8 @@ import {
   mensagemDeErro,
   montarCarga,
   reordenarParadas,
+  atenderSolicitacaoAbast,
+  cancelarSolicitacaoAbast,
 } from "@/lib/odoo/logistica";
 import { exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import type {
@@ -28,6 +30,7 @@ import type {
   HistoricoEntrega,
   MontarCargaInput,
   ResultadoAcao,
+  AtenderAbastResposta,
 } from "@/lib/odoo/logisticaTipos";
 
 const BASE = "/assistencia/logistica";
@@ -113,4 +116,16 @@ export async function estornarEntregaAction(pickingId: number): Promise<Resultad
 
 export async function historicoEntregaAction(pickingId: number): Promise<ResultadoAcao<HistoricoEntrega>> {
   return executar((operador) => historicoEntrega(pickingId, operador));
+}
+
+// Pedido de abastecimento da loja: CD atende (NF 5152 CD -> loja) ou cancela.
+export async function atenderAbastAction(id: number, itens: { codigo: string; qtd: number }[]): Promise<ResultadoAcao<AtenderAbastResposta>> {
+  const lista = itens.filter((i) => i.codigo && Number(i.qtd) > 0).map((i) => ({ codigo: i.codigo, qtd: Number(i.qtd) }));
+  if (!lista.length) return { ok: false, erro: "Nada para atender: as quantidades estão zeradas." };
+  return executar((operador) => atenderSolicitacaoAbast(id, lista, operador), [`${BASE}/abastecimento`]);
+}
+
+export async function cancelarAbastAction(id: number, motivo: string): Promise<ResultadoAcao<unknown>> {
+  if (!motivo.trim()) return { ok: false, erro: "Escreva o motivo do cancelamento." };
+  return executar((operador) => cancelarSolicitacaoAbast(id, operador, motivo.trim()), [`${BASE}/abastecimento`]);
 }

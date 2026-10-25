@@ -29,6 +29,8 @@ import type {
   MontarCargaInput,
   RegistrarParadaInput,
   ResultadoParadaResposta,
+  SolicitacaoAbast,
+  AtenderAbastResposta,
 } from "./logisticaTipos";
 
 if (typeof window !== "undefined") {
@@ -280,4 +282,31 @@ export function mensagemDeErro(err: unknown): string {
   if (err instanceof OdooBridgeError) return err.message;
   if (err instanceof Error) return err.message;
   return "Erro inesperado ao falar com o Odoo.";
+}
+
+// ---- Pedidos de abastecimento das lojas (25/10/2026) --------------------
+export async function listarSolicitacoesAbast(dias = 60): Promise<SolicitacaoAbast[]> {
+  const r = await json<{ solicitacoes: SolicitacaoAbast[] }>("/abastecimento", {
+    perfil: "logistica",
+    query: { estado: "aberta", dias },
+  });
+  return r.solicitacoes ?? [];
+}
+
+export async function atenderSolicitacaoAbast(
+  id: number,
+  itens: { codigo: string; qtd: number }[],
+  operador: string,
+): Promise<AtenderAbastResposta> {
+  // emite a NF-e 5152 (transmissão SEFAZ) -> mesmo prazo do "sair em rota"
+  return json<AtenderAbastResposta>(`/abastecimento/${id}/atender`, {
+    perfil: "logistica",
+    metodo: "POST",
+    corpo: { itens, operador },
+    timeoutMs: TIMEOUT_FATURAMENTO_MS,
+  });
+}
+
+export async function cancelarSolicitacaoAbast(id: number, operador: string, motivo: string): Promise<unknown> {
+  return json(`/abastecimento/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { operador, motivo } });
 }
